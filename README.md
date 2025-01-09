@@ -258,5 +258,5 @@ Alceste Scalas - [**alcsc**](https://people.compute.dtu.dk/alcsc/) - [**github**
 [issues-url]: https://github.com/fio-fsharp/fio/issues
 [license-shield]: https://img.shields.io/github/license/fio-fsharp/fio.svg?style=for-the-badge
 [license-url]: https://github.com/fio-fsharp/fio/blob/main/LICENSE.md
-[nuget-shield]: https://img.shields.io/nuget/FIO.svg?style=plastic
+[nuget-shield]: https://img.shields.io/nuget/v/FIO.svg?style=for-the-badge
 [nuget-url]: https://www.nuget.org/packages/FIO/0.0.9-alpha
