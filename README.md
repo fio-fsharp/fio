@@ -35,11 +35,11 @@
 
 
 ## Introduction
-**FIO** is a type-safe, highly concurrent and asynchronous library for the [F#](https://fsharp.org/) programming language. Based on pure functional programming principles, it serves as an embedded [**domain-specific language (DSL)**](https://martinfowler.com/dsl.html) empowering developers to craft type-safe, concurrent and maintainable programs with ease using functional effects.
+**FIO** is a type-safe, highly concurrent and asynchronous library for the [**F#**](https://fsharp.org/) programming language. Based on pure functional programming principles, it serves as an embedded [**domain-specific language (DSL)**](https://martinfowler.com/dsl.html) empowering developers to craft type-safe, concurrent and maintainable programs with ease using functional effects.
 
 Harnessing concepts from functional programming, **FIO** simplifies the creation of scalable and efficient concurrent applications. It introduces the **IO monad** to manage expressions with side effects and employs “green threads” (also known as fibers) for scalable and efficient concurrency. **FIO** aims to provide an environment similar to that of [**ZIO**](https://zio.dev/), drawing inspiration from both [**ZIO**](https://zio.dev/) and [**Cats Effect**](https://typelevel.org/cats-effect/).
 
-**FIO** was initially developed as part of a master's thesis in Computer Science and Engineering at the [Technical University of Denmark (DTU)](https://www.dtu.dk/english/). You can read the thesis, which provides more details about **FIO**, [here](https://iyyel.io/assets/doc/masters_thesis_daniel_larsen.pdf). Some parts may -- however -- be outdated as development continues.
+**FIO** was initially developed as part of a master's thesis in Computer Science and Engineering at the [**Technical University of Denmark (DTU)**](https://www.dtu.dk/english/). You can read the thesis, which provides more details about **FIO**, [**here**](https://iyyel.io/assets/doc/masters_thesis_daniel_larsen.pdf). Some parts may - however - be outdated as development continues.
 
 **DISCLAIMER:** **FIO** is in early development stages and a lot of improvements and enhancements can be made. If you think the project sounds interesting, do not hesitate to create a PR or contact me for further information or assistance.
 
@@ -48,42 +48,67 @@ Harnessing concepts from functional programming, **FIO** simplifies the creation
 ## Built With
 **FIO** is built using the following technologies:
 
-* [F#](https://fsharp.org/)
-* [.NET](https://dotnet.microsoft.com/en-us/)
+* [**F#**](https://fsharp.org/)
+* [**.NET**](https://dotnet.microsoft.com/en-us/)
 
 
 
 ## Getting Started
 It is easy to get started with **FIO**.
 
-* Download and install [.NET](https://dotnet.microsoft.com/en-us/)
-* Download and install a compatible IDE such as [Visual Studio](https://visualstudio.microsoft.com/downloads/) or [Rider](https://www.jetbrains.com/rider/download/), or a text editor like [Visual Studio Code](https://code.visualstudio.com/).
+* Download and install [**.NET**](https://dotnet.microsoft.com/en-us/)
+* Download and install a compatible IDE such as [**Visual Studio**](https://visualstudio.microsoft.com/downloads/) or [**Rider**](https://www.jetbrains.com/rider/download/), or a text editor like [**Visual Studio Code**](https://code.visualstudio.com/).
 
 * Download or clone this repository
 * Open it in your IDE or text editor of choice
-* Navigate to the _Examples_ project and check out the example programs or create a new file to start using **FIO**
+* Navigate to the [**FIO.Examples**](https://github.com/fio-fsharp/fio/tree/dev/src/FIO.Examples) project and check out the example programs or create a new file to start using **FIO**
 
 
 
 ## Usage
-Create a new class and import the library using "open FSharp.FIO". For example:
+
+There are two ways of using **FIO**. For simple usage, it is possible to create effects directly and execute them using a runtime.
+For more advanced used, it is advised to create a **FIO** application and then execute the application.
+
+### Simple usage
+Create a new F# file and import the library using "open FSharp.FIO" in either the cloned repository or a project with the **FIO** NuGet package installed. For example:
 
 ```fsharp
-open FSharp.FIO
+module SimpleUsage
+
+open System
+
+open FIO.Core
+open FIO.Runtime.Advanced
 
 [<EntryPoint>]
 let main _ =
-  let askForName =
-    fio (fun () -> printfn "%s" "Hello! What is your name?")
-    >> fun _ ->
-    fio (fun () -> Console.ReadLine())
-    >> fun name ->
-    fio (fun () -> printfn $"Hello, %s{name}, welcome to FIO!")
+    let askForName = fio {
+        do! !+ printfn("Hello! What is your name?")
+        let! name = !+ Console.ReadLine()
+        do! !+ printfn($"Hello, %s{name}, welcome to FIO! 🪻💜")
+    }
 
-  let fiber = Advanced.Runtime().Run askForName
-  let result = fiber.Await()
-  printfn $"%A{result}"
+    let fiber = AdvancedRuntime().Run askForName
+    let result = fiber.AwaitResult()
+    printfn $"%A{result}"
+    exit 0
 ```
+
+You can then execute the program with
+
+```$ dotnet run```
+
+and you'll see
+
+```
+Hello! What is your name?
+Daniel
+Hello, Daniel, welcome to FIO! 🪻💜
+Ok ()
+```
+
+### Advanced usage
 
 
 
