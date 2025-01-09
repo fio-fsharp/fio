@@ -40,7 +40,7 @@
 
 Harnessing concepts from functional programming, **FIO** simplifies the creation of scalable and efficient concurrent applications. It introduces the **IO monad** to manage expressions with side effects and employs “green threads” (also known as fibers) for scalable and efficient concurrency. **FIO** aims to provide an environment similar to that of [**ZIO**](https://zio.dev/), drawing inspiration from both [**ZIO**](https://zio.dev/) and [**Cats Effect**](https://typelevel.org/cats-effect/).
 
-**FIO** was initially developed as part of a master's thesis in Computer Science and Engineering at the [**Technical University of Denmark (DTU)**](https://www.dtu.dk/english/). You can read the thesis, which provides more details about **FIO**, [**here**](https://iyyel.io/assets/doc/masters_thesis_daniel_larsen.pdf). Some parts may - however - be outdated as development continues.
+**FIO** was initially developed as part of a master's thesis in Computer Science and Engineering at the [**Technical University of Denmark (DTU)**](https://www.dtu.dk/english/). You can read the thesis, which provides more details about **FIO**, [**here**](https://iyyel.io/assets/doc/masters_thesis_daniel_larsen.pdf). Some parts may be outdated as development continues.
 
 **DISCLAIMER:** **FIO** is in early development stages and a lot of improvements and enhancements can be made. If you think the project sounds interesting, do not hesitate to create a PR or contact me for further information or assistance.
 
@@ -58,7 +58,7 @@ Harnessing concepts from functional programming, **FIO** simplifies the creation
 It is easy to get started with **FIO**.
 
 * Download and install [**.NET**](https://dotnet.microsoft.com/en-us/)
-* Download and install a compatible IDE such as [**Visual Studio**](https://visualstudio.microsoft.com/downloads/) or [**Rider**](https://www.jetbrains.com/rider/download/), or a text editor like [**Visual Studio Code**](https://code.visualstudio.com/).
+* Download and install a compatible IDE such as [**Visual Studio**](https://visualstudio.microsoft.com/downloads/) or [**Rider**](https://www.jetbrains.com/rider/download/), or a text editor like [**Visual Studio Code**](https://code.visualstudio.com/)
 
 * Download or clone this repository
 * Open it in your IDE or text editor of choice
