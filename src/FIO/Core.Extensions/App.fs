@@ -54,7 +54,7 @@ type FIOApp<'R, 'E> (successHandler: 'R -> unit, errorHandler: 'E -> unit, runti
         app.Run()
 
     static member Run(app: FIOApp<'R, 'E>, runtime: Runtime) =
-        app.Run(runtime)
+        app.Run runtime
 
     static member Run(effect: FIO<'R, 'E>) =
         let fiber = defaultRuntime.Run effect
@@ -64,7 +64,7 @@ type FIOApp<'R, 'E> (successHandler: 'R -> unit, errorHandler: 'E -> unit, runti
         app.AwaitResult()
 
     static member AwaitResult(app: FIOApp<'R, 'E>, runtime: Runtime) =
-        app.AwaitResult(runtime)
+        app.AwaitResult runtime
 
     static member AwaitResult(effect: FIO<'R, 'E>) =
         let fiber = defaultRuntime.Run effect
@@ -87,7 +87,7 @@ type FIOApp<'R, 'E> (successHandler: 'R -> unit, errorHandler: 'E -> unit, runti
         mergeFiber successHandler errorHandler fiber
 
     member this.AwaitResult() =
-        this.AwaitResult(runtime)
+        this.AwaitResult runtime
 
     member this.AwaitResult(runtime: Runtime) =
         let fiber = runtime.Run this.effect

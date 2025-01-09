@@ -50,7 +50,7 @@ module internal FIOBuilderHelper =
     let inline internal While(guard: unit -> bool) (effect: FIO<'R, 'E>) : FIO<unit, 'E> =
         let rec loop () =
             if guard () then
-                Delay (fun () -> effect >> loop ())
+                Delay <| fun () -> effect >> loop ()
             else
                 !+ ()
         loop ()
