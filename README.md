@@ -3,6 +3,7 @@
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 [![MIT License][license-shield]][license-url]
+[![NuGet][nuget-shield]][nuget-url]
 
 
 
@@ -257,3 +258,5 @@ Alceste Scalas - [**alcsc**](https://people.compute.dtu.dk/alcsc/) - [**github**
 [issues-url]: https://github.com/fio-fsharp/fio/issues
 [license-shield]: https://img.shields.io/github/license/fio-fsharp/fio.svg?style=for-the-badge
 [license-url]: https://github.com/fio-fsharp/fio/blob/main/LICENSE.md
+[nuget-shield]: https://img.shields.io/nuget/FIO.svg?style=plastic
+[nuget-url]: https://www.nuget.org/packages/FIO/0.0.9-alpha
