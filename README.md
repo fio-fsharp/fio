@@ -61,20 +61,19 @@ It is easy to get started with **FIO**.
 
 * Download or clone this repository
 * Open it in your IDE or text editor of choice
-* Navigate to the [**FIO.Examples**](https://github.com/fio-fsharp/fio/tree/dev/src/FIO.Examples) project and check out the example programs or create a new file to start using **FIO**
+* Navigate to the [**FIO.Examples**](https://github.com/fio-fsharp/fio/tree/dev/src/FIO.Examples) project and check out the example programs or create a new F# file to start using **FIO**
 
 
 
 ## Usage
 
-There are two ways of using **FIO**. For simple usage, it is possible to create effects directly and execute them using a runtime.
-For more advanced used, it is advised to create a **FIO** application and then execute the application.
+There are currently two ways of using **FIO**. It is possible to create effects directly and execute them using one of **FIO**'s runtime systems. This gives the developer more control over the runtime and how the effect is executed. The core **FIO** library provides a **FIOApp** type which encapsulates elements such as the runtime which way not the important for the developer.
 
-### Simple usage
-Create a new F# file and import the library using "open FSharp.FIO" in either the cloned repository or a project with the **FIO** NuGet package installed. For example:
+### Direct usage of effects
+Create a new F# file and import the library using ```open FIO.Core``` in either the cloned repository or a project with the **FIO** NuGet package installed. To use **FIO**'s advanced runtime, add ```open FIO.Runtime.Advanced``` as well. For example:
 
 ```fsharp
-module SimpleUsage
+module DirectUsage
 
 open System
 
@@ -108,7 +107,52 @@ Hello, Daniel, welcome to FIO! 🪻💜
 Ok ()
 ```
 
-### Advanced usage
+### FIOApp usage
+
+In general it is recommended to create a type extending the **FIOApp** type A **FIOApp** is essentially a wrapper around the effect which hides elements such as the runtime system and makes it possible for to write cleaner **FIO** programs. For example:
+
+```fsharp
+module FIOAppUsage
+
+open System
+
+open FIO.Core
+
+type WelcomeApp() =
+    inherit FIOApp<unit, obj>()
+
+    override this.effect = fio {
+        do! !+ printfn("Hello! What is your name?")
+        let! name = !+ Console.ReadLine()
+        do! !+ printfn($"Hello, %s{name}, welcome to FIO! 🪻💜")
+    }
+  
+WelcomeApp().Run()
+```
+
+Once again, you can execute the **FIOApp** using
+
+```$ dotnet run```
+
+and you'll see the same result as before
+
+```
+Hello! What is your name?
+Daniel
+Hello, Daniel, welcome to FIO! 🪻💜
+Ok ()
+```
+
+As a side note, it is also possible to avoid using the **FIO** computation expression and instead directly use the **FIO** DSL (which will be shown later). The above example would then look like this:
+
+```fsharp
+let askForName =
+    !+ printfn("Hello! What is your name?") >>= fun _ ->
+    !+ Console.ReadLine() >>= fun name ->
+    !+ printfn($"Hello, %s{name}, welcome to FIO! 🪻💜")
+```
+
+where ```>>=``` is **FIO**'s bind function.
 
 
 
