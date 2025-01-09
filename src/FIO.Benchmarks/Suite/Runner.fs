@@ -4,7 +4,7 @@
 (* All rights reserved                                                              *)
 (************************************************************************************)
 
-module internal rec FIO.Benchmark.Suite.Runner
+module internal FIO.Benchmarks.Suite.Runner
 
 open FIO.Core
 open FIO.Runtime
@@ -15,31 +15,14 @@ open FIO.Runtime.Deadlocking
 
 open System
 open System.IO
+open System.Globalization
 
-type PingpongConfig =
-    { Rounds: int }
-
-and ThreadringConfig =
-    { Actors: int
-      Rounds: int }
-
-and BigConfig =
-    { Actors: int
-      RoundCount: int }
-
-and BangConfig =
-    { Actors: int
-      Rounds: int }
-
-and ForkConfig = 
-    { Actors: int }
-
-and BenchmarkConfig =
-    | PingpongC of PingpongConfig
-    | ThreadringC of ThreadringConfig
-    | BigC of BigConfig
-    | BangC of BangConfig
-    | ForkC of ForkConfig
+type BenchmarkConfig =
+    | PingpongConfig of Rounds: int
+    | ThreadringConfig of Actors: int * Rounds: int
+    | BigConfig of Actors: int * Rounds: int
+    | BangConfig of Actors: int * Rounds: int
+    | ForkConfig of Actors: int
 
 and EvalFunc = FIO<int64, obj> -> Fiber<int64, obj>
 
@@ -48,11 +31,11 @@ and BenchmarkResult = string * BenchmarkConfig * string * string * (int * int64)
 let private writeResultsToCsv (result: BenchmarkResult) =
     let configStr config =
         match config with
-        | PingpongC config -> $"roundcount%i{config.Rounds}"
-        | ThreadringC config -> $"processcount%i{config.Actors}-roundcount%i{config.Rounds}"
-        | BigC config -> $"processcount%i{config.Actors}-roundcount%i{config.RoundCount}"
-        | BangC config -> $"processcount%i{config.Actors}-roundcount%i{config.Rounds}"
-        | ForkC config -> $"processcount%i{config.Actors}"
+        | PingpongConfig rounds -> $"rounds-%i{rounds}"
+        | ThreadringConfig (actors, rounds) -> $"actors-%i{actors}-rounds-%i{rounds}"
+        | BigConfig (actors, rounds) -> $"actors-%i{actors}-rounds-%i{rounds}"
+        | BangConfig (actors, rounds) -> $"actors-%i{actors}-rounds-%i{rounds}"
+        | ForkConfig actors -> $"actors-%i{actors}"
 
     let rec fileContentStr times acc =
         match times with
@@ -71,22 +54,9 @@ let private writeResultsToCsv (result: BenchmarkResult) =
             Environment.ExpandEnvironmentVariables("%HOMEDRIVE%%HOMEPATH%")
 
     let benchName, config, runtimeFileName, _, times = result
-
-    let configStr = configStr config
-    let runStr = times.Length.ToString() + "runs"
-    let folderName = benchName.ToLower() + "-" + configStr + "-" + runStr
-
-    let fileName =
-        folderName
-        + "-"
-        + runtimeFileName.ToLower()
-        + "-"
-        + DateTime.Now.ToString("dd-MM-yyyy-HH-mm-ss")
-        + ".csv"
-
-    let dirPath =
-        homePath + @"\fio\benchmarks\" + folderName + @"\" + runtimeFileName.ToLower()
-
+    let folderName = $"{benchName.ToLower()}-{configStr config}-runs-{times.Length.ToString()}"
+    let fileName = $"""{folderName}-{runtimeFileName.ToLower()}-{DateTime.Now.ToString("dd_MM_yyyy-HH-mm-ss")}.csv"""
+    let dirPath = homePath + @"\fio\benchmarks\" + folderName + @"\" + runtimeFileName.ToLower()
     let filePath = dirPath + @"\" + fileName
 
     if (not <| Directory.Exists(dirPath)) then
@@ -94,31 +64,39 @@ let private writeResultsToCsv (result: BenchmarkResult) =
     else
         ()
 
-    let fileContent = fileContentStr times ""
-    printfn $"\nSaving benchmark results to '%s{filePath}'"
-    File.WriteAllText(filePath, headerStr + "\n" + fileContent)
+    printfn $"\nSaved benchmark results to '%s{filePath}'"
+    File.WriteAllText(filePath, headerStr + "\n" + fileContentStr times "")
 
 let private benchStr config =
+    let ci = CultureInfo("en-US")
     match config with
-    | PingpongC config -> $"Pingpong (RoundCount: %i{config.Rounds})"
-    | ThreadringC config -> $"Threadring (ProcessCount: %i{config.Actors} RoundCount: %i{config.Rounds})"
-    | BigC config -> $"Big (ProcessCount: %i{config.Actors} RoundCount: %i{config.RoundCount})"
-    | BangC config -> $"Bang (ProcessCount: %i{config.Actors} RoundCount: %i{config.Rounds})"
-    | ForkC config -> $"Fork (ProcessCount: %i{config.Actors})"
+    | PingpongConfig rounds -> $"""Pingpong (Rounds: %s{rounds.ToString("N0", ci)})"""
+    | ThreadringConfig (actors, rounds) -> $"""Threadring (Actors: %s{actors.ToString("N0", ci)} Rounds: %s{rounds.ToString("N0", ci)})"""
+    | BigConfig (actors, rounds) -> $"""Big (Actors: %s{actors.ToString("N0", ci)} Rounds: %s{rounds.ToString("N0", ci)})"""
+    | BangConfig (actors, rounds) -> $"""Bang (Actors: %s{actors.ToString("N0", ci)} Rounds: %s{rounds.ToString("N0", ci)})"""
+    | ForkConfig actors -> $"""Fork (Actors: %s{actors.ToString("N0", ci)})"""
 
 let private printResult (result: BenchmarkResult) =
-    let rec runExecTimesStr runExecTimes acc =
+    let rec runExecTimesStr runExecTimes allTimes acc =
         match runExecTimes with
         | [] ->
+            let onlyTimes = List.map snd allTimes
+            let sum = List.sum onlyTimes
+            let count = List.length onlyTimes
+            let average = (float sum / float count)
             (acc
+                + "│                                                                           │\n"
+                + "│                                    Average time (ms)                      │\n"
+                + "│                                    ─────────────────────────────────────  │\n"
+               + $"│                                    %-35f{average}    │\n"
                 + "└───────────────────────────────────────────────────────────────────────────┘")
         | (run, time) :: ts ->
             let str = $"│  #%-10i{run}                       %-35i{time}    │\n"
-            runExecTimesStr ts (acc + str)
+            runExecTimesStr ts allTimes (acc + str)
 
     let _, config, _, runtimeName, times = result
     let benchName = benchStr config
-    let runExecTimesStr = runExecTimesStr times ""
+    let runExecTimesStr = runExecTimesStr times times ""
 
     let headerStr =
         $"
@@ -149,13 +127,13 @@ let private runBenchmark config runs (runtime: Runtime) : BenchmarkResult =
 
     let createBenchmark config =
         match config with
-        | PingpongC config -> ("Pingpong", Pingpong.Create config.Rounds)
-        | ThreadringC config -> ("Threadring", Threadring.Create config.Actors config.Rounds)
-        | BigC config -> ("Big", Big.Create config.Actors config.RoundCount)
-        | BangC config -> ("Bang", Bang.Create config.Actors config.Rounds)
-        | ForkC config -> ("Fork", Fork.Create config.Actors)
+        | PingpongConfig rounds -> ("Pingpong", Pingpong.Create rounds)
+        | ThreadringConfig (actors, rounds) -> ("Threadring", Threadring.Create actors rounds)
+        | BigConfig (actors, rounds) -> ("Big", Big.Create actors rounds)
+        | BangConfig (actors, rounds) -> ("Bang", Bang.Create actors rounds)
+        | ForkConfig actors -> ("Fork", Fork.Create actors)
 
-    let rec executeBenchmark config curRun acc =
+    let rec executeBenchmark config curRun acc =    
         let bench, eff = createBenchmark config
 
         match curRun with
@@ -179,20 +157,15 @@ let private runBenchmark config runs (runtime: Runtime) : BenchmarkResult =
 let Run configs runtime runs (processCountInc, incTimes) =
     let newConfig config incTime =
         match config with
-        | PingpongC config -> PingpongC config
-        | ThreadringC config ->
-            ThreadringC
-                { Rounds = config.Rounds
-                  Actors = config.Actors + (processCountInc * incTime) }
-        | BigC config ->
-            BigC
-                { RoundCount = config.RoundCount
-                  Actors = config.Actors + (processCountInc * incTime) }
-        | BangC config ->
-            BangC
-                { Rounds = config.Rounds
-                  Actors = config.Actors + (processCountInc * incTime) }
-        | ForkC config -> ForkC { Actors = config.Actors + (processCountInc * incTime) }
+        | PingpongConfig rounds -> PingpongConfig rounds
+        | ThreadringConfig (actors, rounds) ->
+            ThreadringConfig (actors + (processCountInc * incTime), rounds)
+        | BigConfig (actors, rounds) ->
+            BigConfig (actors + (processCountInc * incTime), rounds)
+        | BangConfig (actors, rounds) ->
+            BangConfig (actors + (processCountInc * incTime), rounds)
+        | ForkConfig actors ->
+            ForkConfig (actors + (processCountInc * incTime))
 
     let configs =
         configs

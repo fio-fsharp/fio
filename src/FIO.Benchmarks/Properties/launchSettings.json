@@ -2,7 +2,7 @@
   "profiles": {
     "Benchmarks": {
       "commandName": "Project",
-      "commandLineArgs": "--naive-runtime --runs 1 --threadring 2 1"
+      "commandLineArgs": "--advanced-runtime 7 1 15 --runs 10 --fork 100000"
     }
   }
 }

@@ -4,7 +4,7 @@
 (* All rights reserved                                                              *)
 (************************************************************************************)
 
-module rec FIO.Runtime.Naive
+module FIO.Runtime.Naive
 
 open FIO.Core
 

@@ -4,7 +4,7 @@
 (* All rights reserved                                                              *)
 (************************************************************************************)
 
-module rec FIO.Runtime.Deadlocking
+module FIO.Runtime.Deadlocking
 
 open FIO.Core
 

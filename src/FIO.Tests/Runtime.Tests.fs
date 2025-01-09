@@ -4,7 +4,7 @@
 (* All rights reserved                                                              *)
 (************************************************************************************)
 
-module private FIO.Test
+module private FIO.Tests
 
 #nowarn "0988"
 
@@ -18,7 +18,7 @@ open FIO.Runtime.Intermediate
 open FIO.Runtime.Advanced
 
 [<TestFixture>]
-type internal RuntimeTests() =
+type private RuntimeTests() =
 
     let getSuccessResult (result: Result<'R, 'E>, expected: 'R) =
         match result with

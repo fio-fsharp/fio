@@ -9,48 +9,43 @@
 (* (http://soft.vub.ac.be/AGERE14/papers/ageresplash2014_submission_19.pdf)         *)
 (************************************************************************************)
 
-module internal rec FIO.Benchmark.Suite.Big
+module internal FIO.Benchmarks.Suite.Big
 
 open FIO.Core
 
-open FIO.Benchmark.Tools.Timing.ChannelTimer
+open FIO.Benchmarks.Tools.Timing.ChannelTimer
 
 type private Message =
     | Ping of int * Channel<Message>
     | Pong of int
 
-type private Process =
+type private Actor =
     { Name: string
-      ChanRecvPing: Channel<Message>
-      ChanRecvPong: Channel<Message>
-      ChansSend: Channel<Message> list }
+      PingReceivingChannel: Channel<Message>
+      PongReceivingChannel: Channel<Message>
+      SendingChannels: Channel<Message> list }
 
-let private createProcess proc msg roundCount timerChan goChan =
-    let rec createSendPings chans roundCount =
-        if List.length chans = 0 then
-            createRecvPings proc.ChansSend.Length roundCount
+let private createActor actor message roundCount timerChan goChan =
+
+    let rec createSendPings rounds channels = fio {
+        if List.length channels = 0 then
+            return! createRecvPings actor.SendingChannels.Length rounds
         else
-            let x = msg
-            let msg = Ping(x, proc.ChanRecvPong)
-            let chan, chans = (List.head chans, List.tail chans)
-
-            msg --> chan
-            >>= fun _ ->
-#if DEBUG
-                printfn $"DEBUG: %s{proc.Name} sent ping: %i{x}"
-#endif
-                createSendPings chans roundCount
+            let! channel, rest = !+ (List.head channels, List.tail channels)
+            do! channel <!- Ping (message, actor.PongReceivingChannel)
+            return! createSendPings rounds rest
+    }
 
     and createRecvPings recvCount roundCount =
         if recvCount = 0 then
-            createRecvPongs proc.ChansSend.Length roundCount
+            createRecvPongs actor.SendingChannels.Length roundCount
         else
-            !--> proc.ChanRecvPing
+            !--> actor.PingReceivingChannel
             >>= fun msg ->
                 match msg with
                 | Ping(x, replyChan) ->
 #if DEBUG
-                    printfn $"DEBUG: %s{proc.Name} received ping: %i{x}"
+                    printfn $"DEBUG: %s{actor.Name} received ping: %i{x}"
 #endif
                     let y = x + 1
                     let msgReply = Pong y
@@ -58,7 +53,7 @@ let private createProcess proc msg roundCount timerChan goChan =
                     msgReply --> replyChan
                     >>= fun _ ->
 #if DEBUG
-                        printfn $"DEBUG: %s{proc.Name} sent pong: %i{y}"
+                        printfn $"DEBUG: %s{actor.Name} sent pong: %i{y}"
 #endif
                         createRecvPings (recvCount - 1) roundCount
                 | _ -> failwith "createRecvPings: Received pong when ping should be received!"
@@ -68,22 +63,22 @@ let private createProcess proc msg roundCount timerChan goChan =
             if roundCount = 0 then
                 TimerMessage.Stop --> timerChan
             else
-                createSendPings proc.ChansSend (roundCount - 1)
+                createSendPings (roundCount - 1) actor.SendingChannels
         else
-            !--> proc.ChanRecvPong
+            !--> actor.PongReceivingChannel
             >>= fun msg ->
                 match msg with
                 | Pong x ->
 #if DEBUG
-                    printfn $"DEBUG: %s{proc.Name} received pong: %i{x}"
+                    printfn $"DEBUG: %s{actor.Name} received pong: %i{x}"
 #endif
                     createRecvPongs (recvCount - 1) roundCount
                 | _ -> failwith "createRecvPongs: Received ping when pong should be received!"
 
     TimerMessage.Start --> timerChan
-    >>= fun _ -> !--> goChan >>= fun _ -> createSendPings proc.ChansSend (roundCount - 1)
+    >>= fun _ -> !--> goChan >>= fun _ -> createSendPings (roundCount - 1) actor.SendingChannels
 
-let Create processCount roundCount : FIO<int64, obj> =
+let Create processCount roundCount : FIO<BenchmarkResult, obj> =
     let rec createProcesses processCount =
         let rec createRecvChanProcesses processCount acc =
             match processCount with
@@ -91,9 +86,9 @@ let Create processCount roundCount : FIO<int64, obj> =
             | count ->
                 let proc =
                     { Name = $"p{count - 1}"
-                      ChanRecvPing = Channel<Message>()
-                      ChanRecvPong = Channel<Message>()
-                      ChansSend = [] }
+                      PingReceivingChannel = Channel<Message>()
+                      PongReceivingChannel = Channel<Message>()
+                      SendingChannels = [] }
 
                 createRecvChanProcesses (count - 1) (acc @ [ proc ])
 
@@ -102,13 +97,13 @@ let Create processCount roundCount : FIO<int64, obj> =
             | [] -> acc
             | p :: ps ->
                 let otherProcs = prevRecvChanProcs @ ps
-                let chansSend = List.map (fun p -> p.ChanRecvPing) otherProcs
+                let chansSend = List.map (fun p -> p.PingReceivingChannel) otherProcs
 
                 let proc =
                     { Name = p.Name
-                      ChanRecvPing = p.ChanRecvPing
-                      ChanRecvPong = p.ChanRecvPong
-                      ChansSend = chansSend }
+                      PingReceivingChannel = p.PingReceivingChannel
+                      PongReceivingChannel = p.PongReceivingChannel
+                      SendingChannels = chansSend }
 
                 create ps (prevRecvChanProcs @ [ p ]) (proc :: acc)
 
@@ -119,7 +114,7 @@ let Create processCount roundCount : FIO<int64, obj> =
         match procs with
         | [] -> acc
         | p :: ps ->
-            let eff = createProcess p msg roundCount timerChan goChan <!> acc
+            let eff = createActor p msg roundCount timerChan goChan <!> acc
             createBig ps (msg + 10) timerChan goChan eff
 
     let procs = createProcesses processCount
@@ -133,10 +128,10 @@ let Create processCount roundCount : FIO<int64, obj> =
     let goChan = Channel<int>()
 
     let effEnd =
-        createProcess pa (10 * (processCount - 2)) roundCount timerChan goChan
-        <!> createProcess pb (10 * (processCount - 1)) roundCount timerChan goChan
+        createActor pa (10 * (processCount - 2)) roundCount timerChan goChan
+        <!> createActor pb (10 * (processCount - 1)) roundCount timerChan goChan
 
-    ! (TimerEffect processCount processCount processCount timerChan)
+    ! TimerEffect(processCount, processCount, processCount, timerChan)
     >>= fun fiber ->
         (TimerMessage.MessageChannel goChan) --> timerChan
         >>= fun _ ->

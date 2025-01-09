@@ -4,9 +4,9 @@
 (* All rights reserved                                                            *)
 (**********************************************************************************)
 
-module internal Program
+module private Program
 
-open FIO.Benchmark.Suite.Runner
+open FIO.Benchmarks.Suite.Runner
 
 open System.Threading
 

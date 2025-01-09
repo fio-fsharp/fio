@@ -5,7 +5,7 @@
 (************************************************************************************)
 
 [<AutoOpen>]
-module rec FIO.Core.DSL
+module FIO.Core.DSL
 
 open System.Collections.Concurrent
 open System.Threading
@@ -169,43 +169,48 @@ and FIO<'R, 'E> =
         let fiber = new Fiber<'R, 'E>()
         Concurrent (this.Upcast(), fiber, fiber.ToInternal())
 
-    /// BindOnSuccess binds a continuation to the success result of an effect.
+    /// Bind binds a continuation to the success result of an effect.
     /// If the effect fails, the error is immediately returned.
-    member this.BindOnSuccess(continuation: 'R -> FIO<'R1, 'E>) : FIO<'R1, 'E> =
+    member this.Bind(continuation: 'R -> FIO<'R1, 'E>) : FIO<'R1, 'E> =
         ChainSuccess (this.UpcastResult(), fun result -> continuation (result :?> 'R))
 
-    /// BindOnError binds a continuation to the error result of an effect.
+    /// BindError binds a continuation to the error result of an effect.
     /// If the effect succeeds, the result is immediately returned.
-    member this.BindOnError(continuation: 'E -> FIO<'R, 'E1>) : FIO<'R, 'E1> =
+    member this.BindError(continuation: 'E -> FIO<'R, 'E1>) : FIO<'R, 'E1> =
         ChainError (this.Upcast(), fun error -> continuation (error :?> 'E))
 
     /// Then sequences two effects, ignoring the result of the first effect.
     /// If the first effect fails, the error is immediately returned.
     member inline this.Then(other: FIO<'R1, 'E>) : FIO<'R1, 'E> =
-        this.BindOnSuccess(fun _ -> other)
+        this.Bind <| fun _ -> other
+
+    /// ThenError sequences two effects, ignoring the error of the first effect.
+    /// If the first effect succeeds, the result is immediately returned.
+    member inline this.ThenError(other: FIO<'R, 'E1>) : FIO<'R, 'E1> =
+        this.BindError <| fun _ -> other
 
     /// ApplyWith combines two effects: one produces a function and the other produces a value.
     /// The function is applied to the value, and the result is returned.
     /// Errors are immediately returned if any effect fails.
     member this.ApplyWith(other: FIO<'R -> 'R1, 'E>) : FIO<'R1, 'E> =
-        other.BindOnSuccess(fun otherFunc ->
-            this.BindOnSuccess(fun result ->
-                Success <| otherFunc result))
+        other.Bind <| fun otherFunc ->
+            this.Bind <| fun result ->
+                Success <| otherFunc result
 
     /// InParallelWith executes two effects concurrently and succeeds with a tuple of their results when both complete.
     /// If either effect fails, the error is immediately returned.
     member this.InParallelWith(other: FIO<'R1, 'E>) : FIO<'R * 'R1, 'E> =
-        other.Fork().BindOnSuccess(fun otherFiber ->
-            this.BindOnSuccess(fun thisResult ->
-                otherFiber.Await().BindOnSuccess(fun otherResult ->
-                    Success (thisResult, otherResult))))
+        other.Fork().Bind <| fun otherFiber ->
+            this.Bind <| fun thisResult ->
+                otherFiber.Await().Bind <| fun otherResult ->
+                    Success (thisResult, otherResult)
 
     /// ZipWith combines two effects and succeeds with a tuple of their results when both complete.
     /// Errors are immediately returned if any effect fails.
     member this.ZipWith(other: FIO<'R1, 'E>) : FIO<'R * 'R1, 'E> =
-        this.BindOnSuccess(fun thisResult ->
-            other.BindOnSuccess(fun otherResult ->
-                Success (thisResult, otherResult)))
+        this.Bind <| fun thisResult ->
+            other.Bind <| fun otherResult ->
+                Success (thisResult, otherResult)
 
     /// RaceWith executes two effects concurrently and succeeds with the result of the first effect that completes.
     /// If both effects fail, the first error is returned.
@@ -214,11 +219,11 @@ and FIO<'R, 'E> =
             if thisFiber.Completed() then thisFiber
             else if otherFiber.Completed() then otherFiber
             else loop thisFiber otherFiber
-        this.Fork().BindOnSuccess(fun thisFiber ->
-            other.Fork().BindOnSuccess(fun otherFiber ->
+        this.Fork().Bind <| fun thisFiber ->
+            other.Fork().Bind <| fun otherFiber ->
                 match (loop (thisFiber.ToInternal()) (otherFiber.ToInternal())).AwaitResult() with
                 | Ok result -> Success (result :?> 'R)
-                | Error error -> Failure (error :?> 'E)))
+                | Error error -> Failure (error :?> 'E)
 
     member internal this.UpcastResult() : FIO<obj, 'E> =
         match this with
@@ -300,11 +305,11 @@ module Operators =
 
     /// An alias for `Send`, which puts the message on the given channel and succeeds with unit.
     let inline ( -!> ) (message: 'R) (channel: Channel<'R>) : FIO<unit, 'E> =
-        (channel.Send message).Then(succeed ())
+        (channel.Send message).Then <| succeed ()
 
     /// An alias for `Send`, which puts the message on the given channel and succeeds with unit.
     let inline ( <!- ) (channel: Channel<'R>) (message: 'R) : FIO<unit, 'E> =
-        (channel.Send message).Then(succeed ())
+        (channel.Send message).Then <| succeed ()
 
     /// An alias for `Receive`, which retrieves a message from the channel and succeeds with it.
     let inline ( !--> ) (channel: Channel<'R>) : FIO<'R, 'E> =
@@ -316,11 +321,11 @@ module Operators =
 
     /// An alias for `Receive`, which retrieves a message from the channel and succeeds with unit.
     let inline ( !-!> ) (channel: Channel<'R>) : FIO<unit, 'E> =
-        channel.Receive().Then(succeed ())
+        channel.Receive().Then <| succeed ()
 
     /// An alias for `Receive`, which retrieves a message from the channel and succeeds with unit.
     let inline ( !<!- ) (channel: Channel<'R>) : FIO<unit, 'E> =
-        channel.Receive().Then(succeed ())
+        channel.Receive().Then <| succeed ()
 
     /// An alias for `Fork`, which executes an effect concurrently and returns the fiber that executes it.
     /// The fiber can be awaited for the result of the effect.
@@ -329,27 +334,27 @@ module Operators =
 
     /// An alias for `Fork`, which executes an effect concurrently and returns `unit` when executed.
     let inline ( !! ) (effect: FIO<'R, 'E>) : FIO<unit, 'E1> =
-        effect.Fork().BindOnSuccess(fun _ -> succeed ())
+        effect.Fork().Bind <| fun _ -> succeed ()
 
     /// An alias for `Await`, which waits for the result of the given fiber and succeeds with it.
     let inline ( !? ) (fiber: Fiber<'R, 'E>) : FIO<'R, 'E> =
         fiber.Await()
 
-    /// An alias for `BindOnSuccess`, which chains the success result of the effect to the continuation function.
+    /// An alias for `Bind`, which chains the success result of the effect to the continuation function.
     let inline ( >>= ) (effect: FIO<'R, 'E>) (continuation: 'R -> FIO<'R1, 'E>) : FIO<'R1, 'E> =
-        effect.BindOnSuccess continuation
+        effect.Bind continuation
 
-    /// An alias for `BindOnSuccess`, which chains the success result of the effect to the continuation function.
+    /// An alias for `Bind`, which chains the success result of the effect to the continuation function.
     let inline ( =<< ) (continuation: 'R -> FIO<'R1, 'E>) (effect: FIO<'R, 'E>)  : FIO<'R1, 'E> =
-        effect.BindOnSuccess continuation
+        effect.Bind continuation
 
-    /// An alias for `BindOnError`, which chains the error result of the effect to the continuation function.
+    /// An alias for `BindError`, which chains the error result of the effect to the continuation function.
     let inline ( >>? ) (effect: FIO<'R, 'E>) (continuation: 'E -> FIO<'R, 'E1>) : FIO<'R, 'E1> =
-        effect.BindOnError continuation
+        effect.BindError continuation
 
-    /// An alias for `BindOnError`, which chains the error result of the effect to the continuation function.
+    /// An alias for `BindError`, which chains the error result of the effect to the continuation function.
     let inline ( ?<< ) (continuation: 'E -> FIO<'R, 'E1>) (effect: FIO<'R, 'E>) : FIO<'R, 'E1> =
-        effect.BindOnError continuation
+        effect.BindError continuation
 
     /// An alias for `Then`, which sequences two effects, ignoring the result of the first one.
     let inline ( >> ) (leftEffect: FIO<'R, 'E>) (rightEffect: FIO<'R1, 'E>) : FIO<'R1, 'E> =
@@ -358,6 +363,14 @@ module Operators =
     /// An alias for `Then`, which sequences two effects, ignoring the result of the first one.
     let inline ( << ) (leftEffect: FIO<'R, 'E>) (rightEffect: FIO<'R1, 'E>) : FIO<'R, 'E> =
         rightEffect.Then leftEffect
+
+    /// An alias for `ThenError`, which sequences two effects, ignoring the error of the first one.
+    let inline ( >? ) (leftEffect: FIO<'R, 'E>) (rightEffect: FIO<'R, 'E1>) : FIO<'R, 'E1> =
+        leftEffect.ThenError rightEffect
+
+    /// An alias for `ThenError`, which sequences two effects, ignoring the error of the first one.
+    let inline ( ?< ) (leftEffect: FIO<'R, 'E1>) (rightEffect: FIO<'R, 'E>) : FIO<'R, 'E1> =
+        rightEffect.ThenError leftEffect
 
     /// An alias for `ApplyWith`, which combines two effects: one producing a function and the other a value, 
     /// and applies the function to the value.
@@ -377,7 +390,7 @@ module Operators =
     /// An alias for `InParallelWith`, which executes two effects concurrently and succeeds with `unit` when completed.
     /// If either effect fails, the error is immediately returned.
     let inline ( <!> ) (leftEffect: FIO<'R, 'E>) (rightEffect: FIO<'R1, 'E>) : FIO<unit, 'E> =
-        (leftEffect.InParallelWith rightEffect).Then(succeed ())
+        (leftEffect.InParallelWith rightEffect).Then <| succeed ()
 
     /// An alias for `ZipWith`, which combines the results of two effects into a tuple when both succeed.
     /// If either effect fails, the error is immediately returned.

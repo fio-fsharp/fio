@@ -10,37 +10,37 @@ open Argu
 
 open FIO.Runtime
 
-open FIO.Benchmark.Suite
+open FIO.Benchmarks.Suite
 
 type Arguments =
     | Naive_Runtime
-    | Intermediate_Runtime of evalworkercount: int * blockingworkercount: int * evalstepcount: int
-    | Advanced_Runtime of evalworkercount: int * blockingworkercount: int * evalstepcount: int
-    | Deadlocking_Runtime of evalworkercount: int * blockingworkercount: int * evalstepcount: int
+    | Intermediate_Runtime of evalworkers: int * blockingworkers: int * evalsteps: int
+    | Advanced_Runtime of evalworkers: int * blockingworkers: int * evalsteps: int
+    | Deadlocking_Runtime of evalworkers: int * blockingworkers: int * evalsteps: int
     | [<Mandatory>] Runs of runs: int
-    | Process_Increment of processcountinc: int * inctimes: int
-    | Pingpong of roundcount: int
-    | Threadring of processcount: int * roundcount: int
-    | Big of processcount: int * roundcount: int
-    | Bang of processcount: int * roundcount: int
-    | Spawn of processcount: int
+    | Process_Increment of actor_inc: int * inc_times: int
+    | Pingpong of rounds: int
+    | Threadring of actors: int * rounds: int
+    | Big of actors: int * rounds: int
+    | Bang of actors: int * rounds: int
+    | Fork of actors: int
 
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Naive_Runtime -> "specify naive runtime. (specify only one runtime)"
+            | Naive_Runtime -> "specify naive runtime."
             | Intermediate_Runtime _ ->
-                "specify eval worker count, blocking worker count and eval step count for intermediate runtime. (specify only one runtime)"
-            | Advanced_Runtime _ -> "specify eval worker count, blocking worker count and eval step count for advanced runtime. (specify only one runtime)"
+                "specify evaluation workers, blocking workers and eval steps for intermediate runtime."
+            | Advanced_Runtime _ -> "specify evaluation workers, blocking workers and eval steps for advanced runtime."
             | Deadlocking_Runtime _ ->
-                "specify eval worker count, blocking worker count and eval step count for deadlocking runtime. (specify only one runtime)"
+                "specify evaluation workers, blocking workers and eval steps for deadlocking runtime."
             | Runs _ -> "specify the number of runs for each benchmark."
-            | Process_Increment _ -> "specify the value of process count increment and how many times."
-            | Pingpong _ -> "specify round count for pingpong benchmark."
-            | Threadring _ -> "specify process count and round count for threadring benchmark."
-            | Big _ -> "specify process count and round count for big benchmark."
-            | Bang _ -> "specify process count and round count for bang benchmark."
-            | Spawn _ -> "specify process count for spawn benchmark."
+            | Process_Increment _ -> "specify the value of actor increment and how many times."
+            | Pingpong _ -> "specify rounds for pingpong benchmark."
+            | Threadring _ -> "specify actors and rounds for threadring benchmark."
+            | Big _ -> "specify actors and rounds for big benchmark."
+            | Bang _ -> "specify actors and rounds for bang benchmark."
+            | Fork _ -> "specify actors for fork benchmark."
 
 type Parser() =
     let parser = ArgumentParser.Create<Arguments>()
@@ -62,40 +62,36 @@ type Parser() =
 
         let pingpongConfig =
             match results.TryGetResult Pingpong with
-            | Some roundCount -> [ Runner.PingpongC { Rounds = roundCount } ]
+            | Some rounds -> 
+                [ Runner.PingpongConfig (rounds) ]
             | _ -> []
 
         let threadringConfig =
             match results.TryGetResult Threadring with
-            | Some(processCount, roundCount) ->
-                [ Runner.ThreadringC
-                      { Actors = processCount
-                        Rounds = roundCount } ]
+            | Some(actors, rounds) ->
+                [ Runner.ThreadringConfig (actors, rounds) ]
             | _ -> []
 
         let bigConfig =
             match results.TryGetResult Big with
-            | Some(processCount, roundCount) ->
-                [ Runner.BigC
-                      { Actors = processCount
-                        RoundCount = roundCount } ]
+            | Some(actors, rounds) ->
+                [ Runner.BigConfig (actors, rounds) ]
             | _ -> []
 
         let bangConfig =
             match results.TryGetResult Bang with
-            | Some(processCount, roundCount) ->
-                [ Runner.BangC
-                      { Actors = processCount
-                        Rounds = roundCount } ]
+            | Some(actors, rounds) ->
+                [ Runner.BangConfig (actors, rounds) ]
             | _ -> []
 
-        let spawnConfig =
-            match results.TryGetResult Spawn with
-            | Some processcount -> [ Runner.ForkC { Actors = processcount } ]
+        let forkConfig =
+            match results.TryGetResult Fork with
+            | Some actors -> 
+                [ Runner.ForkConfig (actors) ]
             | _ -> []
 
         let configs =
-            pingpongConfig @ threadringConfig @ bigConfig @ bangConfig @ spawnConfig
+            pingpongConfig @ threadringConfig @ bigConfig @ bangConfig @ forkConfig
 
         let runtime: Runtime =
             match results.TryGetResult Naive_Runtime with

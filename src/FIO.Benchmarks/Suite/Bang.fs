@@ -9,20 +9,22 @@
 (* (https://dl.acm.org/doi/10.1145/2364489.2364495I)                                *)
 (************************************************************************************)
 
-module internal rec FIO.Benchmark.Suite.Bang
+module internal FIO.Benchmarks.Suite.Bang
 
-open FIO.Benchmark.Tools.Timing.ChannelTimer
+open FIO.Benchmarks.Tools.Timing.ChannelTimer
 
 open FIO.Core
 
-type private Process = { Name: string; Chan: Channel<int> }
+type private Actor = 
+    { Name: string; 
+      Channel: int channel }
 
 let rec private createSendProcess proc msg roundCount timerChan goChan =
     let rec create proc msg roundCount =
         if roundCount = 0 then
             !+ ()
         else
-            msg --> proc.Chan
+            msg --> proc.Channel
             >>= fun _ ->
 #if DEBUG
                 printfn $"DEBUG: %s{proc.Name} sent: %i{msg}"
@@ -37,7 +39,7 @@ let rec private createRecvProcess proc roundCount timerChan goChan =
         if roundCount = 0 then
             TimerMessage.Stop --> timerChan >>= fun _ -> !+ ()
         else
-            !--> proc.Chan
+            !--> proc.Channel
             >>= fun x ->
 #if DEBUG
                 printfn $"DEBUG: %s{proc.Name} received: %i{x}"
@@ -47,12 +49,12 @@ let rec private createRecvProcess proc roundCount timerChan goChan =
     TimerMessage.Start --> timerChan
     >>= fun _ -> !--> goChan >>= fun _ -> create proc roundCount
 
-let Create processCount roundCount : FIO<int64, obj> =
+let Create processCount roundCount : FIO<BenchmarkResult, obj> =
     let rec createSendProcesses recvProcChan processCount =
         List.map
             (fun count ->
                 { Name = $"p{count}"
-                  Chan = recvProcChan })
+                  Channel = recvProcChan })
             [ 1..processCount ]
 
     let rec createBang recvProc sendProcs msg acc timerChan goChan =
@@ -62,8 +64,8 @@ let Create processCount roundCount : FIO<int64, obj> =
             let eff = createSendProcess p msg roundCount timerChan goChan <!> acc
             createBang recvProc ps (msg + 10) eff timerChan goChan
 
-    let recvProc = { Name = "p0"; Chan = Channel<int>() }
-    let sendProcs = createSendProcesses recvProc.Chan processCount
+    let recvProc = { Name = "p0"; Channel = Channel<int>() }
+    let sendProcs = createSendProcesses recvProc.Channel processCount
 
     let p, ps =
         match List.rev sendProcs with
@@ -77,7 +79,7 @@ let Create processCount roundCount : FIO<int64, obj> =
         createSendProcess p 0 roundCount timerChan goChan
         <!> createRecvProcess recvProc (processCount * roundCount) timerChan goChan
 
-    ! (TimerEffect (processCount + 1) (processCount + 1) 1 timerChan)
+    ! TimerEffect(processCount + 1, processCount + 1, 1, timerChan)
     >>= fun fiber ->
         (TimerMessage.MessageChannel goChan) --> timerChan
         >>= fun _ ->

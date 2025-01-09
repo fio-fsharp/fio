@@ -5,7 +5,7 @@
 (************************************************************************************)
 
 [<AutoOpen>]
-module rec FIO.Core.CE
+module FIO.Core.CE
 
 module internal FIOBuilderHelper =
 
@@ -19,10 +19,10 @@ module internal FIOBuilderHelper =
         effect
 
     let inline internal Yield(result: 'R) : FIO<'R, 'E> =
-        FIOBuilderHelper.Return result
+        Return result
 
     let inline internal YieldFrom(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
-        FIOBuilderHelper.ReturnFrom effect
+        ReturnFrom effect
 
     let inline internal Combine(firstEffect: FIO<'R, 'E>) (secondEffect: FIO<'R1, 'E>) : FIO<'R1, 'E> =
         firstEffect >> secondEffect
@@ -31,16 +31,13 @@ module internal FIOBuilderHelper =
         !+ ()
 
     let inline internal Delay(factory: unit -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        NonBlocking (fun () -> Ok()) >> factory ()
+        NonBlocking (fun () -> Ok()) >>= fun _ -> factory ()
 
     let inline internal Run(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
         effect
 
     let inline internal TryWith(effect: FIO<'R, 'E>) (handler: 'E -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        match effect with
-        | Success value -> !+ value
-        | Failure error -> handler error
-        | _ -> effect
+        effect >>? handler
 
     let inline internal TryFinally(effect: FIO<'R, 'E>) (finalizer: unit -> unit) : FIO<'R, 'E> =
         effect >>= fun result ->
@@ -53,7 +50,7 @@ module internal FIOBuilderHelper =
     let inline internal While(guard: unit -> bool) (effect: FIO<'R, 'E>) : FIO<unit, 'E> =
         let rec loop () =
             if guard () then
-                Delay (fun () -> effect >> loop ())
+                Delay <| fun () -> effect >> loop ()
             else
                 !+ ()
         loop ()
@@ -87,7 +84,7 @@ type FIOBuilder() =
     member this.Run(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
         FIOBuilderHelper.Run effect
 
-    member this.TryWith(effect: FIO<'R, 'E>, handler: 'E -> FIO<'R, 'E>) : FIO<'R, 'E> = 
+    member this.TryWith(effect: FIO<'R, exn>, handler: exn -> FIO<'R, exn>) : FIO<'R, exn> = 
         FIOBuilderHelper.TryWith effect handler
 
     member this.TryFinally(effect: FIO<'R, 'E>, finalizer: unit -> unit) : FIO<'R, 'E> =

@@ -4,7 +4,7 @@
 (* All rights reserved                                                              *)
 (************************************************************************************)
 
-module internal rec FIO.Benchmark.Tools.Timing
+module internal FIO.Benchmarks.Tools.Timing
 
 open FIO.Core
 
@@ -12,62 +12,13 @@ open System.Diagnostics
 
 type TimerResult = int64
 
-module internal SimpleTimer =
-
-    type TimerMessage =
-        | Start
-        | Stop
-
-    let TimerEffect startCount stopCount channel : FIO<TimerResult, 'E> =
-        let stopwatch = Stopwatch()
-
-        // TODO: Make tail-recursive.
-        let rec loopStart count = fio {
-            match count with
-            | 0 ->
-                #if DEBUG
-                do! !+ printfn("DEBUG: TimerEffect: Timer started!")
-                #endif
-                do! !+ stopwatch.Start() 
-            | count ->
-                let! received = !<-- channel
-                match received with
-                | TimerMessage.Start ->
-                    return! loopStart (count - 1)
-                | _ ->  
-                    return! loopStart count
-        }
-
-        // TODO: Make tail-recursive.
-        let rec loopStop count = fio {
-            match count with
-            | 0 ->       
-                #if DEBUG
-                do! !+ printfn("DEBUG: TimerEffect: Timer stopped!")
-                #endif
-                do! !+ stopwatch.Stop()
-            | count ->
-                let! received = !<-- channel
-                match received with
-                | TimerMessage.Stop ->
-                    return! loopStop (count - 1)
-                | _ -> 
-                    return! loopStop count
-        }
-
-        fio {
-            do! loopStart startCount
-            do! loopStop stopCount
-            return stopwatch.ElapsedMilliseconds
-        }
-
 module internal StopwatchTimer =
 
     type TimerMessage =
         | Start of Stopwatch
         | Stop
 
-    let TimerEffect stopCount channel : FIO<TimerResult, 'E> =
+    let TimerEffect(stopCount, channel) : FIO<TimerResult, 'E> =
         let mutable stopwatch = Stopwatch()
 
         // TODO: Make tail-recursive.
@@ -105,7 +56,7 @@ module internal ChannelTimer =
         | Start
         | Stop
 
-    let TimerEffect startCount messageCount stopCount channel : FIO<TimerResult, 'E> =
+    let TimerEffect(startCount, messageCount, stopCount, channel) : FIO<TimerResult, 'E> =
         let stopwatch = Stopwatch()
         let mutable messageChannel = Channel<int>()
 

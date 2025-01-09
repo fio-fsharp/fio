@@ -5,11 +5,11 @@ VisualStudioVersion = 17.0.32014.148
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FIO", "FIO\FIO.fsproj", "{0B1D12CA-CD2E-4BEB-84F3-6549878A7DC8}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FIO.Benchmark", "FIO.Benchmark\FIO.Benchmark.fsproj", "{FF020285-6B80-4420-93A3-5B62B65D3C22}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FIO.Benchmarks", "FIO.Benchmarks\FIO.Benchmarks.fsproj", "{FF020285-6B80-4420-93A3-5B62B65D3C22}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FIO.Example", "FIO.Example\FIO.Example.fsproj", "{543F6D16-0C1D-42ED-815F-255E3AAB713C}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FIO.Examples", "FIO.Examples\FIO.Examples.fsproj", "{543F6D16-0C1D-42ED-815F-255E3AAB713C}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FIO.Test", "FIO.Test\FIO.Test.fsproj", "{C268093D-D055-4DDF-BD0D-B9499E92CED1}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FIO.Tests", "FIO.Tests\FIO.Tests.fsproj", "{C268093D-D055-4DDF-BD0D-B9499E92CED1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

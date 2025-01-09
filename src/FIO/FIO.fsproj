@@ -10,7 +10,8 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<RepositoryUrl>https://github.com/iyyel/fio</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
-		<Version>0.0.1</Version>
+		<Version>0.0.9-alpha</Version>
+		<PackageIcon>fio_logo_wide.png</PackageIcon>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -24,6 +25,33 @@
 		<Compile Include="Runtime\Deadlocking.fs" />
 		<Compile Include="Library\Network.fs" />
 		<Compile Include="Core.Extensions\App.fs" />
+	</ItemGroup>
+
+	<PropertyGroup>
+		<!-- 
+		Ensure debugging information is easily found, so that editors can locate the source code locations for your library.
+        This slightly increases the size of your package, but the usability benefits are worth it.
+		-->
+		<DebugType>embedded</DebugType>
+		<!-- Ensure that files that are generated during the build by the .NET SDK are also included in your compiled library. -->
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\..\assets\images\fio_logo_wide.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\..\LICENSE.md">
+		  <Pack>True</Pack>
+		  <PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\..\README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
 	</ItemGroup>
 
 	<ItemGroup>

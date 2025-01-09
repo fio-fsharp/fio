@@ -8,6 +8,7 @@
 
 	<ItemGroup>
 		<Compile Include="Tools\Timing.fs" />
+		<Compile Include="Suite\Suite.fs" />
 		<Compile Include="Suite\Pingpong.fs" />
 		<Compile Include="Suite\Threadring.fs" />
 		<Compile Include="Suite\Big.fs" />

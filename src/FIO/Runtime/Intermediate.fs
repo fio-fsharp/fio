@@ -4,7 +4,7 @@
 (* All rights reserved                                                              *)
 (************************************************************************************)
 
-module rec FIO.Runtime.Intermediate
+module FIO.Runtime.Intermediate
 
 open FIO.Core
 
