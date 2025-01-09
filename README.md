@@ -8,7 +8,7 @@
 
 <br />
 <div align="center">
-  <a href="https://github.com/iyyel/fio">
+  <a href="https://github.com/fio-fsharp/fio">
     <img src="assets/images/fio_logo_wide.png" width="auto" height="300" alt="FIO Logo">
   </a>
 
@@ -35,14 +35,13 @@
 
 
 ## Introduction
-**FIO** is a type-safe, highly concurrent and asynchronous library for F# that is based on principles from pure functional programming. It provides a construct known as the IO monad for handling expressions with side effects. It uses the concept of "green threads" also known as "fibers" to provide scalable and efficient concurrency.
+**FIO** is a type-safe, highly concurrent and asynchronous library for the [F#](https://fsharp.org/) programming language. Based on pure functional programming principles, it serves as an embedded [**domain-specific language (DSL)**](https://martinfowler.com/dsl.html) empowering developers to craft type-safe, concurrent and maintainable programs with ease using functional effects.
 
-**FIO** is an attempt at creating a similar environment to that of [ZIO](https://zio.dev/) for Scala. **FIO** is both inspired by
-[ZIO](https://zio.dev/) and [Cats Effect](https://typelevel.org/cats-effect/).
+Harnessing concepts from functional programming, **FIO** simplifies the creation of scalable and efficient concurrent applications. It introduces the **IO monad** to manage expressions with side effects and employs “green threads” (also known as fibers) for scalable and efficient concurrency. **FIO** aims to provide an environment similar to that of [**ZIO**](https://zio.dev/), drawing inspiration from both [**ZIO**](https://zio.dev/) and [**Cats Effect**](https://typelevel.org/cats-effect/).
 
-**FIO** was developed as part of a master's thesis in Computer Science and Engineering at the [Technical University of Denmark (DTU)](https://www.dtu.dk/english/). You can read the thesis, which provides more details about **FIO**, [here](https://iyyel.io/assets/doc/masters_thesis_daniel_larsen.pdf).
+**FIO** was initially developed as part of a master's thesis in Computer Science and Engineering at the [Technical University of Denmark (DTU)](https://www.dtu.dk/english/). You can read the thesis, which provides more details about **FIO**, [here](https://iyyel.io/assets/doc/masters_thesis_daniel_larsen.pdf). Some parts may -- however -- be outdated as development continues.
 
-**DISCLAIMER:** **FIO** is in early development stages and a lot of improvements and enhancements can be made. This README might be lackluster.
+**DISCLAIMER:** **FIO** is in early development stages and a lot of improvements and enhancements can be made. If you think the project sounds interesting, do not hesitate to create a PR or contact me for further information or assistance.
 
 
 
@@ -58,7 +57,7 @@
 It is easy to get started with **FIO**.
 
 * Download and install [.NET](https://dotnet.microsoft.com/en-us/)
-* Download and install a compatible IDE such as [Visual Studio](https://visualstudio.microsoft.com/downloads/) or [Rider](https://www.jetbrains.com/rider/download/), or a text editor like [Visual Studio Code](https://code.visualstudio.com/)
+* Download and install a compatible IDE such as [Visual Studio](https://visualstudio.microsoft.com/downloads/) or [Rider](https://www.jetbrains.com/rider/download/), or a text editor like [Visual Studio Code](https://code.visualstudio.com/).
 
 * Download or clone this repository
 * Open it in your IDE or text editor of choice
