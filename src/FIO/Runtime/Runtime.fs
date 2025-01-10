@@ -8,6 +8,26 @@ namespace FIO.Runtime
 
 open FIO.Core
 
+type WorkerConfig =
+    { EvaluationWorkerCount: int
+      EvaluationWorkerSteps: int64 
+      BlockingWorkerCount: int }
+
 [<AbstractClass>]
-type Runtime() =
+type FIORuntime() =
     abstract member Run : FIO<'R, 'E> -> Fiber<'R, 'E>
+
+[<AbstractClass>]
+type FIOWorkerRuntime(config: WorkerConfig) =
+    inherit FIORuntime()
+
+    let validateWorkerConfiguration () =
+        if config.EvaluationWorkerCount <= 0 ||
+           config.EvaluationWorkerSteps <= 0 ||
+           config.BlockingWorkerCount <= 0 then
+            invalidArg "config" "Invalid worker configuration!"
+
+    do validateWorkerConfiguration ()
+
+    member this.GetWorkerConfiguration () =
+        config

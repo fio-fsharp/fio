@@ -84,7 +84,7 @@ type FIOBuilder() =
     member this.Run(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
         FIOBuilderHelper.Run effect
 
-    member this.TryWith(effect: FIO<'R, exn>, handler: exn -> FIO<'R, exn>) : FIO<'R, exn> = 
+    member this.TryWith(effect: FIO<'R, 'E>, handler: 'E -> FIO<'R, 'E>) : FIO<'R, 'E> = 
         FIOBuilderHelper.TryWith effect handler
 
     member this.TryFinally(effect: FIO<'R, 'E>, finalizer: unit -> unit) : FIO<'R, 'E> =

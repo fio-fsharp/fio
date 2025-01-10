@@ -10,30 +10,16 @@ open FIO.Core
 
 open System.Collections.Concurrent
 
-#if DETECT_DEADLOCK || MONITOR
-open FIO.Monitor
-#endif
-
 type internal EvalWorker
     (
         runtime: DeadlockingRuntime,
         workItemQueue: InternalQueue<WorkItem>,
         blockingWorker: BlockingWorker,
-#if DETECT_DEADLOCK
-        deadlockDetector: DeadlockDetector<BlockingWorker, EvalWorker>,
-#endif
         evalSteps
     ) as self =
-#if DETECT_DEADLOCK
-    inherit Worker()
-    let mutable working = false
-#endif
     let _ =
         (async {
             for workItem in workItemQueue.GetConsumingEnumerable() do
-#if DETECT_DEADLOCK
-                working <- true
-#endif
                 match runtime.InternalRun workItem.Effect workItem.LastAction evalSteps with
                 | Success res, Evaluated, _ -> self.CompleteWorkItem(workItem, Ok res)
                 | Failure err, Evaluated, _ -> self.CompleteWorkItem(workItem, Error err)
@@ -46,9 +32,6 @@ type internal EvalWorker
 
                     blockingWorker.RescheduleForBlocking blockingItem workItem
                 | _ -> failwith $"EvalWorker: Error occurred while evaluating effect!"
-#if DETECT_DEADLOCK
-                working <- false
-#endif
          }
          |> Async.StartAsTask
          |> ignore)
@@ -56,48 +39,26 @@ type internal EvalWorker
     member private _.CompleteWorkItem(workItem, res) =
         workItem.Complete res
         blockingWorker.RescheduleBlockingEffects workItem.InternalFiber
-#if DETECT_DEADLOCK
-        deadlockDetector.RemoveBlockingItem(BlockingFiber workItem.IFiber)
-#endif
 
     member private _.RescheduleForRunning(workItem) = workItemQueue.Add workItem
 
-#if DETECT_DEADLOCK
-    override _.Working() = working && workItemQueue.Count > 0
-#endif
 
 and internal BlockingWorker
     (
         workItemQueue: InternalQueue<WorkItem>,
-#if DETECT_DEADLOCK
-        deadlockDetector: DeadlockDetector<BlockingWorker, EvalWorker>,
-#endif
         blockingWorkItemMap: BlockingWorkItemMap,
         blockingEventQueue: InternalQueue<Channel<obj>>
     ) as self =
-#if DETECT_DEADLOCK
-    inherit Worker()
-    let mutable working = false
-#endif
     let _ =
         (async {
             for blockingChan in blockingEventQueue.GetConsumingEnumerable() do
-#if DETECT_DEADLOCK
-                working <- true
-#endif
                 self.HandleBlockingChannel blockingChan
-#if DETECT_DEADLOCK
-                working <- false
-#endif
          }
          |> Async.StartAsTask
          |> ignore)
 
     member internal this.RescheduleForBlocking blockingItem workItem =
         blockingWorkItemMap.RescheduleWorkItem blockingItem workItem
-#if DETECT_DEADLOCK
-        deadlockDetector.AddBlockingItem blockingItem
-#endif
 
     member private this.HandleBlockingChannel(blockingChan) =
         let blockingItem = BlockingChannel blockingChan
@@ -105,9 +66,6 @@ and internal BlockingWorker
         match blockingWorkItemMap.TryRemove blockingItem with
         | true, (blockingQueue: InternalQueue<WorkItem>) ->
             workItemQueue.Add <| blockingQueue.Take()
-#if DETECT_DEADLOCK
-            deadlockDetector.RemoveBlockingItem blockingItem
-#endif
             if blockingQueue.Count > 0 then
                 blockingWorkItemMap.Add(blockingItem, blockingQueue)
         | false, _ -> blockingEventQueue.Add blockingChan
@@ -120,10 +78,6 @@ and internal BlockingWorker
             while blockingQueue.Count > 0 do
                 workItemQueue.Add <| blockingQueue.Take()
         | false, _ -> ()
-
-#if DETECT_DEADLOCK
-    override _.Working() = working && workItemQueue.Count > 0
-#endif
 
 and internal BlockingWorkItemMap() =
     let blockingWorkItemMap =
@@ -152,29 +106,15 @@ and internal BlockingWorkItemMap() =
     member internal this.Get() : ConcurrentDictionary<BlockingItem, InternalQueue<WorkItem>> = blockingWorkItemMap
 
 and DeadlockingRuntime(evalWorkerCount, blockingWorkerCount, evalStepCount) as self =
-    inherit Runtime()
+    inherit FIORuntime()
 
     let workItemQueue = new InternalQueue<WorkItem>()
     let blockingEventQueue = new InternalQueue<Channel<obj>>()
     let blockingWorkItemMap = BlockingWorkItemMap()
 
-#if DETECT_DEADLOCK
-    let deadlockDetector =
-        new DeadlockDetector<BlockingWorker, EvalWorker>(workItemQueue, 500)
-#endif
-
     do
         let blockingWorkers = self.CreateBlockingWorkers()
         self.CreateEvalWorkers(List.head blockingWorkers) |> ignore
-#if DETECT_DEADLOCK
-        let evalWorkers = self.CreateEvalWorkers(List.head blockingWorkers)
-        deadlockDetector.SetBlockingWorkers blockingWorkers
-        deadlockDetector.SetEvalWorkers evalWorkers
-#endif
-#if MONITOR
-        Monitor(workItemQueue, None, Some blockingEventQueue, Some <| blockingWorkItemMap.Get())
-        |> ignore
-#endif
 
     new() = DeadlockingRuntime(System.Environment.ProcessorCount - 1, 1, 15)
 
@@ -231,13 +171,8 @@ and DeadlockingRuntime(evalWorkerCount, blockingWorkerCount, evalStepCount) as s
         let createBlockingWorkers start final =
             List.map
                 (fun _ ->
-#if DETECT_DEADLOCK
-                    BlockingWorker(workItemQueue, deadlockDetector, blockingWorkItemMap, blockingEventQueue))
-                [ start..final ]
-#else
                     BlockingWorker(workItemQueue, blockingWorkItemMap, blockingEventQueue))
                 [ start..final ]
-#endif
         let _, blockingWorkerCount, _ = this.GetConfiguration()
         createBlockingWorkers 0 (blockingWorkerCount - 1)
 
@@ -245,11 +180,7 @@ and DeadlockingRuntime(evalWorkerCount, blockingWorkerCount, evalStepCount) as s
         let createEvalWorkers blockingWorker evalSteps start final =
             List.map
                 (fun _ ->
-#if DETECT_DEADLOCK
-                    EvalWorker(this, workItemQueue, blockingWorker, deadlockDetector, evalSteps)
-#else
                     EvalWorker(this, workItemQueue, blockingWorker, evalSteps)
-#endif
                 )
                 [ start..final ]
 

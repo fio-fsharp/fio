@@ -21,25 +21,25 @@ open FIO.Library.Network.WebSockets
 
 let helloWorld1 () =
     let hello: FIO<string, obj> = !+ "Hello world!"
-    let fiber: Fiber<string, obj> = AdvancedRuntime().Run hello
+    let fiber: Fiber<string, obj> = Runtime().Run hello
     let result: Result<string, obj> = fiber.AwaitResult()
     printfn $"%A{result}"
 
 let helloWorld2 () =
     let hello: FIO<obj, string> = !- "Hello world!"
-    let fiber: Fiber<obj, string> = AdvancedRuntime().Run hello
+    let fiber: Fiber<obj, string> = Runtime().Run hello
     let result: Result<obj, string> = fiber.AwaitResult()
     printfn $"%A{result}"
 
 let helloWorld3 () =
     let hello = !+ "Hello world!"
-    let fiber = AdvancedRuntime().Run hello
+    let fiber = Runtime().Run hello
     let result = fiber.AwaitResult()
     printfn $"%A{result}"
 
 let concurrency () =
     let concurrent = ! !+ 42 >>= fun fiber -> !? fiber >>= succeed
-    let fiber = AdvancedRuntime().Run concurrent
+    let fiber = Runtime().Run concurrent
     let result = fiber.AwaitResult()
     printfn $"%A{result}"
 
