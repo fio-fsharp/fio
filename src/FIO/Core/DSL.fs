@@ -150,7 +150,7 @@ and Channel<'R> private (
 
     /// Receive retrieves a message from the channel and succeeds with it.
     member this.Receive() : FIO<'R, 'E> =
-        Blocking this
+        Receive this
 
 and channel<'R> = Channel<'R>
 
@@ -158,9 +158,8 @@ and channel<'R> = Channel<'R>
 /// with a result or fail with an error when executed.
 and FIO<'R, 'E> =
     internal
-    | NonBlocking of action: (unit -> Result<'R, 'E>)
-    | Blocking of channel: Channel<'R>
     | Send of message: 'R * channel: Channel<'R>
+    | Receive of channel: Channel<'R>
     | Concurrent of effect: FIO<obj, obj> * fiber: obj * internalFiber: InternalFiber
     | Await of internalFiber: InternalFiber
     | ChainSuccess of effect: FIO<obj, 'E> * continuation: (obj -> FIO<'R, 'E>)
@@ -232,17 +231,11 @@ and FIO<'R, 'E> =
 
     member internal this.UpcastResult() : FIO<obj, 'E> =
         match this with
-        | NonBlocking action ->
-            NonBlocking <| fun () ->
-            match action () with
-            | Ok result -> Ok (result :> obj)
-            | Error error -> Error error
-
-        | Blocking channel ->
-            Blocking <| channel.Upcast()
-
         | Send (message, channel) ->
             Send (message :> obj, channel.Upcast())
+
+        | Receive channel ->
+            Receive <| channel.Upcast()
 
         | Concurrent (effect, fiber, internalFiber) ->
             Concurrent (effect, fiber, internalFiber)
@@ -264,17 +257,11 @@ and FIO<'R, 'E> =
 
     member internal this.UpcastError() : FIO<'R, obj> =
         match this with
-        | NonBlocking action ->
-            NonBlocking <| fun () ->
-            match action () with
-            | Ok result -> Ok result
-            | Error error -> Error (error :> obj)
-
-        | Blocking channel ->
-            Blocking channel
-
         | Send (message, channel) ->
             Send (message, channel)
+
+        | Receive channel ->
+            Receive channel
 
         | Concurrent (effect, fiber, internalFiber) ->
             Concurrent (effect, fiber, internalFiber)
@@ -298,11 +285,11 @@ and FIO<'R, 'E> =
         this.UpcastResult().UpcastError()
 
 /// Creates an effect that succeeds immediately with the given result.
-let succeed<'R, 'E> (result: 'R) : FIO<'R, 'E> =
+let succeed (result: 'R) : FIO<'R, 'E> =
     Success result
 
 /// Creates an effect that fails immediately with the given error.
-let fail<'R, 'E> (error: 'E) : FIO<'R, 'E> =
+let fail (error: 'E) : FIO<'R, 'E> =
     Failure error
 
 [<AutoOpen>]

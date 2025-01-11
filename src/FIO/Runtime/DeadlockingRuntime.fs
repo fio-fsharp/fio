@@ -123,19 +123,15 @@ and DeadlockingRuntime(evalWorkerCount, blockingWorkerCount, evalStepCount) as s
             (eff, RescheduleForRunning, 0)
         else
             match eff with
-            | NonBlocking action ->
-                match action () with
-                | Ok res -> (Success res, Evaluated, evalSteps - 1)
-                | Error err -> (Failure err, Evaluated, evalSteps - 1)
-            | Blocking chan ->
-                if prevAction = RescheduleForBlocking(BlockingChannel chan) then
-                    (Success <| chan.Take(), Evaluated, evalSteps - 1)
-                else
-                    (Blocking chan, RescheduleForBlocking(BlockingChannel chan), evalSteps)
             | Send(value, chan) ->
                 chan.Add value
                 blockingEventQueue.Add <| chan
                 (Success value, Evaluated, evalSteps - 1)
+            | Receive chan ->
+                if prevAction = RescheduleForBlocking(BlockingChannel chan) then
+                    (Success <| chan.Take(), Evaluated, evalSteps - 1)
+                else
+                    (Receive chan, RescheduleForBlocking(BlockingChannel chan), evalSteps)
             | Concurrent(eff, fiber, ifiber) ->
                 workItemQueue.Add <| WorkItem.Create(eff, ifiber, [], prevAction)
                 (Success fiber, Evaluated, evalSteps - 1)

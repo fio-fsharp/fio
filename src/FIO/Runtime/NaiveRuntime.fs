@@ -32,15 +32,12 @@ type Runtime() =
             | Error error -> handleError error stack
 
         match effect with
-        | NonBlocking action ->
-            handleResult (action ()) stack
-
-        | Blocking channel ->
-            handleSuccess (channel.Take()) stack
-
         | Send (message, channel) ->
             channel.Add message
             handleSuccess message stack
+
+        | Receive channel ->
+            handleSuccess (channel.Take()) stack
 
         | Concurrent (effect, fiber, internalFiber) ->
             async {

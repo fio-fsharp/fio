@@ -151,19 +151,16 @@ and Runtime(config: WorkerConfig) as this =
         else
             let newEvalSteps = evalSteps - 1L
             match effect with
-            | NonBlocking action ->
-                handleResult (action ()) newEvalSteps stack
-
-            | Blocking channel ->
-                if prevAction = RescheduleForBlocking(BlockingChannel channel) then
-                    handleSuccess (channel.Take()) newEvalSteps stack
-                else
-                    ((Blocking channel, stack), RescheduleForBlocking(BlockingChannel channel), evalSteps)
-
             | Send (message, channel) ->
                 channel.Add message
                 blockingEventQueue.Add channel
                 handleSuccess message newEvalSteps stack
+
+            | Receive channel ->
+                if prevAction = RescheduleForBlocking(BlockingChannel channel) then
+                    handleSuccess (channel.Take()) newEvalSteps stack
+                else
+                    ((Receive channel, stack), RescheduleForBlocking(BlockingChannel channel), evalSteps)
 
             | Concurrent (effect, fiber, ifiber) ->
                 workItemQueue.Add <| WorkItem.Create(effect, ifiber, [], prevAction)
