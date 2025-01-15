@@ -34,13 +34,13 @@ and internal WorkItem =
     { Effect: FIO<obj, obj>
       InternalFiber: InternalFiber
       Stack: ContinuationStack
-      LastAction: RuntimeAction }
+      PrevAction: RuntimeAction }
 
     static member Create(effect, internalFiber, stack, lastAction) =
         { Effect = effect
           InternalFiber = internalFiber
           Stack = stack
-          LastAction = lastAction }
+          PrevAction = lastAction }
 
     member internal this.Complete(result) =
         this.InternalFiber.Complete result

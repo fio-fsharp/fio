@@ -15,7 +15,7 @@ type private EvaluationWorkerConfig =
     { Runtime: Runtime
       WorkItemQueue: InternalQueue<WorkItem>
       BlockingWorker: BlockingWorker
-      EvaluationWorkerSteps: int64 }
+      EvaluationWorkerSteps: int }
 
 and private BlockingWorkerConfig =
     { WorkItemQueue: InternalQueue<WorkItem>
@@ -34,20 +34,24 @@ and private EvaluationWorker(config: EvaluationWorkerConfig) =
         | _ -> ()
 
     let processWorkItem workItem =
-        match config.Runtime.InternalRun workItem.Effect workItem.LastAction config.EvaluationWorkerSteps workItem.Stack with
-        | (Success result, _), Evaluated, _ ->
+        match config.Runtime.InternalRun workItem.Effect workItem.Stack workItem.PrevAction config.EvaluationWorkerSteps with
+        | Success result, _, Evaluated, _ ->
             completeWorkItem workItem
             <| Ok result
-        | (Failure error, _), Evaluated, _ ->
+
+        | Failure error, _, Evaluated, _ ->
             completeWorkItem workItem
             <| Error error
-        | (effect, stack), RescheduleForRunning, _ ->
+
+        | effect, stack, RescheduleForRunning, _ ->
             config.WorkItemQueue.Add 
             <| WorkItem.Create(effect, workItem.InternalFiber, stack, RescheduleForRunning)
-        | (effect, stack), RescheduleForBlocking blockingItem, _ ->
+
+        | effect, stack, RescheduleForBlocking blockingItem, _ ->
             config.BlockingWorker.RescheduleForBlocking blockingItem
             <| WorkItem.Create(effect, workItem.InternalFiber, stack, RescheduleForBlocking blockingItem)
             handleBlockingFiber blockingItem
+
         | _ ->
             invalidOp "EvaluationWorker: Unexpected state encountered during effect evaluation."
 
@@ -66,6 +70,7 @@ and private EvaluationWorker(config: EvaluationWorkerConfig) =
             cancellationTokenSource.Cancel()
 
 and private BlockingWorker(config: BlockingWorkerConfig) =
+
     let processBlockingChannel (blockingChannel: Channel<obj>) =
         if blockingChannel.HasBlockingWorkItems() then
             blockingChannel.RescheduleBlockingWorkItem config.WorkItemQueue
@@ -124,65 +129,67 @@ and Runtime(config: WorkerConfig) as this =
         Runtime(
             { EvaluationWorkerCount = Environment.ProcessorCount - 1
               BlockingWorkerCount = 1
-              EvaluationWorkerSteps = 20L })
+              EvaluationWorkerSteps = 20 })
 
-    [<TailCall>]
-    member internal this.InternalRun effect prevAction evalSteps stack : (FIO<obj, obj> * ContinuationStack) * RuntimeAction * int64 =
+    member internal this.InternalRun effect stack prevAction evalSteps : FIO<obj, obj> * ContinuationStack * RuntimeAction * int =
 
-        let rec handleSuccess result newEvalSteps stack =
+        let rec handleSuccess result stack evalSteps newEvalSteps =
             match stack with
-            | [] -> ((Success result, []), Evaluated, newEvalSteps)
-            | (SuccessKind, cont) :: ss -> this.InternalRun (cont result) Evaluated evalSteps ss
-            | (ErrorKind, _) :: ss -> handleSuccess result newEvalSteps ss
+            | [] -> (Success result, [], Evaluated, newEvalSteps)
+            | (SuccessKind, cont) :: ss -> interpret (cont result) ss Evaluated evalSteps
+            | (ErrorKind, _) :: ss -> handleSuccess result ss evalSteps newEvalSteps
 
-        let rec handleError error newEvalSteps stack =
+        and handleError error stack evalSteps newEvalSteps =
             match stack with
-            | [] -> ((Failure error, []), Evaluated, newEvalSteps)
-            | (SuccessKind, _) :: ss -> handleError error newEvalSteps ss
-            | (ErrorKind, cont) :: ss -> this.InternalRun (cont error) Evaluated evalSteps ss
+            | [] -> (Failure error, [], Evaluated, newEvalSteps)
+            | (SuccessKind, _) :: ss -> handleError error ss evalSteps newEvalSteps
+            | (ErrorKind, cont) :: ss -> interpret (cont error) ss Evaluated evalSteps
 
-        let handleResult result newEvalSteps stack =
+        and handleResult result stack evalSteps newEvalSteps =
             match result with
-            | Ok result -> handleSuccess result newEvalSteps stack
-            | Error error -> handleError error newEvalSteps stack
+            | Ok result -> handleSuccess result stack evalSteps newEvalSteps
+            | Error error -> handleError error stack evalSteps newEvalSteps
 
-        if evalSteps = 0L then
-            ((effect, stack), RescheduleForRunning, 0L)
-        else
-            let newEvalSteps = evalSteps - 1L
-            match effect with
-            | Send (message, channel) ->
-                channel.Add message
-                blockingEventQueue.Add channel
-                handleSuccess message newEvalSteps stack
+        and interpret effect stack prevAction evalSteps =
+            if evalSteps = 0 then
+                (effect, stack, RescheduleForRunning, 0)
+            else
+                let newEvalSteps = evalSteps - 1
+                match effect with
+                | Send (message, channel) ->
+                    channel.Add message
+                    blockingEventQueue.Add channel
+                    handleSuccess message stack evalSteps newEvalSteps
 
-            | Receive channel ->
-                if prevAction = RescheduleForBlocking(BlockingChannel channel) then
-                    handleSuccess (channel.Take()) newEvalSteps stack
-                else
-                    ((Receive channel, stack), RescheduleForBlocking(BlockingChannel channel), evalSteps)
+                | Receive channel ->
+                    if prevAction = RescheduleForBlocking(BlockingChannel channel) then
+                        handleSuccess (channel.Take()) stack evalSteps newEvalSteps
+                    else
+                        (Receive channel, stack, RescheduleForBlocking(BlockingChannel channel), evalSteps)
 
-            | Concurrent (effect, fiber, ifiber) ->
-                workItemQueue.Add <| WorkItem.Create(effect, ifiber, [], prevAction)
-                handleSuccess fiber newEvalSteps stack
+                | Concurrent (effect, fiber, ifiber) ->
+                    workItemQueue.Add <| WorkItem.Create(effect, ifiber, [], prevAction)
+                    handleSuccess fiber stack evalSteps newEvalSteps
 
-            | Await ifiber ->
-                if ifiber.Completed() then
-                    handleResult (ifiber.AwaitResult()) newEvalSteps stack
-                else
-                    ((Await ifiber, stack), RescheduleForBlocking(BlockingFiber ifiber), evalSteps)
+                | Await ifiber ->
+                    if ifiber.Completed() then
+                        handleResult (ifiber.AwaitResult()) stack evalSteps newEvalSteps
+                    else
+                        (Await ifiber, stack, RescheduleForBlocking(BlockingFiber ifiber), evalSteps)
 
-            | ChainSuccess (effect, continuation) ->
-                this.InternalRun effect prevAction evalSteps ((SuccessKind, continuation) :: stack)
+                | ChainSuccess (effect, continuation) ->
+                    interpret effect ((SuccessKind, continuation) :: stack) prevAction evalSteps
 
-            | ChainError (effect, continuation) ->
-                this.InternalRun effect prevAction evalSteps ((ErrorKind, continuation) :: stack)
+                | ChainError (effect, continuation) ->
+                    interpret effect ((ErrorKind, continuation) :: stack) prevAction evalSteps
 
-            | Success result ->
-                handleSuccess result newEvalSteps stack
+                | Success result ->
+                    handleSuccess result stack evalSteps newEvalSteps
 
-            | Failure error ->
-                handleError error newEvalSteps stack
+                | Failure error ->
+                    handleError error stack evalSteps newEvalSteps
+
+        interpret effect stack prevAction evalSteps
 
     override this.Run (effect: FIO<'R, 'E>) : Fiber<'R, 'E> =
         let fiber = Fiber<'R, 'E>()

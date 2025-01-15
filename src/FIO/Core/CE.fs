@@ -58,6 +58,7 @@ type FIOBuilder() =
                 succeed ()
         sequence.GetEnumerator() |> loop
 
+    // TODO: While seems to be broken. :)
     member inline this.While(guard: unit -> bool, effect: FIO<'R, 'E>) : FIO<unit, 'E> =
         let rec loop () =
             if guard () then
@@ -69,7 +70,7 @@ type FIOBuilder() =
     member inline this.Using(resource: #IDisposable, body: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
         this.TryFinally(body resource, fun () -> resource.Dispose())
 
-    member inline this.Match(value: 'T, cases: ('T -> FIO<'R, 'E>)) : FIO<'R, 'E> =
+    member inline this.Match(value: 'T, cases: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
         cases value
 
 let fio = FIOBuilder()

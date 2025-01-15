@@ -15,7 +15,7 @@ type internal Worker() =
     abstract Working: unit -> bool
 
 type internal DeadlockDetector<'B, 'E when 'B :> Worker and 'E :> Worker>(workItemQueue: InternalQueue<WorkItem>, intervalMs: int) as self =
-    let blockingItems = new ConcurrentDictionary<BlockingItem, Unit>()
+    let blockingItems = ConcurrentDictionary<BlockingItem, Unit>()
     let mutable blockingWorkers: List<'B> = []
     let mutable evalWorkers: List<'E> = []
     let mutable countDown = 10
@@ -109,7 +109,7 @@ type internal Monitor
             printfn $"MONITOR:    ------------ workItem start ------------"
             printfn $"MONITOR:      WorkItem IFiber completed: %A{ifiber.Completed()}"
             printfn $"MONITOR:      WorkItem IFiber blocking items count: %A{ifiber.BlockingWorkItemsCount()}"
-            printfn $"MONITOR:      WorkItem PrevAction: %A{workItem.LastAction}"
+            printfn $"MONITOR:      WorkItem PrevAction: %A{workItem.PrevAction}"
             printfn $"MONITOR:      WorkItem Eff: %A{workItem.Effect}"
             printfn $"MONITOR:    ------------ workItem end ------------"
 
@@ -131,7 +131,7 @@ type internal Monitor
             let ifiber = workItem.InternalFiber
             printfn $"MONITOR:      WorkItem IFiber completed: %A{ifiber.Completed()}"
             printfn $"MONITOR:      WorkItem IFiber blocking items count: %A{ifiber.BlockingWorkItemsCount()}"
-            printfn $"MONITOR:      WorkItem PrevAction: %A{workItem.LastAction}"
+            printfn $"MONITOR:      WorkItem PrevAction: %A{workItem.PrevAction}"
             printfn $"MONITOR:      WorkItem Eff: %A{workItem.Effect}"
             printfn $"MONITOR:    ------------ BlockingItem * WorkItem end ------------"
 

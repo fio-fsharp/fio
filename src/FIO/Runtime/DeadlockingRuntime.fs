@@ -20,7 +20,7 @@ type internal EvalWorker
     let _ =
         (async {
             for workItem in workItemQueue.GetConsumingEnumerable() do
-                match runtime.InternalRun workItem.Effect workItem.LastAction evalSteps with
+                match runtime.InternalRun workItem.Effect workItem.PrevAction evalSteps with
                 | Success res, Evaluated, _ -> self.CompleteWorkItem(workItem, Ok res)
                 | Failure err, Evaluated, _ -> self.CompleteWorkItem(workItem, Error err)
                 | eff, RescheduleForRunning, _ ->

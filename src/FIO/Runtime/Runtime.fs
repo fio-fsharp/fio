@@ -10,7 +10,7 @@ open FIO.Core
 
 type WorkerConfig =
     { EvaluationWorkerCount: int
-      EvaluationWorkerSteps: int64 
+      EvaluationWorkerSteps: int 
       BlockingWorkerCount: int }
 
 [<AbstractClass>]

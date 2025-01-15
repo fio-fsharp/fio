@@ -59,9 +59,30 @@ type EnterNumberApp() =
     override this.effect = fio {
         do! printff "Enter a number: "
         let! input = readLine ()
-        match Int32.TryParse(input) with
+        match Int32.TryParse input with
         | true, number -> return $"You entered the number: {number}."
         | false, _ -> return! !- "You entered an invalid number!"
+    }
+
+type TryCatchApp() =
+    inherit FIOApp<string, int>()
+
+    override this.effect = fio {
+        try 
+            do! !- 1
+            return "Successfully completed!"
+        with errorCode ->
+            return! !- errorCode
+    }
+
+type ForApp() =
+    inherit FIOApp<unit, obj>()
+
+    override this.effect = fio {
+        for number in 1..10 do // TODO: How to use for comprehension correctly with FIO?
+            match number % 2 = 0 with
+            | true -> printfn $"{number} is even!"
+            | false -> ()
     }
 
 type GuessNumberApp() =
@@ -71,11 +92,12 @@ type GuessNumberApp() =
         let! numberToGuess = !+ Random().Next(1, 100)
         let mutable guess = -1
 
+        // TODO: This while loop here does not work.
         while guess <> numberToGuess do
             do! printff "Guess a number: "
             let! input = readLine ()
 
-            match Int32.TryParse(input) with
+            match Int32.TryParse input with
             | true, parsedInput ->
                 guess <- parsedInput
                 if guess < numberToGuess then
@@ -115,16 +137,16 @@ type PingPongCEApp() =
     inherit FIOApp<unit, obj>()
 
     let pinger (channel1: Channel<string>) (channel2: Channel<string>) = fio {
-        let! ping = channel1.Send "ping"
+        let! ping = "ping" --> channel1
         do! printfnf $"pinger sent: %s{ping}"
-        let! pong = channel2.Receive()
+        let! pong = !<-- channel2
         do! printfnf $"pinger received: %s{pong}"
     }
 
     let ponger (channel1: Channel<string>) (channel2: Channel<string>) = fio {
-        let! ping = channel1.Receive()
+        let! ping = !<-- channel1
         do! printfnf $"ponger received: %s{ping}"
-        let! pong = channel2.Send "pong"
+        let! pong = "pong" --> channel2
         do! printfnf $"ponger sent: %s{pong}"
     }
 
@@ -193,7 +215,6 @@ type HighlyConcurrentApp() =
             return! receiver channel (count - 1) max
     }
 
-    [<TailCall>]
     let rec create channel count acc random = fio {
         if count = 0 then
             return! acc
@@ -309,7 +330,6 @@ type WebSocketApp(serverUrl, clientUrl) =
     override this.effect = fio {
         do! server serverUrl <!> client clientUrl
     }
-
 helloWorld1 ()
 Console.ReadLine() |> ignore
 
@@ -348,7 +368,7 @@ Console.ReadLine() |> ignore
 RaceServersApp().Run()
 Console.ReadLine() |> ignore
 
-HighlyConcurrentApp().Run()
+// HighlyConcurrentApp().Run()
 Console.ReadLine() |> ignore
 
 SocketApp("127.0.0.1", 5000).Run()

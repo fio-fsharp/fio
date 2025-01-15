@@ -15,7 +15,7 @@ type private EvaluationWorkerConfig =
     { Runtime: Runtime
       WorkItemQueue: InternalQueue<WorkItem>
       BlockingWorker: BlockingWorker
-      EvaluationWorkerSteps: int64 }
+      EvaluationWorkerSteps: int }
 
 and private BlockingWorkerConfig =
     { WorkItemQueue: InternalQueue<WorkItem>
@@ -24,7 +24,7 @@ and private BlockingWorkerConfig =
 and private EvaluationWorker(config: EvaluationWorkerConfig) =
 
     let processWorkItem workItem = 
-        match config.Runtime.InternalRun workItem.Effect workItem.LastAction config.EvaluationWorkerSteps workItem.Stack with
+        match config.Runtime.InternalRun workItem.Effect workItem.PrevAction config.EvaluationWorkerSteps workItem.Stack with
         | (Success result, _), Evaluated, _ ->
             workItem.Complete <| Ok result
 
@@ -122,10 +122,10 @@ and Runtime(config: WorkerConfig) as this =
         Runtime(
             { EvaluationWorkerCount = Environment.ProcessorCount - 1
               BlockingWorkerCount = 1
-              EvaluationWorkerSteps = 20L })
+              EvaluationWorkerSteps = 20 })
 
     [<TailCall>]
-    member internal this.InternalRun effect prevAction evalSteps stack : (FIO<obj, obj> * ContinuationStack) * RuntimeAction * int64 =
+    member internal this.InternalRun effect prevAction evalSteps stack : (FIO<obj, obj> * ContinuationStack) * RuntimeAction * int =
 
         let rec handleSuccess result newEvalSteps stack =
             match stack with
@@ -144,10 +144,10 @@ and Runtime(config: WorkerConfig) as this =
             | Ok result' -> handleSuccess result' newEvalSteps stack
             | Error error -> handleError error newEvalSteps stack
 
-        if evalSteps = 0L then
+        if evalSteps = 0 then
             ((effect, stack), RescheduleForRunning, 0)
         else
-            let newEvalSteps = evalSteps - 1L
+            let newEvalSteps = evalSteps - 1
             match effect with
             | Send (message, channel) ->
                 channel.Add message
