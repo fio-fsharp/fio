@@ -1,8 +1,8 @@
-﻿(************************************************************************************)
-(* FIO - A type-safe, highly concurrent programming library for F#                  *)
-(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU) *)
-(* All rights reserved                                                              *)
-(************************************************************************************)
+﻿(*************************************************************************************************************)
+(* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
+(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
+(* All rights reserved                                                                                       *)
+(*************************************************************************************************************)
 
 module private FIO.Examples
 

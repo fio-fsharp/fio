@@ -1,13 +1,13 @@
-﻿(************************************************************************************)
-(* FIO - A type-safe, highly concurrent programming library for F#                  *)
-(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU) *)
-(* All rights reserved                                                              *)
-(* -------------------------------------------------------------------------------- *)
-(* Threadring benchmark                                                             *)
-(* Measures: Message sending; Context switching between actors                      *)
-(* Savina benchmark #5                                                              *)
-(* (http://soft.vub.ac.be/AGERE14/papers/ageresplash2014_submission_19.pdf)         *)
-(************************************************************************************)
+﻿(*************************************************************************************************************)
+(* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
+(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
+(* All rights reserved                                                                                       *)
+(* --------------------------------------------------------------------------------------------------------- *)
+(* Threadring benchmark                                                                                      *)
+(* Measures: Message sending; Context switching between actors                                               *)
+(* Savina benchmark #5                                                                                       *)
+(* (http://soft.vub.ac.be/AGERE14/papers/ageresplash2014_submission_19.pdf)                                  *)
+(*************************************************************************************************************)
 
 module internal FIO.Benchmarks.Suite.Threadring
 
