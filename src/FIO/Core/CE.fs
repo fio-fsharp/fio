@@ -15,6 +15,15 @@ type FIOBuilder() =
     member inline this.Bind(effect: FIO<'R1, 'E>, continuation: 'R1 -> FIO<'R, 'E>) : FIO<'R, 'E> =
         effect.Bind continuation
 
+    member inline this.Combine(effect: FIO<'R, 'E>, effect': FIO<'R1, 'E>) : FIO<'R1, 'E> = 
+        effect.Then effect'
+
+    member inline this.Run(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
+        effect
+
+    member inline this.Zero() : FIO<unit, 'E> =
+        succeed ()
+
     member inline this.Return(result: 'R) : FIO<'R, 'E> =
         succeed result
 
@@ -25,18 +34,6 @@ type FIOBuilder() =
         succeed result
 
     member inline this.YieldFrom(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
-        effect
-
-    member inline this.Combine(effect: FIO<'R, 'E>, effect': FIO<'R1, 'E>) : FIO<'R1, 'E> = 
-        effect.Then effect'
-
-    member inline this.Zero() : FIO<unit, 'E> =
-        succeed ()
-
-    member inline this.Delay(func: unit -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        func ()
-
-    member inline this.Run(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
         effect
 
     member inline this.TryWith(effect: FIO<'R, 'E>, handler: 'E -> FIO<'R, 'E>) : FIO<'R, 'E> = 
@@ -50,6 +47,9 @@ type FIOBuilder() =
             with exn ->
                 fail (exn :?> 'E)
 
+    member inline this.Delay(func: unit -> FIO<'R, 'E>) : FIO<'R, 'E> =
+        func ()
+
     member inline this.For(sequence: seq<'T>, body: 'T -> FIO<unit, 'E>) : FIO<unit, 'E> =
         let rec loop (enumerator: IEnumerator<'T>) =
             if enumerator.MoveNext() then
@@ -58,11 +58,10 @@ type FIOBuilder() =
                 succeed ()
         sequence.GetEnumerator() |> loop
 
-    // TODO: While seems to be broken. :)
     member inline this.While(guard: unit -> bool, effect: FIO<'R, 'E>) : FIO<unit, 'E> =
         let rec loop () =
             if guard () then
-                this.Delay <| fun () -> effect >> loop ()
+                this.Delay <| fun () -> effect.Bind <| fun _ -> loop ()
             else
                 succeed ()
         loop ()

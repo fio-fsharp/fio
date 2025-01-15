@@ -18,11 +18,12 @@
 		<Compile Include="Core\DSL.fs" />
 		<Compile Include="Core\CE.fs" />
 		<Compile Include="Runtime\Runtime.fs" />
-		<Compile Include="Runtime\Tools.fs" />
 		<Compile Include="Runtime\NaiveRuntime.fs" />
 		<Compile Include="Runtime\IntermediateRuntime.fs" />
 		<Compile Include="Runtime\AdvancedRuntime.fs" />
 		<Compile Include="Runtime\DeadlockingRuntime.fs" />
+		<Compile Include="Runtime.Extensions\Monitor.fs" />
+		<Compile Include="Runtime.Extensions\DeadlockDetector.fs" />
 		<Compile Include="Library\Console.fs" />
 		<Compile Include="Library\Network.fs" />
 		<Compile Include="Core.Extensions\App.fs" />

@@ -23,7 +23,8 @@ and internal ContinuationStackFrame =
 and internal ContinuationStack =
     ContinuationStackFrame list
 
-and internal InternalQueue<'T> = BlockingCollection<'T>
+and internal InternalQueue<'T> =
+    BlockingCollection<'T>
 
 and internal RuntimeAction =
     | RescheduleForRunning
@@ -36,7 +37,7 @@ and internal WorkItem =
       Stack: ContinuationStack
       PrevAction: RuntimeAction }
 
-    static member Create(effect, internalFiber, stack, lastAction) =
+    static member internal Create(effect, internalFiber, stack, lastAction) =
         { Effect = effect
           InternalFiber = internalFiber
           Stack = stack

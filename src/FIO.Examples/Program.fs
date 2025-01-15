@@ -232,6 +232,7 @@ type HighlyConcurrentApp() =
         return! create channel (fiberCount - 1) acc random
     }
 
+// TODO: Does not work correctly.
 type SocketApp(ip: string, port: int) =
     inherit FIOApp<unit, exn>()
 
@@ -252,7 +253,8 @@ type SocketApp(ip: string, port: int) =
             while true do
                 let! clientSocket = !+ Socket<string>(listener.AcceptSocket())
                 let! endpoint = clientSocket.RemoteEndPoint()
-                do! printfnf $"Client connected from %A{endpoint}"
+                                >>= fun endPoint -> !+ endPoint.ToString()
+                do! printfnf $"Client connected from %s{endpoint}"
                 do! !! echo(clientSocket)
         }
 
@@ -281,6 +283,7 @@ type SocketApp(ip: string, port: int) =
         do! server ip port <!> client ip port
     }
 
+// TODO: Does not work correctly.
 type WebSocketApp(serverUrl, clientUrl) =
     inherit FIOApp<unit, exn>()
 
@@ -295,7 +298,7 @@ type WebSocketApp(serverUrl, clientUrl) =
     
         fio {
             let! serverSocket = !+ ServerWebSocket<string>()
-            do! serverSocket.Start(url)
+            do! serverSocket.Start url
             do! printfnf $"Server listening on %s{url}..."
 
             while true do
@@ -323,13 +326,14 @@ type WebSocketApp(serverUrl, clientUrl) =
 
         fio {
             let! clientSocket = !+ ClientWebSocket<string>()
-            do! clientSocket.Connect(url)
+            do! clientSocket.Connect url
             do! send clientSocket <!> receive clientSocket
         }
 
     override this.effect = fio {
         do! server serverUrl <!> client clientUrl
     }
+
 helloWorld1 ()
 Console.ReadLine() |> ignore
 
@@ -348,10 +352,11 @@ Console.ReadLine() |> ignore
 EnterNumberApp().Run()
 Console.ReadLine() |> ignore
 
-let appResult = EnterNumberApp().Run(
-    (fun success -> $"You won: %s{success}"), 
-    (fun error -> $"You lost: %s{error}"))
-printfn $"%s{appResult}"
+TryCatchApp().Run()
+Console.ReadLine() |> ignore
+
+ForApp().Run()
+Console.ReadLine() |> ignore
 
 GuessNumberApp().Run() // TODO: Does not work correctly.
 Console.ReadLine() |> ignore
@@ -368,11 +373,11 @@ Console.ReadLine() |> ignore
 RaceServersApp().Run()
 Console.ReadLine() |> ignore
 
-// HighlyConcurrentApp().Run()
+HighlyConcurrentApp().Run()
 Console.ReadLine() |> ignore
 
-SocketApp("127.0.0.1", 5000).Run()
+SocketApp("127.0.0.1", 5000).Run() // TODO: Does not work correctly.
 Console.ReadLine() |> ignore
 
-WebSocketApp("http://localhost:8080/", "ws://localhost:8080/").Run()
+WebSocketApp("http://localhost:8080/", "ws://localhost:8080/").Run() // TODO: Does not work correctly.
 Console.ReadLine() |> ignore

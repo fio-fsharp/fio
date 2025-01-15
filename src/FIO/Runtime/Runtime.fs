@@ -8,14 +8,14 @@ namespace FIO.Runtime
 
 open FIO.Core
 
+[<AbstractClass>]
+type FIORuntime() =
+    abstract member Run : FIO<'R, 'E> -> Fiber<'R, 'E>
+
 type WorkerConfig =
     { EvaluationWorkerCount: int
       EvaluationWorkerSteps: int 
       BlockingWorkerCount: int }
-
-[<AbstractClass>]
-type FIORuntime() =
-    abstract member Run : FIO<'R, 'E> -> Fiber<'R, 'E>
 
 [<AbstractClass>]
 type FIOWorkerRuntime(config: WorkerConfig) =

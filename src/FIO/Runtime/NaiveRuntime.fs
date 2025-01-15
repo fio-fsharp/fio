@@ -11,56 +11,58 @@ open FIO.Core
 type Runtime() =
     inherit FIORuntime()
 
-    [<TailCall>]
     member private this.InternalRun (effect: FIO<obj, obj>) (stack: ContinuationStack) : Result<obj, obj> =
 
         let rec handleSuccess result stack =
             match stack with
             | [] -> Ok result
-            | (SuccessKind, cont) :: ss -> this.InternalRun (cont result) ss
+            | (SuccessKind, cont) :: ss -> interpret (cont result) ss
             | (ErrorKind, _) :: ss -> handleSuccess result ss
 
-        let rec handleError error stack =
+        and handleError error stack =
             match stack with
             | [] -> Error error
             | (SuccessKind, _) :: ss -> handleError error ss
-            | (ErrorKind, cont) :: ss -> this.InternalRun (cont error) ss
+            | (ErrorKind, cont) :: ss -> interpret (cont error) ss
 
-        let handleResult result stack =
+        and handleResult result stack =
             match result with
             | Ok result' -> handleSuccess result' stack
             | Error error -> handleError error stack
 
-        match effect with
-        | Send (message, channel) ->
-            channel.Add message
-            handleSuccess message stack
+        and interpret effect' stack' =
+            match effect' with
+            | Send (message, channel) ->
+                channel.Add message
+                handleSuccess message stack'
 
-        | Receive channel ->
-            handleSuccess (channel.Take()) stack
+            | Receive channel ->
+                handleSuccess (channel.Take()) stack'
 
-        | Concurrent (effect, fiber, internalFiber) ->
-            async {
-                internalFiber.Complete
-                <| this.InternalRun effect ContinuationStack.Empty
-            }
-            |> Async.Start
-            handleSuccess fiber stack
+            | Concurrent (effect, fiber, internalFiber) ->
+                async {
+                    internalFiber.Complete
+                    <| interpret effect ContinuationStack.Empty
+                }
+                |> Async.Start
+                handleSuccess fiber stack'
 
-        | Await internalFiber ->
-            handleResult (internalFiber.AwaitResult()) stack
+            | Await internalFiber ->
+                handleResult (internalFiber.AwaitResult()) stack'
 
-        | ChainSuccess (effect, continuation) ->
-            this.InternalRun effect ((SuccessKind, continuation) :: stack)
+            | ChainSuccess (effect, continuation) ->
+                interpret effect ((SuccessKind, continuation) :: stack')
 
-        | ChainError (effect, continuation) ->
-            this.InternalRun effect ((ErrorKind, continuation) :: stack)
+            | ChainError (effect, continuation) ->
+                interpret effect ((ErrorKind, continuation) :: stack')
 
-        | Success result ->
-            handleSuccess result stack
+            | Success result ->
+                handleSuccess result stack'
 
-        | Failure result ->
-            handleError result stack
+            | Failure error ->
+                handleError error stack'
+
+        interpret effect stack
 
     override this.Run (effect: FIO<'R, 'E>) : Fiber<'R, 'E> =
         let fiber = new Fiber<'R, 'E>()
