@@ -167,15 +167,15 @@ and Runtime(config: WorkerConfig) as this =
                     else
                         (Receive channel, stack, RescheduleForBlocking(BlockingChannel channel), evalSteps)
 
-                | Concurrent (effect, fiber, ifiber) ->
-                    workItemQueue.Add <| WorkItem.Create(effect, ifiber, [], prevAction)
+                | Concurrent (effect, fiber, internalFiber) ->
+                    workItemQueue.Add <| WorkItem.Create(effect, internalFiber, [], prevAction)
                     handleSuccess fiber stack evalSteps newEvalSteps
 
-                | Await ifiber ->
-                    if ifiber.Completed() then
-                        handleResult (ifiber.AwaitResult()) stack evalSteps newEvalSteps
+                | Await internalFiber ->
+                    if internalFiber.Completed() then
+                        handleResult (internalFiber.AwaitResult()) stack evalSteps newEvalSteps
                     else
-                        (Await ifiber, stack, RescheduleForBlocking(BlockingFiber ifiber), evalSteps)
+                        (Await internalFiber, stack, RescheduleForBlocking <| BlockingFiber internalFiber, evalSteps)
 
                 | ChainSuccess (effect, continuation) ->
                     interpret effect ((SuccessKind, continuation) :: stack) prevAction evalSteps

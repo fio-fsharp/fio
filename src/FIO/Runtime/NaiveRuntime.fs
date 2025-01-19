@@ -11,7 +11,7 @@ open FIO.Core
 type Runtime() =
     inherit FIORuntime()
 
-    member private this.InternalRun (effect: FIO<obj, obj>) (stack: ContinuationStack) : Result<obj, obj> =
+    member private this.InternalRun effect stack : Result<obj, obj> =
 
         let rec handleSuccess result stack =
             match stack with

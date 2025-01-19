@@ -79,7 +79,7 @@ type ForApp() =
     inherit FIOApp<unit, obj>()
 
     override this.effect = fio {
-        for number in 1..10 do // TODO: How to use for comprehension correctly with FIO?
+        for number in 1..10 do
             match number % 2 = 0 with
             | true -> printfn $"{number} is even!"
             | false -> ()
@@ -92,7 +92,6 @@ type GuessNumberApp() =
         let! numberToGuess = !+ Random().Next(1, 100)
         let mutable guess = -1
 
-        // TODO: This while loop here does not work.
         while guess <> numberToGuess do
             do! printff "Guess a number: "
             let! input = readLine ()
@@ -232,7 +231,6 @@ type HighlyConcurrentApp() =
         return! create channel (fiberCount - 1) acc random
     }
 
-// TODO: Does not work correctly.
 type SocketApp(ip: string, port: int) =
     inherit FIOApp<unit, exn>()
 
@@ -283,7 +281,6 @@ type SocketApp(ip: string, port: int) =
         do! server ip port <!> client ip port
     }
 
-// TODO: Does not work correctly.
 type WebSocketApp(serverUrl, clientUrl) =
     inherit FIOApp<unit, exn>()
 
@@ -358,7 +355,7 @@ Console.ReadLine() |> ignore
 ForApp().Run()
 Console.ReadLine() |> ignore
 
-GuessNumberApp().Run() // TODO: Does not work correctly.
+GuessNumberApp().Run()
 Console.ReadLine() |> ignore
 
 PingPongApp().Run()
@@ -376,8 +373,8 @@ Console.ReadLine() |> ignore
 HighlyConcurrentApp().Run()
 Console.ReadLine() |> ignore
 
-SocketApp("127.0.0.1", 5000).Run() // TODO: Does not work correctly.
+SocketApp("127.0.0.1", 5000).Run()
 Console.ReadLine() |> ignore
 
-WebSocketApp("http://localhost:8080/", "ws://localhost:8080/").Run() // TODO: Does not work correctly.
+WebSocketApp("http://localhost:8080/", "ws://localhost:8080/").Run()
 Console.ReadLine() |> ignore

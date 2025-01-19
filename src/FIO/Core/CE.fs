@@ -48,7 +48,7 @@ type FIOBuilder() =
                 fail (exn :?> 'E)
 
     member inline this.Delay(func: unit -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        func ()
+        (succeed ()).Bind <| fun _ -> func ()
 
     member inline this.For(sequence: seq<'T>, body: 'T -> FIO<unit, 'E>) : FIO<unit, 'E> =
         let rec loop (enumerator: IEnumerator<'T>) =

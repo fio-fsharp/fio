@@ -104,7 +104,7 @@ type Parser() =
                     | Some(ewc, bwc, esc) -> Advanced.Runtime({ EvaluationWorkerCount = ewc; EvaluationWorkerSteps = esc; BlockingWorkerCount = bwc })
                     | _ ->
                         match results.TryGetResult Deadlocking_Runtime with
-                        | Some(ewc, bwc, esc) -> Deadlocking.DeadlockingRuntime(ewc, bwc, esc)
+                        | Some(ewc, bwc, esc) -> Deadlocking.Runtime({ EvaluationWorkerCount = ewc; EvaluationWorkerSteps = esc; BlockingWorkerCount = bwc })
                         | _ -> failwith "ArgParser: Invalid runtime specified!"
 
         (configs, runtime, runs, processIncrement)

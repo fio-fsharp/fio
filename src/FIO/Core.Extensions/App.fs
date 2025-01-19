@@ -73,7 +73,7 @@ type FIOApp<'R, 'E> (successHandler: 'R -> unit, errorHandler: 'E -> unit, runti
     abstract member effect: FIO<'R, 'E>
 
     member this.Run() =
-        this.Run(runtime)
+        this.Run runtime
 
     member this.Run(runtime: FIORuntime) =
         let fiber = runtime.Run this.effect
