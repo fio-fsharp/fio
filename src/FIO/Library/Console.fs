@@ -4,23 +4,20 @@
 (* All rights reserved                                                                                       *)
 (*************************************************************************************************************)
 
-module private Program
+module FIO.Library.Console
 
-open FIO.Benchmarks.Suite.Runner
+open System
 
-open System.Threading
+open FIO.Core
 
-let maxThreads = 32767
-ThreadPool.SetMaxThreads(maxThreads, maxThreads) |> ignore
-ThreadPool.SetMinThreads(maxThreads, maxThreads) |> ignore
+let printfnf format : FIO<'R, 'E> =
+    !+ printfn(format)
 
-let runBenchmarks parsedArgs =
-    let configs, runtime, runs, fiberIncrement = parsedArgs
-    Run configs runtime runs fiberIncrement
+let printff format : FIO<'R, 'E> =
+    !+ printf(format)
 
-[<EntryPoint>]
-let main args =
-    let parser = ArgParser.Parser()
-    parser.PrintArgs args
-    runBenchmarks <| parser.ParseArgs args
-    0
+let sprintff format : FIO<'R, 'E> =
+    !+ sprintf(format)
+
+let readLine () : FIO<string, 'E> =
+    !+ Console.ReadLine()

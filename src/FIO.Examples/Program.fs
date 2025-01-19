@@ -1,8 +1,8 @@
-﻿(************************************************************************************)
-(* FIO - A type-safe, highly concurrent programming library for F#                  *)
-(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU) *)
-(* All rights reserved                                                              *)
-(************************************************************************************)
+﻿(*************************************************************************************************************)
+(* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
+(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
+(* All rights reserved                                                                                       *)
+(*************************************************************************************************************)
 
 module private FIO.Examples
 
@@ -16,30 +16,31 @@ open System.Net.WebSockets
 
 open FIO.Core
 open FIO.Runtime.Advanced
+open FIO.Library.Console
 open FIO.Library.Network.Sockets
 open FIO.Library.Network.WebSockets
 
 let helloWorld1 () =
     let hello: FIO<string, obj> = !+ "Hello world!"
-    let fiber: Fiber<string, obj> = AdvancedRuntime().Run hello
+    let fiber: Fiber<string, obj> = Runtime().Run hello
     let result: Result<string, obj> = fiber.AwaitResult()
     printfn $"%A{result}"
 
 let helloWorld2 () =
     let hello: FIO<obj, string> = !- "Hello world!"
-    let fiber: Fiber<obj, string> = AdvancedRuntime().Run hello
+    let fiber: Fiber<obj, string> = Runtime().Run hello
     let result: Result<obj, string> = fiber.AwaitResult()
     printfn $"%A{result}"
 
 let helloWorld3 () =
     let hello = !+ "Hello world!"
-    let fiber = AdvancedRuntime().Run hello
+    let fiber = Runtime().Run hello
     let result = fiber.AwaitResult()
     printfn $"%A{result}"
 
 let concurrency () =
     let concurrent = ! !+ 42 >>= fun fiber -> !? fiber >>= succeed
-    let fiber = AdvancedRuntime().Run concurrent
+    let fiber = Runtime().Run concurrent
     let result = fiber.AwaitResult()
     printfn $"%A{result}"
 
@@ -47,20 +48,41 @@ type WelcomeApp() =
     inherit FIOApp<unit, obj>()
 
     override this.effect = fio {
-        do! !+ printfn("Hello! What is your name?")
-        let! name = !+ Console.ReadLine()
-        do! !+ printfn($"Hello, %s{name}, welcome to FIO! 🪻💜")
+        do! printfnf "Hello! What is your name?"
+        let! name = readLine ()
+        do! printfnf $"Hello, %s{name}, welcome to FIO! 🪻💜"
     }
 
 type EnterNumberApp() =
     inherit FIOApp<string, string>()
 
     override this.effect = fio {
-        do! !+ printf("Enter a number: ")
-        let! input = !+ Console.ReadLine()
-        match Int32.TryParse(input) with
+        do! printff "Enter a number: "
+        let! input = readLine ()
+        match Int32.TryParse input with
         | true, number -> return $"You entered the number: {number}."
         | false, _ -> return! !- "You entered an invalid number!"
+    }
+
+type TryCatchApp() =
+    inherit FIOApp<string, int>()
+
+    override this.effect = fio {
+        try 
+            do! !- 1
+            return "Successfully completed!"
+        with errorCode ->
+            return! !- errorCode
+    }
+
+type ForApp() =
+    inherit FIOApp<unit, obj>()
+
+    override this.effect = fio {
+        for number in 1..10 do
+            match number % 2 = 0 with
+            | true -> printfn $"{number} is even!"
+            | false -> ()
     }
 
 type GuessNumberApp() =
@@ -71,19 +93,19 @@ type GuessNumberApp() =
         let mutable guess = -1
 
         while guess <> numberToGuess do
-            do! !+ printf("Guess a number: ")
-            let! input = !+ Console.ReadLine()
+            do! printff "Guess a number: "
+            let! input = readLine ()
 
-            match Int32.TryParse(input) with
+            match Int32.TryParse input with
             | true, parsedInput ->
                 guess <- parsedInput
                 if guess < numberToGuess then
-                    do! !+ printfn("Too low! Try again.")
+                    do! printfnf "Too low! Try again."
                 elif guess > numberToGuess then
-                    do! !+ printfn("Too high! Try again.")
+                    do! printfnf "Too high! Try again."
                 else
-                    do! !+ printfn("Congratulations! You guessed the number!")
-            | _ -> do! !+ printfn("Invalid input. Please enter a number.")
+                    do! printfnf "Congratulations! You guessed the number!"
+            | _ -> do! printfnf "Invalid input. Please enter a number."
 
         return guess
     }
@@ -114,17 +136,17 @@ type PingPongCEApp() =
     inherit FIOApp<unit, obj>()
 
     let pinger (channel1: Channel<string>) (channel2: Channel<string>) = fio {
-        let! ping = channel1.Send "ping"
-        do! !+ printfn($"pinger sent: %s{ping}")
-        let! pong = channel2.Receive()
-        do! !+ printfn($"pinger received: %s{pong}")
+        let! ping = "ping" --> channel1
+        do! printfnf $"pinger sent: %s{ping}"
+        let! pong = !<-- channel2
+        do! printfnf $"pinger received: %s{pong}"
     }
 
     let ponger (channel1: Channel<string>) (channel2: Channel<string>) = fio {
-        let! ping = channel1.Receive()
-        do! !+ printfn($"ponger received: %s{ping}")
-        let! pong = channel2.Send "pong"
-        do! !+ printfn($"ponger sent: %s{pong}")
+        let! ping = !<-- channel1
+        do! printfnf $"ponger received: %s{ping}"
+        let! pong = "pong" --> channel2
+        do! printfnf $"ponger sent: %s{pong}"
     }
 
     override this.effect = fio {
@@ -179,20 +201,19 @@ type HighlyConcurrentApp() =
     let sender (channel: Channel<int>) id (random: Random) = fio {
         let! message = !+ random.Next(100, 501)
         do! message -!> channel
-        do! !+ printfn($"Sender[%i{id}] sent: %i{message}")
+        do! printfnf $"Sender[%i{id}] sent: %i{message}"
     }
 
     let rec receiver (channel: Channel<int>) count (max: int) = fio {
         if count = 0 then
             let! maxFibers = !+ max.ToString("N0", CultureInfo("en-US"))
-            do! !+ printfn($"Successfully received a message from all %s{maxFibers} fibers!")
+            do! printfnf $"Successfully received a message from all %s{maxFibers} fibers!"
         else
             let! message = !<-- channel
-            do! !+ printfn($"Receiver received: %i{message}")
+            do! printfnf $"Receiver received: %i{message}"
             return! receiver channel (count - 1) max
     }
 
-    [<TailCall>]
     let rec create channel count acc random = fio {
         if count = 0 then
             return! acc
@@ -217,35 +238,36 @@ type SocketApp(ip: string, port: int) =
         let echo (clientSocket: Socket<string>) = fio {
             while true do
                 let! received = clientSocket.Receive()
-                do! !+ printfn($"Server received: %s{received}")
-                let! echo = !+ sprintf($"Echo: %s{received}")
+                do! printfnf $"Server received: %s{received}"
+                let! echo = !+ $"Echo: %s{received}"
                 do! clientSocket.Send echo
         }
 
         fio {
             let! listener = !+ (new TcpListener(IPAddress.Parse(ip), port))
             do! !+ listener.Start()
-            do! !+ printfn($"Server listening on %s{ip}:%i{port}...")
+            do! printfnf $"Server listening on %s{ip}:%i{port}..."
 
             while true do
                 let! clientSocket = !+ Socket<string>(listener.AcceptSocket())
                 let! endpoint = clientSocket.RemoteEndPoint()
-                do! !+ printfn($"Client connected from %A{endpoint}")
+                                >>= fun endPoint -> !+ endPoint.ToString()
+                do! printfnf $"Client connected from %s{endpoint}"
                 do! !! echo(clientSocket)
         }
 
     let client (ip: string) (port: int) =
         let send (socket: Socket<string>) = fio {
             while true do
-                do! !+ printf("Enter a message: ")
-                let! message = !+ Console.ReadLine()
+                do! printff "Enter a message: "
+                let! message = readLine ()
                 do! socket.Send message
         }
 
         let receive (socket: Socket<string>) = fio {
             while true do
                 let! received = socket.Receive()
-                do! !+ printfn($"Client received: %s{received}")
+                do! printfnf $"Client received: %s{received}"
         }
     
         fio {
@@ -266,40 +288,42 @@ type WebSocketApp(serverUrl, clientUrl) =
         let echo (clientSocket: WebSocket<string>) = fio {
             while clientSocket.State = WebSocketState.Open do
                 let! received = clientSocket.Receive()
-                do! !+ printfn($"Server received: %s{received}")
-                let! echo = !+ sprintf($"Echo: %s{received}")
+                do! printfnf $"Server received: %s{received}"
+                let! echo = !+ $"Echo: %s{received}"
                 do! clientSocket.Send echo
         }
     
         fio {
             let! serverSocket = !+ ServerWebSocket<string>()
-            do! serverSocket.Start(url)
-            do! !+ printfn($"Server listening on %s{url}...")
+            do! serverSocket.Start url
+            do! printfnf $"Server listening on %s{url}..."
 
             while true do
                 let! clientSocket = serverSocket.Accept()
-                let! remoteEndPoint = clientSocket.RemoteEndPoint()
-                do! !+ printfn($"Client connected from %s{remoteEndPoint.ToString()}")
+                let! remoteEndPoint = 
+                    clientSocket.RemoteEndPoint()
+                    >>= fun endPoint -> !+ endPoint.ToString()                  
+                do! printfnf $"Client connected from %s{remoteEndPoint}"
                 do! !! echo(clientSocket)
         }
 
     let client url =
         let send (clientSocket: ClientWebSocket<string>) = fio {
             while true do
-                do! !+ printf("Enter a message: ")
-                let! message = !+ Console.ReadLine()
+                do! printff "Enter a message: "
+                let! message = readLine ()
                 do! clientSocket.Send message
         }
 
         let receive (clientSocket: ClientWebSocket<string>) = fio {
             while true do
                 let! message = clientSocket.Receive()
-                do! !+ printfn($"Client received: %s{message}")
+                do! printfnf $"Client received: %s{message}"
         }
 
         fio {
             let! clientSocket = !+ ClientWebSocket<string>()
-            do! clientSocket.Connect(url)
+            do! clientSocket.Connect url
             do! send clientSocket <!> receive clientSocket
         }
 
@@ -325,12 +349,13 @@ Console.ReadLine() |> ignore
 EnterNumberApp().Run()
 Console.ReadLine() |> ignore
 
-let appResult = EnterNumberApp().Run(
-    (fun success -> $"You won: %s{success}"), 
-    (fun error -> $"You lost: %s{error}"))
-printfn $"%s{appResult}"
+TryCatchApp().Run()
+Console.ReadLine() |> ignore
 
-GuessNumberApp().Run() // TODO: Does not work correctly.
+ForApp().Run()
+Console.ReadLine() |> ignore
+
+GuessNumberApp().Run()
 Console.ReadLine() |> ignore
 
 PingPongApp().Run()

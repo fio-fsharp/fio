@@ -10,7 +10,7 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<RepositoryUrl>https://github.com/iyyel/fio</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
-		<Version>0.0.9-alpha</Version>
+		<Version>0.0.11-alpha</Version>
 		<PackageIcon>fio_logo_wide.png</PackageIcon>
 	</PropertyGroup>
 
@@ -18,11 +18,13 @@
 		<Compile Include="Core\DSL.fs" />
 		<Compile Include="Core\CE.fs" />
 		<Compile Include="Runtime\Runtime.fs" />
-		<Compile Include="Runtime\Tools.fs" />
-		<Compile Include="Runtime\Naive.fs" />
-		<Compile Include="Runtime\Intermediate.fs" />
-		<Compile Include="Runtime\Advanced.fs" />
-		<Compile Include="Runtime\Deadlocking.fs" />
+		<Compile Include="Runtime\NaiveRuntime.fs" />
+		<Compile Include="Runtime\IntermediateRuntime.fs" />
+		<Compile Include="Runtime\AdvancedRuntime.fs" />
+		<Compile Include="Runtime\DeadlockingRuntime.fs" />
+		<Compile Include="Runtime.Extensions\Monitor.fs" />
+		<Compile Include="Runtime.Extensions\DeadlockDetector.fs" />
+		<Compile Include="Library\Console.fs" />
 		<Compile Include="Library\Network.fs" />
 		<Compile Include="Core.Extensions\App.fs" />
 	</ItemGroup>
@@ -45,8 +47,8 @@
 			<PackagePath>\</PackagePath>
 		</None>
 		<None Include="..\..\LICENSE.md">
-		  <Pack>True</Pack>
-		  <PackagePath>\</PackagePath>
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
 		</None>
 		<None Include="..\..\README.md">
 			<Pack>True</Pack>

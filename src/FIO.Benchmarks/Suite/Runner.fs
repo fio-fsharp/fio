@@ -1,8 +1,8 @@
-﻿(************************************************************************************)
-(* FIO - A type-safe, highly concurrent programming library for F#                  *)
-(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU) *)
-(* All rights reserved                                                              *)
-(************************************************************************************)
+﻿(*************************************************************************************************************)
+(* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
+(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
+(* All rights reserved                                                                                       *)
+(*************************************************************************************************************)
 
 module internal FIO.Benchmarks.Suite.Runner
 
@@ -110,20 +110,24 @@ let private printResult (result: BenchmarkResult) =
     let toPrint = headerStr + runExecTimesStr
     printfn $"%s{toPrint}"
 
-let private runBenchmark config runs (runtime: Runtime) : BenchmarkResult =
-    let getRuntimeName (runtime: Runtime) =
+let private runBenchmark config runs (runtime: FIORuntime) : BenchmarkResult =
+    let getRuntimeName (runtime: FIORuntime) =
+        (*
         match runtime with
-        | :? NaiveRuntime -> ("naive", "Naive")
-        | :? IntermediateRuntime as r ->
+        | :? Runtime -> ("naive", "Naive")
+        | :? Runtime as r ->
             let ewc, bwc, esc = r.GetConfiguration()
             ($"intermediate-ewc%i{ewc}-bwc%i{bwc}-esc%i{esc}", $"Intermediate (EWC: %i{ewc} BWC: %i{bwc} ESC: %i{esc})")
-        | :? AdvancedRuntime as r ->
-            let ewc, bwc, esc = r.GetConfiguration()
+        | :? Runtime as r ->
+            let config = r.GetWorkerConfiguration()
+            let (ewc, bwc, esc) = (config.EvaluationWorkerCount, config.BlockingWorkerCount, config.EvaluationWorkerSteps)
             ($"advanced-ewc%i{ewc}-bwc%i{bwc}-esc%i{esc}", $"Advanced (EWC: %i{ewc} BWC: %i{bwc} ESC: %i{esc})")
         | :? DeadlockingRuntime as r ->
             let ewc, bwc, esc = r.GetConfiguration()
             ($"deadlocking-ewc%i{ewc}-bwc%i{bwc}-esc%i{esc}", $"Deadlocking (EWC: %i{ewc} BWC: %i{bwc} ESC: %i{esc})")
         | _ -> failwith "runBenchmark: Invalid runtime!"
+        *)
+        failwith "Not implemented currently!"
 
     let createBenchmark config =
         match config with

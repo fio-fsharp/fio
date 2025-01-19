@@ -1,96 +1,75 @@
-﻿(************************************************************************************)
-(* FIO - A type-safe, highly concurrent programming library for F#                  *)
-(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU) *)
-(* All rights reserved                                                              *)
-(************************************************************************************)
+﻿(*************************************************************************************************************)
+(* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
+(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
+(* All rights reserved                                                                                       *)
+(*************************************************************************************************************)
 
 [<AutoOpen>]
 module FIO.Core.CE
 
-module internal FIOBuilderHelper =
-
-    let inline internal Bind(effect: FIO<'R1, 'E>) (continuation: 'R1 -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        effect >>= continuation
-
-    let inline internal Return(result: 'R) : FIO<'R, 'E> =
-        !+ result
-
-    let inline internal ReturnFrom(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
-        effect
-
-    let inline internal Yield(result: 'R) : FIO<'R, 'E> =
-        Return result
-
-    let inline internal YieldFrom(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
-        ReturnFrom effect
-
-    let inline internal Combine(firstEffect: FIO<'R, 'E>) (secondEffect: FIO<'R1, 'E>) : FIO<'R1, 'E> =
-        firstEffect >> secondEffect
-
-    let inline internal Zero() : FIO<unit, 'E> =
-        !+ ()
-
-    let inline internal Delay(factory: unit -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        NonBlocking (fun () -> Ok()) >>= fun _ -> factory ()
-
-    let inline internal Run(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
-        effect
-
-    let inline internal TryWith(effect: FIO<'R, 'E>) (handler: 'E -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        effect >>? handler
-
-    let inline internal TryFinally(effect: FIO<'R, 'E>) (finalizer: unit -> unit) : FIO<'R, 'E> =
-        effect >>= fun result ->
-            try
-                finalizer ()
-                !+ result
-            with exn ->
-                !- (exn :?> 'E)
-
-    let inline internal While(guard: unit -> bool) (effect: FIO<'R, 'E>) : FIO<unit, 'E> =
-        let rec loop () =
-            if guard () then
-                Delay <| fun () -> effect >> loop ()
-            else
-                !+ ()
-        loop ()
+open System
+open System.Collections.Generic
 
 type FIOBuilder() =
 
-    member this.Bind(effect: FIO<'R1, 'E>, continuation: 'R1 -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        FIOBuilderHelper.Bind effect continuation
+    member inline this.Bind(effect: FIO<'R1, 'E>, continuation: 'R1 -> FIO<'R, 'E>) : FIO<'R, 'E> =
+        effect.Bind continuation
 
-    member this.Return(result: 'R) : FIO<'R, 'E> =
-        FIOBuilderHelper.Return result
+    member inline this.Combine(effect: FIO<'R, 'E>, effect': FIO<'R1, 'E>) : FIO<'R1, 'E> = 
+        effect.Then effect'
 
-    member this.ReturnFrom(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
-        FIOBuilderHelper.ReturnFrom effect
+    member inline this.Run(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
+        effect
 
-    member this.Yield(result: 'R) : FIO<'R, 'E> =
-        FIOBuilderHelper.Yield result
+    member inline this.Zero() : FIO<unit, 'E> =
+        succeed ()
 
-    member this.YieldFrom(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
-        FIOBuilderHelper.YieldFrom effect
+    member inline this.Return(result: 'R) : FIO<'R, 'E> =
+        succeed result
 
-    member this.Combine(firstEffect: FIO<'R, 'E>, secondEffect: FIO<'R1, 'E>) : FIO<'R1, 'E> = 
-        FIOBuilderHelper.Combine firstEffect secondEffect
+    member inline this.ReturnFrom(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
+        effect
 
-    member this.Zero() : FIO<unit, 'E> =
-        FIOBuilderHelper.Zero()
+    member inline this.Yield(result: 'R) : FIO<'R, 'E> =
+        succeed result
 
-    member this.Delay(factory: unit -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        FIOBuilderHelper.Delay factory
+    member inline this.YieldFrom(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
+        effect
 
-    member this.Run(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
-        FIOBuilderHelper.Run effect
+    member inline this.TryWith(effect: FIO<'R, 'E>, handler: 'E -> FIO<'R, 'E>) : FIO<'R, 'E> = 
+        effect.BindError handler
 
-    member this.TryWith(effect: FIO<'R, exn>, handler: exn -> FIO<'R, exn>) : FIO<'R, exn> = 
-        FIOBuilderHelper.TryWith effect handler
+    member inline this.TryFinally(effect: FIO<'R, 'E>, finalizer: unit -> unit) : FIO<'R, 'E> =
+        effect.Bind <| fun result ->
+            try
+                finalizer ()
+                succeed result
+            with exn ->
+                fail (exn :?> 'E)
 
-    member this.TryFinally(effect: FIO<'R, 'E>, finalizer: unit -> unit) : FIO<'R, 'E> =
-        FIOBuilderHelper.TryFinally effect finalizer
+    member inline this.Delay(func: unit -> FIO<'R, 'E>) : FIO<'R, 'E> =
+        (succeed ()).Bind <| fun _ -> func ()
 
-    member this.While(guard: unit -> bool, effect: FIO<'R, 'E>) : FIO<unit, 'E> =
-        FIOBuilderHelper.While guard effect
+    member inline this.For(sequence: seq<'T>, body: 'T -> FIO<unit, 'E>) : FIO<unit, 'E> =
+        let rec loop (enumerator: IEnumerator<'T>) =
+            if enumerator.MoveNext() then
+                (body enumerator.Current).Then <| loop enumerator
+            else
+                succeed ()
+        sequence.GetEnumerator() |> loop
+
+    member inline this.While(guard: unit -> bool, effect: FIO<'R, 'E>) : FIO<unit, 'E> =
+        let rec loop () =
+            if guard () then
+                this.Delay <| fun () -> effect.Bind <| fun _ -> loop ()
+            else
+                succeed ()
+        loop ()
+
+    member inline this.Using(resource: #IDisposable, body: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
+        this.TryFinally(body resource, fun () -> resource.Dispose())
+
+    member inline this.Match(value: 'T, cases: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
+        cases value
 
 let fio = FIOBuilder()

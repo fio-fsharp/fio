@@ -1,8 +1,8 @@
-﻿(************************************************************************************)
-(* FIO - A type-safe, highly concurrent programming library for F#                  *)
-(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU) *)
-(* All rights reserved                                                              *)
-(************************************************************************************)
+﻿(*************************************************************************************************************)
+(* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
+(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
+(* All rights reserved                                                                                       *)
+(*************************************************************************************************************)
 
 module private FIO.Tests
 
@@ -13,9 +13,6 @@ open NUnit.Framework
 
 open FIO.Core
 open FIO.Runtime
-open FIO.Runtime.Naive
-open FIO.Runtime.Intermediate
-open FIO.Runtime.Advanced
 
 [<TestFixture>]
 type private RuntimeTests() =
@@ -36,13 +33,13 @@ type private RuntimeTests() =
 
     static member GenerateRuntimes() =
         seq {
-            yield TestCaseData(NaiveRuntime())
-            yield TestCaseData(IntermediateRuntime())
-            yield TestCaseData(AdvancedRuntime())
+            yield TestCaseData(Naive.Runtime())
+            yield TestCaseData(Intermediate.Runtime())
+            yield TestCaseData(Advanced.Runtime())
         }
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.SucceedFunctionTest(runtime: Runtime) =
+    member this.SucceedFunctionTest(runtime: FIORuntime) =
         // Arrange
         let expected = "Jinsei x Boku"
         let effect = !+ expected
@@ -57,7 +54,7 @@ type private RuntimeTests() =
         Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.FailFunctionTest(runtime: Runtime) =
+    member this.FailFunctionTest(runtime: FIORuntime) =
         // Arrange
         let expected = "Niche Syndrome"
         let effect = !- expected
@@ -72,7 +69,7 @@ type private RuntimeTests() =
         Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.StopFunctionTest(runtime: Runtime) =
+    member this.StopFunctionTest(runtime: FIORuntime) =
         // Arrange
         let expected = ()
         let effect = !+ ()
@@ -87,7 +84,7 @@ type private RuntimeTests() =
         Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.SendMessageFunctionTest(runtime: Runtime) =
+    member this.SendMessageFunctionTest(runtime: FIORuntime) =
         // Arrange
         let expected = "Beam of Light"
         let channel = Channel()
@@ -104,7 +101,7 @@ type private RuntimeTests() =
         Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ReceiveMessageFunctionTest(runtime: Runtime) =
+    member this.ReceiveMessageFunctionTest(runtime: FIORuntime) =
         // Arrange
         let expected = "Zeitakubyo"
         let channel = Channel()
@@ -125,7 +122,7 @@ type private RuntimeTests() =
         Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ConcurrentlyAndAwaitSucceedFunctionTest(runtime: Runtime) =
+    member this.ConcurrentlyAndAwaitSucceedFunctionTest(runtime: FIORuntime) =
         // Arrange
         let expected = "ONE OK ROCK"
 
@@ -144,7 +141,7 @@ type private RuntimeTests() =
         Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ConcurrentlyAndAwaitFailFunctionTest(runtime: Runtime) =
+    member this.ConcurrentlyAndAwaitFailFunctionTest(runtime: FIORuntime) =
         // Arrange
         let expected = "Kanjou Effect"
 
@@ -163,7 +160,7 @@ type private RuntimeTests() =
         Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.SequenceSuccessErrorFunctionTest(runtime: Runtime) =
+    member this.SequenceSuccessErrorFunctionTest(runtime: FIORuntime) =
         // Arrange
         let expected = "Sleep Token"
 
@@ -183,7 +180,7 @@ type private RuntimeTests() =
 
     // TODO: Hmm, are we sure about this behavior?
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.SequenceErrorSuccessFunctionTest(runtime: Runtime) =
+    member this.SequenceErrorSuccessFunctionTest(runtime: FIORuntime) =
         // Arrange
         let expected = "Bad Omens"
 
@@ -202,7 +199,7 @@ type private RuntimeTests() =
         Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ParallelizeDoubleSuccessFunctionTest(runtime: Runtime) =
+    member this.ParallelizeDoubleSuccessFunctionTest(runtime: FIORuntime) =
         // Arrange
         let spiritbox = "Spiritbox"
         let imminence = "Imminence"
@@ -219,7 +216,7 @@ type private RuntimeTests() =
         Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ParallelizeDoubleFailureFunctionTest(runtime: Runtime) =
+    member this.ParallelizeDoubleFailureFunctionTest(runtime: FIORuntime) =
         // Arrange
         let julieta = "Julieta"
         let groza = "Groza"
@@ -236,7 +233,7 @@ type private RuntimeTests() =
         Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ParallelizeSuccessFailureFunctionTest(runtime: Runtime) =
+    member this.ParallelizeSuccessFailureFunctionTest(runtime: FIORuntime) =
         // Arrange
         let ambitions = "Ambitions"
         let eyeOfTheStorm = "Eye of the Storm"
@@ -253,7 +250,7 @@ type private RuntimeTests() =
         Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ParallelizeFailureSuccessFunctionTest(runtime: Runtime) =
+    member this.ParallelizeFailureSuccessFunctionTest(runtime: FIORuntime) =
         // Arrange
         let bombsAway = "Bombs Away"
         let takingOff = "Taking Off"
@@ -270,7 +267,7 @@ type private RuntimeTests() =
         Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ParallelizeUnitDoubleSuccessFunctionTest(runtime: Runtime) =
+    member this.ParallelizeUnitDoubleSuccessFunctionTest(runtime: FIORuntime) =
         // Arrange
         let expected = ()
         let effect = !+ "I won't be there" <!> !+ "and neither will I"
@@ -285,7 +282,7 @@ type private RuntimeTests() =
         Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ParallelizeUnitDoubleFailureFunctionTest(runtime: Runtime) =
+    member this.ParallelizeUnitDoubleFailureFunctionTest(runtime: FIORuntime) =
         // Arrange
         let lostInTonight = "Lost in Tonight"
         let ghost = "and yet, I will not be there"
@@ -302,7 +299,7 @@ type private RuntimeTests() =
         Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ParallelizeUnitSuccessFailureFunctionTest(runtime: Runtime) =
+    member this.ParallelizeUnitSuccessFailureFunctionTest(runtime: FIORuntime) =
         // Arrange
         let startAgain = "Start Again"
         let ghost = "I am a ghost, boo"
@@ -319,7 +316,7 @@ type private RuntimeTests() =
         Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ParallelizeUnitFailureSuccessFunctionTest(runtime: Runtime) =
+    member this.ParallelizeUnitFailureSuccessFunctionTest(runtime: FIORuntime) =
         // Arrange
         let oneWayTicket = "One Way Ticket"
         let ghost = "Boo, boo..."
@@ -336,7 +333,7 @@ type private RuntimeTests() =
         Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ZipDoubleSuccessFunctionTest(runtime: Runtime) =
+    member this.ZipDoubleSuccessFunctionTest(runtime: FIORuntime) =
         // Arrange
         let standOutFitIn = "Stand Out Fit In"
         let worstInMe = "Worst In Me"
@@ -353,7 +350,7 @@ type private RuntimeTests() =
         Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ZipDoubleFailureFunctionTest(runtime: Runtime) =
+    member this.ZipDoubleFailureFunctionTest(runtime: FIORuntime) =
         // Arrange
         let itWasntEasy = "It Wasn't Easy"
         let lettingGo = "Letting Go"
@@ -370,7 +367,7 @@ type private RuntimeTests() =
         Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ZipSuccessFailureFunctionTest(runtime: Runtime) =
+    member this.ZipSuccessFailureFunctionTest(runtime: FIORuntime) =
         // Arrange
         let theLastTime = "The Last Time"
         let cantWait = "Cant Wait"
@@ -387,7 +384,7 @@ type private RuntimeTests() =
         Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.ZipFailureSuccessFunctionTest(runtime: Runtime) =
+    member this.ZipFailureSuccessFunctionTest(runtime: FIORuntime) =
         // Arrange
         let wastedNights = "Wasted Nights"
         let growOldDieYoung = "Grow Old Die Young"
@@ -404,7 +401,7 @@ type private RuntimeTests() =
         Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.RaceLeftSucceedsFunctionTest(runtime: Runtime) =
+    member this.RaceLeftSucceedsFunctionTest(runtime: FIORuntime) =
         // Arrange
         let thirtyFiveXXXV = "35xxxv"
         let iAmSoSlow = "Really slow..."
@@ -430,7 +427,7 @@ type private RuntimeTests() =
         Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.RaceRightSucceedsFunctionTest(runtime: Runtime) =
+    member this.RaceRightSucceedsFunctionTest(runtime: FIORuntime) =
         // Arrange
         let nowIAmSlow = "Now I am slow..."
         let nicheSyndrome = "Niche Syndrome"
@@ -456,7 +453,7 @@ type private RuntimeTests() =
         Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.RaceLeftFailsFunctionTest(runtime: Runtime) =
+    member this.RaceLeftFailsFunctionTest(runtime: FIORuntime) =
         // Arrange
         let kanjouEffect = "Kanjou Effect"
         let livingDolls = "Living Dolls"
@@ -482,7 +479,7 @@ type private RuntimeTests() =
         Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
-    member this.RaceRightFailsFunctionTest(runtime: Runtime) =
+    member this.RaceRightFailsFunctionTest(runtime: FIORuntime) =
         // Arrange
         let nope = "Nope"
         let reflection = "Reflection"

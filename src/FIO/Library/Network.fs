@@ -1,8 +1,8 @@
-(************************************************************************************)
-(* FIO - A type-safe, highly concurrent programming library for F#                  *)
-(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU) *)
-(* All rights reserved                                                              *)
-(************************************************************************************)
+(*************************************************************************************************************)
+(* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
+(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
+(* All rights reserved                                                                                       *)
+(*************************************************************************************************************)
 
 namespace FIO.Library.Network
 
@@ -83,11 +83,11 @@ module WebSockets =
             member this.Receive() : FIO<'R, exn> =
                 try
                     let buffer = Array.zeroCreate 1024
-                    let result = webSocketContext.WebSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None).Result
+                    let result = webSocketContext.WebSocket.ReceiveAsync(ArraySegment<byte>(buffer), CancellationToken.None).Result
 
                     if result.MessageType = WebSocketMessageType.Close then
                         webSocketContext.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None).Wait()
-                        !- (new Exception("Received Close message"))
+                        !- (Exception("Received Close message"))
                     else 
                         let serialized = Encoding.UTF8.GetString(buffer, 0, result.Count)
                         let received = JsonSerializer.Deserialize<'R>(serialized, options)
@@ -123,7 +123,6 @@ module WebSockets =
 
     type ServerWebSocket<'R>() =
         let listener = new HttpListener()
-        let options = JsonFSharpOptions.Default().ToJsonSerializerOptions()
 
         member this.Start(url) : FIO<unit, exn> =
             try
@@ -142,7 +141,7 @@ module WebSockets =
                 else
                     context.Response.StatusCode <- 400
                     context.Response.Close()
-                    !- (new Exception("Not a WebSocket request"))
+                    !- (Exception("Not a WebSocket request"))
             with exn ->
                 !- exn
 
@@ -159,7 +158,7 @@ module WebSockets =
 
         member this.Connect(url) : FIO<unit, exn> =
             try
-                let uri = new Uri(url)
+                let uri = Uri(url)
                 clientSocket.ConnectAsync(uri, CancellationToken.None)
                 |> Async.AwaitTask
                 |> Async.RunSynchronously

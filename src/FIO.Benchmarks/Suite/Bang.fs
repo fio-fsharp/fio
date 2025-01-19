@@ -1,13 +1,13 @@
-﻿(************************************************************************************)
-(* FIO - A type-safe, highly concurrent programming library for F#                  *)
-(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU) *)
-(* All rights reserved                                                              *)
-(* -------------------------------------------------------------------------------- *)
-(* Bang benchmark                                                                   *)
-(* Measures: Many-to-One message passing                                            *)
-(* A Scalability Benchmark Suite for Erlang/OTP                                     *)
-(* (https://dl.acm.org/doi/10.1145/2364489.2364495I)                                *)
-(************************************************************************************)
+﻿(*************************************************************************************************************)
+(* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
+(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
+(* All rights reserved                                                                                       *)
+(* --------------------------------------------------------------------------------------------------------- *)
+(* Bang benchmark                                                                                            *)
+(* Measures: Many-to-One message passing                                                                     *)
+(* A Scalability Benchmark Suite for Erlang/OTP                                                              *)
+(* (https://dl.acm.org/doi/10.1145/2364489.2364495I)                                                         *)
+(*************************************************************************************************************)
 
 module internal FIO.Benchmarks.Suite.Bang
 
