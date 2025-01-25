@@ -12,64 +12,64 @@ open System.Collections.Generic
 
 type FIOBuilder() =
 
-    member inline this.Bind(effect: FIO<'R1, 'E>, continuation: 'R1 -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        effect.Bind continuation
+    member inline this.Bind (eff: FIO<'R1, 'E>, cont: 'R1 -> FIO<'R, 'E>) : FIO<'R, 'E> =
+        eff.Bind cont
 
-    member inline this.Combine(effect: FIO<'R, 'E>, effect': FIO<'R1, 'E>) : FIO<'R1, 'E> = 
-        effect.Then effect'
+    member inline this.Combine (eff: FIO<'R, 'E>, eff': FIO<'R1, 'E>) : FIO<'R1, 'E> =
+        eff.Then eff'
 
-    member inline this.Run(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
-        effect
+    member inline this.Run (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
+        eff
 
-    member inline this.Zero() : FIO<unit, 'E> =
-        succeed ()
+    member inline this.Zero () : FIO<unit, 'E> =
+        FIO.Succeed ()
 
-    member inline this.Return(result: 'R) : FIO<'R, 'E> =
-        succeed result
+    member inline this.Return (res: 'R) : FIO<'R, 'E> =
+        FIO.Succeed res
 
-    member inline this.ReturnFrom(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
-        effect
+    member inline this.ReturnFrom (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
+        eff
 
-    member inline this.Yield(result: 'R) : FIO<'R, 'E> =
-        succeed result
+    member inline this.Yield (res: 'R) : FIO<'R, 'E> =
+        FIO.Succeed res
 
-    member inline this.YieldFrom(effect: FIO<'R, 'E>) : FIO<'R, 'E> =
-        effect
+    member inline this.YieldFrom (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
+        eff
 
-    member inline this.TryWith(effect: FIO<'R, 'E>, handler: 'E -> FIO<'R, 'E>) : FIO<'R, 'E> = 
-        effect.BindError handler
+    member inline this.TryWith (eff: FIO<'R, 'E>, handler: 'E -> FIO<'R, 'E>) : FIO<'R, 'E> =
+        eff.BindError handler
 
-    member inline this.TryFinally(effect: FIO<'R, 'E>, finalizer: unit -> unit) : FIO<'R, 'E> =
-        effect.Bind <| fun result ->
+    member inline this.TryFinally (eff: FIO<'R, 'E>, finalizer: unit -> unit) : FIO<'R, 'E> =
+        eff.Bind <| fun res ->
             try
                 finalizer ()
-                succeed result
+                FIO.Succeed res
             with exn ->
-                fail (exn :?> 'E)
+                FIO.Fail (exn :?> 'E)
 
-    member inline this.Delay(func: unit -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        (succeed ()).Bind func
+    member inline this.Delay (func: unit -> FIO<'R, 'E>) : FIO<'R, 'E> =
+       (FIO.Succeed ()).Bind func
 
-    member inline this.For(sequence: seq<'T>, body: 'T -> FIO<unit, 'E>) : FIO<unit, 'E> =
+    member inline this.For (sequence: seq<'T>, body: 'T -> FIO<unit, 'E>) : FIO<unit, 'E> =
         let rec loop (enumerator: IEnumerator<'T>) =
             if enumerator.MoveNext() then
                 (body enumerator.Current).Then <| loop enumerator
             else
-                succeed ()
+                FIO.Succeed ()
         sequence.GetEnumerator() |> loop
 
-    member inline this.While(guard: unit -> bool, effect: FIO<'R, 'E>) : FIO<unit, 'E> =
+    member inline this.While (guard: unit -> bool, eff: FIO<'R, 'E>) : FIO<unit, 'E> =
         let rec loop () =
             if guard () then
-                this.Delay <| fun () -> effect.Bind <| fun _ -> loop ()
+                this.Delay <| fun () -> eff.Bind <| fun _ -> loop ()
             else
-                succeed ()
+                FIO.Succeed ()
         loop ()
 
-    member inline this.Using(resource: #IDisposable, body: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        this.TryFinally(body resource, fun () -> resource.Dispose())
+    member inline this.Using (resource: #IDisposable, body: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
+        this.TryFinally (body resource, fun () -> resource.Dispose())
 
-    member inline this.Match(value: 'T, cases: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
+    member inline this.Match (value: 'T, cases: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
         cases value
 
 let fio = FIOBuilder()

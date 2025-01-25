@@ -12,10 +12,10 @@ open System.Collections.Concurrent
 
 type internal Monitor
     (
-        workItemQueue: InternalQueue<WorkItem>,
-        blockingItemQueue: Option<InternalQueue<BlockingItem * WorkItem>>,
-        blockingEventQueue: Option<InternalQueue<Channel<obj>>>,
-        blockingWorkItemMap: Option<ConcurrentDictionary<BlockingItem, InternalQueue<WorkItem>>>
+        workItemQueue: BlockingQueue<WorkItem>,
+        blockingItemQueue: Option<BlockingQueue<BlockingItem * WorkItem>>,
+        blockingEventQueue: Option<BlockingQueue<Channel<obj>>>,
+        blockingWorkItemMap: Option<ConcurrentDictionary<BlockingItem, BlockingQueue<WorkItem>>>
     ) as self =
     let _ =
         (async {
@@ -47,22 +47,22 @@ type internal Monitor
          |> Async.StartAsTask
          |> ignore)
 
-    member private this.PrintWorkItemQueueInfo(queue: InternalQueue<WorkItem>) =
+    member private this.PrintWorkItemQueueInfo(queue: BlockingQueue<WorkItem>) =
         printfn $"MONITOR: workItemQueue count: %i{queue.Count}"
         printfn "MONITOR: ------------ workItemQueue information start ------------"
 
         for workItem in queue.ToArray() do
-            let ifiber = workItem.InternalFiber
+            let ifiber = workItem.IFiber
             printfn $"MONITOR:    ------------ workItem start ------------"
             printfn $"MONITOR:      WorkItem IFiber completed: %A{ifiber.Completed()}"
             printfn $"MONITOR:      WorkItem IFiber blocking items count: %A{ifiber.BlockingWorkItemsCount()}"
             printfn $"MONITOR:      WorkItem PrevAction: %A{workItem.PrevAction}"
-            printfn $"MONITOR:      WorkItem Eff: %A{workItem.Effect}"
+            printfn $"MONITOR:      WorkItem Eff: %A{workItem.Eff}"
             printfn $"MONITOR:    ------------ workItem end ------------"
 
         printfn "MONITOR: ------------ workItemQueue information end ------------"
 
-    member private this.PrintBlockingItemQueueInfo(queue: InternalQueue<BlockingItem * WorkItem>) =
+    member private this.PrintBlockingItemQueueInfo(queue: BlockingQueue<BlockingItem * WorkItem>) =
         printfn $"MONITOR: blockingItemQueue count: %i{queue.Count}"
         printfn "MONITOR: ------------ blockingItemQueue information start ------------"
 
@@ -71,20 +71,20 @@ type internal Monitor
 
             match blockingItem with
             | BlockingChannel chan -> printfn $"MONITOR:      Blocking Channel count: %A{chan.Count}"
-            | BlockingFiber ifiber ->
+            | BlockingIFiber ifiber ->
                 printfn $"MONITOR:      Blocking IFiber completed: %A{ifiber.Completed()}"
                 printfn $"MONITOR:      Blocking IFiber blocking items count: %A{ifiber.BlockingWorkItemsCount()}"
 
-            let ifiber = workItem.InternalFiber
+            let ifiber = workItem.IFiber
             printfn $"MONITOR:      WorkItem IFiber completed: %A{ifiber.Completed()}"
             printfn $"MONITOR:      WorkItem IFiber blocking items count: %A{ifiber.BlockingWorkItemsCount()}"
             printfn $"MONITOR:      WorkItem PrevAction: %A{workItem.PrevAction}"
-            printfn $"MONITOR:      WorkItem Eff: %A{workItem.Effect}"
+            printfn $"MONITOR:      WorkItem Eff: %A{workItem.Eff}"
             printfn $"MONITOR:    ------------ BlockingItem * WorkItem end ------------"
 
         printfn "MONITOR: ------------ workItemQueue information end ------------"
 
-    member private _.PrintBlockingEventQueueInfo(queue: InternalQueue<Channel<obj>>) =
+    member private _.PrintBlockingEventQueueInfo(queue: BlockingQueue<Channel<obj>>) =
         printfn $"MONITOR: blockingEventQueue count: %i{queue.Count}"
         printfn "MONITOR: ------------ blockingEventQueue information start ------------"
 
@@ -95,5 +95,5 @@ type internal Monitor
 
         printfn "MONITOR: ------------ blockingEventQueue information end ------------"
 
-    member private _.PrintBlockingWorkItemMapInfo(map: ConcurrentDictionary<BlockingItem, InternalQueue<WorkItem>>) =
+    member private _.PrintBlockingWorkItemMapInfo(map: ConcurrentDictionary<BlockingItem, BlockingQueue<WorkItem>>) =
         printfn $"MONITOR: blockingWorkItemMap count: %i{map.Count}"

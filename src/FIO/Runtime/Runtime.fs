@@ -13,18 +13,18 @@ type FIORuntime() =
     abstract member Run : FIO<'R, 'E> -> Fiber<'R, 'E>
 
 type WorkerConfig =
-    { EvaluationWorkerCount: int
-      EvaluationWorkerSteps: int 
-      BlockingWorkerCount: int }
+    { EWCount: int
+      EWSteps: int
+      BWCount: int }
 
 [<AbstractClass>]
 type FIOWorkerRuntime(config: WorkerConfig) =
     inherit FIORuntime()
 
     let validateWorkerConfiguration () =
-        if config.EvaluationWorkerCount <= 0 ||
-           config.EvaluationWorkerSteps <= 0 ||
-           config.BlockingWorkerCount <= 0 then
+        if config.EWCount <= 0 ||
+           config.EWSteps <= 0 ||
+           config.BWCount <= 0 then
             invalidArg "config" "Invalid worker configuration!"
 
     do validateWorkerConfiguration ()

@@ -8,7 +8,7 @@ open System.Collections.Concurrent
 type internal Worker() =
     abstract Working: unit -> bool
 
-type internal DeadlockDetector<'B, 'E when 'B :> Worker and 'E :> Worker>(workItemQueue: InternalQueue<WorkItem>, intervalMs: int) as self =
+type internal DeadlockDetector<'B, 'E when 'B :> Worker and 'E :> Worker>(workItemQueue: BlockingQueue<WorkItem>, intervalMs: int) as self =
     let blockingItems = ConcurrentDictionary<BlockingItem, Unit>()
     let mutable blockingWorkers: List<'B> = []
     let mutable evalWorkers: List<'E> = []
