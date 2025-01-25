@@ -28,19 +28,15 @@ and private EvaluationWorker(config: EvaluationWorkerConfig) =
         | Success res, _, Evaluated, _ ->
             workItem.Complete
             <| Ok res
-
         | Failure err, _, Evaluated, _ ->
             workItem.Complete
             <| Error err
-
         | eff, stack, RescheduleForRunning, _ ->
             config.WorkItemQueue.Add
             <| WorkItem.Create eff workItem.IFiber stack RescheduleForRunning
-
         | eff, stack, RescheduleForBlocking blockingItem, _ ->
             config.BlockingWorker.RescheduleForBlocking blockingItem 
             <| WorkItem.Create eff workItem.IFiber stack (RescheduleForBlocking blockingItem)
-
         | _ ->
             invalidOp "EvaluationWorker: Unexpected state encountered during effect evaluation."
 
@@ -153,30 +149,23 @@ and Runtime(config: WorkerConfig) as this =
                 match eff with
                 | Success res ->
                     handleSuccess res newEvalSteps stack
-                   
                 | Failure err ->
                     handleError err newEvalSteps stack
-
                 | Concurrent (eff, fiber, ifiber) ->
                     workItemQueue.Add <| WorkItem.Create eff ifiber ContStack.Empty prevAction
                     handleSuccess fiber newEvalSteps stack
-
                 | Await ifiber ->
                     if ifiber.Completed() then
                         handleResult (ifiber.AwaitResult()) newEvalSteps stack
                     else
                         (Await ifiber, stack, RescheduleForBlocking <| BlockingIFiber ifiber, evalSteps)
-
                 | ChainSuccess (eff, cont) ->
                     interpret eff ((SuccessCont, cont) :: stack) prevAction evalSteps
-
                 | ChainError (eff, cont) ->
                     interpret eff ((FailureCont, cont) :: stack) prevAction evalSteps
-
                 | Send (msg, chan) ->
                     chan.Add msg
                     handleSuccess msg newEvalSteps stack
-
                 | Receive chan ->
                     if prevAction = RescheduleForBlocking (BlockingChannel chan) then
                         handleSuccess (chan.Take()) newEvalSteps stack
@@ -187,5 +176,6 @@ and Runtime(config: WorkerConfig) as this =
 
     override this.Run (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
         let fiber = Fiber<'R, 'E>()
-        workItemQueue.Add <| WorkItem.Create (eff.Upcast()) (fiber.ToInternal()) ContStack.Empty Evaluated
+        workItemQueue.Add
+        <| WorkItem.Create (eff.Upcast()) (fiber.ToInternal()) ContStack.Empty Evaluated
         fiber

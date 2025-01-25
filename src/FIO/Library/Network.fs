@@ -34,14 +34,14 @@ module Sockets =
             try
                 let serialized = JsonSerializer.Serialize(msg, options)
                 writer.WriteLine serialized
-                writer.Flush()
+                writer.Flush ()
                 !+ ()
             with exn ->
                 !- exn
 
         member this.Receive () : FIO<'R, exn> =
             try 
-                let line = reader.ReadLine()
+                let line = reader.ReadLine ()
                 !+ JsonSerializer.Deserialize<'R>(line, options)
             with exn ->
                 !- exn
@@ -74,7 +74,7 @@ module WebSockets =
             try
                 let serialized = JsonSerializer.Serialize(msg, options)
                 let buffer = Encoding.UTF8.GetBytes serialized
-                webSocketContext.WebSocket.SendAsync(ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None).Wait()
+                webSocketContext.WebSocket.SendAsync(ArraySegment<byte> buffer, WebSocketMessageType.Text, true, CancellationToken.None).Wait()
                 !+ ()
             with exn ->
                 !- exn
@@ -82,8 +82,7 @@ module WebSockets =
             member this.Receive () : FIO<'R, exn> =
                 try
                     let buffer = Array.zeroCreate 1024
-                    let result = webSocketContext.WebSocket.ReceiveAsync(ArraySegment<byte>(buffer), CancellationToken.None).Result
-
+                    let result = webSocketContext.WebSocket.ReceiveAsync(ArraySegment<byte> buffer, CancellationToken.None).Result
                     if result.MessageType = WebSocketMessageType.Close then
                         webSocketContext.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None).Wait()
                         !- Exception("Received Close message")
@@ -168,7 +167,7 @@ module WebSockets =
             try
                 let serialized = JsonSerializer.Serialize(msg, options)
                 let buffer = Encoding.UTF8.GetBytes serialized
-                clientSocket.SendAsync(ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None).Wait()
+                clientSocket.SendAsync(ArraySegment<byte> buffer, WebSocketMessageType.Text, true, CancellationToken.None).Wait()
                 !+ ()
             with exn ->
                 !- exn
@@ -176,7 +175,7 @@ module WebSockets =
         member this.Receive () : FIO<'R, exn> = 
             try
                 let buffer = Array.zeroCreate<byte> 1024
-                let result = clientSocket.ReceiveAsync(ArraySegment<byte>(buffer), CancellationToken.None).Result
+                let result = clientSocket.ReceiveAsync(ArraySegment<byte> buffer, CancellationToken.None).Result
                 let serialized = Encoding.UTF8.GetString(buffer, 0, result.Count)
                 !+ JsonSerializer.Deserialize<'R>(serialized, options)
             with exn ->

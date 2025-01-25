@@ -34,10 +34,8 @@ type Runtime() =
             match eff with
             | Success res ->
                 handleSuccess res stack
-
             | Failure err ->
                 handleError err stack
-
             | Concurrent (eff, fiber, ifiber) ->
                 async {
                     ifiber.Complete
@@ -45,20 +43,15 @@ type Runtime() =
                 }
                 |> Async.Start
                 handleSuccess fiber stack
-
             | Await ifiber ->
                 handleResult (ifiber.AwaitResult()) stack
-
             | ChainSuccess (eff, cont) ->
                 interpret eff ((SuccessCont, cont) :: stack)
-
             | ChainError (eff, cont) ->
                 interpret eff ((FailureCont, cont) :: stack)
-
             | Send (msg, chan) ->
                 chan.Add msg
                 handleSuccess msg stack
-
             | Receive chan ->
                 handleSuccess (chan.Take()) stack
 

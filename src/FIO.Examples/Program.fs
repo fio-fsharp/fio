@@ -47,7 +47,7 @@ let concurrency () =
 type WelcomeApp() =
     inherit FIOApp<unit, obj>()
 
-    override this.eff = fio {
+    override this.effect = fio {
         do! printfnf "Hello! What is your name?"
         let! name = readLine ()
         do! printfnf $"Hello, %s{name}, welcome to FIO! 🪻💜"
@@ -56,7 +56,7 @@ type WelcomeApp() =
 type EnterNumberApp() =
     inherit FIOApp<string, string>()
 
-    override this.eff = fio {
+    override this.effect = fio {
         do! printff "Enter a number: "
         let! input = readLine ()
         match Int32.TryParse input with
@@ -67,7 +67,7 @@ type EnterNumberApp() =
 type TryCatchApp() =
     inherit FIOApp<string, int>()
 
-    override this.eff = fio {
+    override this.effect = fio {
         try 
             do! !- 1
             return "Successfully completed!"
@@ -78,7 +78,7 @@ type TryCatchApp() =
 type ForApp() =
     inherit FIOApp<unit, obj>()
 
-    override this.eff = fio {
+    override this.effect = fio {
         for number in 1..10 do
             match number % 2 = 0 with
             | true -> printfn $"{number} is even!"
@@ -88,7 +88,7 @@ type ForApp() =
 type GuessNumberApp() =
     inherit FIOApp<int, string>()
 
-    override this.eff = fio {
+    override this.effect = fio {
         let! numberToGuess = !+ Random().Next(1, 100)
         let mutable guess = -1
 
@@ -127,7 +127,7 @@ type PingPongApp() =
         printfn $"ponger sent: %s{pong}"
         !+ ()
 
-    override this.eff =
+    override this.effect =
         let channel1 = Channel<string>()
         let channel2 = Channel<string>()
         pinger channel1 channel2 <!> ponger channel1 channel2
@@ -149,7 +149,7 @@ type PingPongCEApp() =
         do! printfnf $"ponger sent: %s{pong}"
     }
 
-    override this.eff = fio {
+    override this.effect = fio {
         let channel1 = Channel<string>()
         let channel2 = Channel<string>()
         return! pinger channel1 channel2 <!> ponger channel1 channel2
@@ -174,7 +174,7 @@ type ErrorHandlingApp() =
     let webserviceResult : FIO<char, Error> =
         awaitWebservice >>? fun error -> !- (WsError error)
 
-    override this.eff =
+    override this.effect =
         databaseResult <^> webserviceResult >>? fun _ -> !+ ("default", 'D')
 
 type RaceServersApp() =
@@ -190,7 +190,7 @@ type RaceServersApp() =
         return "server data (Region B)"
     }
 
-    override this.eff = fio {
+    override this.effect = fio {
         return! serverRegionA <%> serverRegionB
     }
 
@@ -222,7 +222,7 @@ type HighlyConcurrentApp() =
             return! create channel (count - 1) newAcc random
     }
 
-    override this.eff = fio {
+    override this.effect = fio {
         let fiberCount = 1000000
         let channel = Channel<int>()
         let random = Random()
@@ -277,7 +277,7 @@ type SocketApp(ip: string, port: int) =
             do! send clientSocket <!> receive clientSocket
         }
 
-    override this.eff = fio {
+    override this.effect = fio {
         do! server ip port <!> client ip port
     }
 
@@ -327,7 +327,7 @@ type WebSocketApp(serverUrl, clientUrl) =
             do! send clientSocket <!> receive clientSocket
         }
 
-    override this.eff = fio {
+    override this.effect = fio {
         do! server serverUrl <!> client clientUrl
     }
 

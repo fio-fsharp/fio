@@ -71,33 +71,33 @@ type FIOApp<'R, 'E> (successHandler: 'R -> unit, errorHandler: 'E -> unit, runti
         let fiber = defaultRuntime.Run eff
         fiber.Await()
 
-    abstract member eff: FIO<'R, 'E>
+    abstract member effect: FIO<'R, 'E>
 
     member this.Run () =
         this.Run runtime
 
     member this.Run (runtime: FIORuntime) =
-        let fiber = runtime.Run this.eff
+        let fiber = runtime.Run this.effect
         fiberHandler fiber
 
     member this.Run (successHandler: 'R -> 'F, errorHandler: 'E -> 'F) =
         this.Run (successHandler, errorHandler, runtime)
 
     member this.Run (successHandler: 'R -> 'F, errorHandler: 'E -> 'F, runtime: FIORuntime) =
-        let fiber = runtime.Run this.eff
+        let fiber = runtime.Run this.effect
         mergeFiber successHandler errorHandler fiber
 
     member this.AwaitResult () =
         this.AwaitResult runtime
 
     member this.AwaitResult (runtime: FIORuntime) =
-        let fiber = runtime.Run this.eff
+        let fiber = runtime.Run this.effect
         fiber.Await()
 
     member this.AwaitResult (successHandler: 'R -> 'R1, errorHandler: 'E -> 'E1) =
         this.AwaitResult (successHandler, errorHandler, runtime)
 
     member this.AwaitResult (successHandler: 'R -> 'R1, errorHandler: 'E -> 'E1, runtime: FIORuntime) =
-        let fiber = runtime.Run this.eff
+        let fiber = runtime.Run this.effect
         let res = fiber.AwaitResult()
         mapResult successHandler errorHandler res

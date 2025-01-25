@@ -7,7 +7,6 @@
 [<AutoOpen>]
 module FIO.Core.DSL
 
-open System
 open System.Threading
 open System.Collections.Concurrent
 
@@ -272,25 +271,18 @@ and FIO<'R, 'E> =
         match this with
         | Success res ->
             Success (res :> obj)
-
         | Failure err ->
             Failure err
-
         | Concurrent (eff, fiber, ifiber) ->
             Concurrent (eff, fiber, ifiber)
-
         | Await ifiber ->
             Await ifiber
-
         | ChainSuccess (eff, cont) ->
             ChainSuccess (eff, fun res -> (cont res).UpcastResult())
-
         | ChainError (eff, cont) ->
             ChainError (eff, fun err -> (cont err).UpcastResult())
-
         | Send (msg, chan) ->
             Send (msg :> obj, chan.Upcast())
-
         | Receive chan ->
             Receive <| chan.Upcast()
 
@@ -298,25 +290,18 @@ and FIO<'R, 'E> =
         match this with
         | Success res ->
             Success res
-
         | Failure err ->
             Failure (err :> obj)
-
         | Concurrent (eff, fiber, ifiber) ->
             Concurrent (eff, fiber, ifiber)
-
         | Await ifiber ->
             Await ifiber
-
         | ChainSuccess (eff, cont) ->
             ChainSuccess (eff.UpcastError(), fun res -> (cont res).UpcastError())
-
         | ChainError (eff, cont) ->
             ChainError (eff.UpcastError(), fun err -> (cont err).UpcastError())
-
         | Send (msg, chan) ->
             Send (msg, chan)
-
         | Receive chan ->
             Receive chan
 
