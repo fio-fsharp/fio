@@ -10,15 +10,16 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<RepositoryUrl>https://github.com/iyyel/fio</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
-		<Version>0.0.11-alpha</Version>
+		<Version>0.0.12-alpha</Version>
 		<PackageIcon>fio_logo_wide.png</PackageIcon>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<Compile Include="Core\DSL.fs" />
 		<Compile Include="Core\CE.fs" />
+		<Compile Include="Core\Ops.fs" />
 		<Compile Include="Runtime\Runtime.fs" />
-		<Compile Include="Runtime\NaiveRuntime.fs" />
+		<Compile Include="Runtime\NativeRuntime.fs" />
 		<Compile Include="Runtime\IntermediateRuntime.fs" />
 		<Compile Include="Runtime\AdvancedRuntime.fs" />
 		<Compile Include="Runtime\DeadlockingRuntime.fs" />

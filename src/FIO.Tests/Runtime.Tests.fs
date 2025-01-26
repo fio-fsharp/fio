@@ -15,16 +15,16 @@ open FIO.Core
 open FIO.Runtime
 
 [<TestFixture>]
-type private RuntimeTests() =
+type RuntimeTests() =
 
-    let getSuccessResult (result: Result<'R, 'E>, expected: 'R) =
+    let successResult (result: Result<'R, 'E>, expected: 'R) =
         match result with
         | Ok result -> result
         | Error error ->
             Assert.Fail($"Result contained Error ({error}) when it was expected to contain Ok ({expected})")
             failwith "Test failed"
 
-    let getFailureResult (result: Result<'R, 'E>, expected: 'E) =
+    let failureResult (result: Result<'R, 'E>, expected: 'E) =
         match result with
         | Ok result ->
             Assert.Fail($"Result contained Ok ({result}) when it was expected to contain Error ({expected})")
@@ -33,7 +33,7 @@ type private RuntimeTests() =
 
     static member GenerateRuntimes() =
         seq {
-            yield TestCaseData(Naive.Runtime())
+            yield TestCaseData(Native.Runtime())
             yield TestCaseData(Intermediate.Runtime())
             yield TestCaseData(Advanced.Runtime())
         }
@@ -51,7 +51,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.True)
         Assert.That(result.IsError, Is.False)
-        Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
+        Assert.That(successResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.FailFunctionTest(runtime: FIORuntime) =
@@ -66,7 +66,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.StopFunctionTest(runtime: FIORuntime) =
@@ -81,7 +81,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.True)
         Assert.That(result.IsError, Is.False)
-        Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
+        Assert.That(successResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.SendMessageFunctionTest(runtime: FIORuntime) =
@@ -98,7 +98,7 @@ type private RuntimeTests() =
         Assert.That(result.IsOk, Is.True)
         Assert.That(result.IsError, Is.False)
         Assert.That(channel.Count(), Is.EqualTo(1))
-        Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
+        Assert.That(successResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ReceiveMessageFunctionTest(runtime: FIORuntime) =
@@ -119,7 +119,7 @@ type private RuntimeTests() =
         Assert.That(result.IsOk, Is.True)
         Assert.That(result.IsError, Is.False)
         Assert.That(channel.Count(), Is.EqualTo(0))
-        Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
+        Assert.That(successResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ConcurrentlyAndAwaitSucceedFunctionTest(runtime: FIORuntime) =
@@ -138,7 +138,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.True)
         Assert.That(result.IsError, Is.False)
-        Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
+        Assert.That(successResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ConcurrentlyAndAwaitFailFunctionTest(runtime: FIORuntime) =
@@ -157,7 +157,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.SequenceSuccessErrorFunctionTest(runtime: FIORuntime) =
@@ -176,7 +176,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     // TODO: Hmm, are we sure about this behavior?
     [<TestCaseSource("GenerateRuntimes")>]
@@ -196,7 +196,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ParallelizeDoubleSuccessFunctionTest(runtime: FIORuntime) =
@@ -213,7 +213,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.True)
         Assert.That(result.IsError, Is.False)
-        Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
+        Assert.That(successResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ParallelizeDoubleFailureFunctionTest(runtime: FIORuntime) =
@@ -230,7 +230,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ParallelizeSuccessFailureFunctionTest(runtime: FIORuntime) =
@@ -247,7 +247,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ParallelizeFailureSuccessFunctionTest(runtime: FIORuntime) =
@@ -264,7 +264,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ParallelizeUnitDoubleSuccessFunctionTest(runtime: FIORuntime) =
@@ -279,7 +279,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.True)
         Assert.That(result.IsError, Is.False)
-        Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
+        Assert.That(successResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ParallelizeUnitDoubleFailureFunctionTest(runtime: FIORuntime) =
@@ -296,7 +296,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ParallelizeUnitSuccessFailureFunctionTest(runtime: FIORuntime) =
@@ -313,7 +313,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ParallelizeUnitFailureSuccessFunctionTest(runtime: FIORuntime) =
@@ -330,7 +330,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ZipDoubleSuccessFunctionTest(runtime: FIORuntime) =
@@ -347,7 +347,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.True)
         Assert.That(result.IsError, Is.False)
-        Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
+        Assert.That(successResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ZipDoubleFailureFunctionTest(runtime: FIORuntime) =
@@ -364,7 +364,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ZipSuccessFailureFunctionTest(runtime: FIORuntime) =
@@ -381,7 +381,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.ZipFailureSuccessFunctionTest(runtime: FIORuntime) =
@@ -398,7 +398,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.RaceLeftSucceedsFunctionTest(runtime: FIORuntime) =
@@ -415,7 +415,7 @@ type private RuntimeTests() =
                 return iAmSoSlow
             }
 
-        let effect = leftEffect <?> rightEffect
+        let effect = leftEffect <%> rightEffect
 
         // Act
         let fiber = runtime.Run(effect)
@@ -424,7 +424,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.True)
         Assert.That(result.IsError, Is.False)
-        Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
+        Assert.That(successResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.RaceRightSucceedsFunctionTest(runtime: FIORuntime) =
@@ -441,7 +441,7 @@ type private RuntimeTests() =
 
         let rightEffect = !+ nicheSyndrome
 
-        let effect = leftEffect <?> rightEffect
+        let effect = leftEffect <%> rightEffect
 
         // Act
         let fiber = runtime.Run(effect)
@@ -450,7 +450,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.True)
         Assert.That(result.IsError, Is.False)
-        Assert.That(getSuccessResult(result, expected), Is.EqualTo(expected))
+        Assert.That(successResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.RaceLeftFailsFunctionTest(runtime: FIORuntime) =
@@ -467,7 +467,7 @@ type private RuntimeTests() =
                 return livingDolls
             }
 
-        let effect = leftEffect <?> rightEffect
+        let effect = leftEffect <%> rightEffect
 
         // Act
         let fiber = runtime.Run(effect)
@@ -476,7 +476,7 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))
 
     [<TestCaseSource("GenerateRuntimes")>]
     member this.RaceRightFailsFunctionTest(runtime: FIORuntime) =
@@ -493,7 +493,7 @@ type private RuntimeTests() =
 
         let rightEffect = !- reflection
 
-        let effect = leftEffect <?> rightEffect
+        let effect = leftEffect <%> rightEffect
 
         // Act
         let fiber = runtime.Run(effect)
@@ -502,4 +502,4 @@ type private RuntimeTests() =
         // Assert
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
-        Assert.That(getFailureResult(result, expected), Is.EqualTo(expected))
+        Assert.That(failureResult(result, expected), Is.EqualTo(expected))

@@ -95,16 +95,16 @@ type Parser() =
 
         let runtime: FIORuntime =
             match results.TryGetResult Naive_Runtime with
-            | Some _ -> Naive.Runtime()
+            | Some _ -> Native.Runtime()
             | _ ->
                 match results.TryGetResult Intermediate_Runtime with
-                | Some(ewc, bwc, esc) -> Intermediate.Runtime({ EvaluationWorkerCount = ewc; EvaluationWorkerSteps = esc; BlockingWorkerCount = bwc })
+                | Some(ewc, bwc, esc) -> Intermediate.Runtime({ EWCount = ewc; EWSteps = esc; BWCount = bwc })
                 | _ ->
                     match results.TryGetResult Advanced_Runtime with
-                    | Some(ewc, bwc, esc) -> Advanced.Runtime({ EvaluationWorkerCount = ewc; EvaluationWorkerSteps = esc; BlockingWorkerCount = bwc })
+                    | Some(ewc, bwc, esc) -> Advanced.Runtime({ EWCount = ewc; EWSteps = esc; BWCount = bwc })
                     | _ ->
                         match results.TryGetResult Deadlocking_Runtime with
-                        | Some(ewc, bwc, esc) -> Deadlocking.Runtime({ EvaluationWorkerCount = ewc; EvaluationWorkerSteps = esc; BlockingWorkerCount = bwc })
+                        | Some(ewc, bwc, esc) -> Deadlocking.Runtime({ EWCount = ewc; EWSteps = esc; BWCount = bwc })
                         | _ -> failwith "ArgParser: Invalid runtime specified!"
 
         (configs, runtime, runs, processIncrement)

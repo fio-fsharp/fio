@@ -84,4 +84,4 @@ let Create processCount roundCount : FIO<BenchmarkResult, obj> =
         (TimerMessage.MessageChannel goChan) --> timerChan
         >>= fun _ ->
             createBang recvProc ps 10 effEnd timerChan goChan
-            >>= fun _ -> !? fiber >>= fun res -> succeed res
+            >>= fun _ -> !? fiber >>= fun res -> FIO.Succeed res

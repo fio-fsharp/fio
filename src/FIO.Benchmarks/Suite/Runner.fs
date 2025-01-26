@@ -8,10 +8,6 @@ module internal FIO.Benchmarks.Suite.Runner
 
 open FIO.Core
 open FIO.Runtime
-open FIO.Runtime.Naive
-open FIO.Runtime.Intermediate
-open FIO.Runtime.Advanced
-open FIO.Runtime.Deadlocking
 
 open System
 open System.IO

@@ -39,7 +39,7 @@ let helloWorld3 () =
     printfn $"%A{result}"
 
 let concurrency () =
-    let concurrent = ! !+ 42 >>= fun fiber -> !? fiber >>= succeed
+    let concurrent = ! !+ 42 >>= fun fiber -> !? fiber >>= FIO.Succeed
     let fiber = Runtime().Run concurrent
     let result = fiber.AwaitResult()
     printfn $"%A{result}"
@@ -191,7 +191,7 @@ type RaceServersApp() =
     }
 
     override this.effect = fio {
-        return! serverRegionA <?> serverRegionB
+        return! serverRegionA <%> serverRegionB
     }
 
 // Release build required to run, will otherwise crash.

@@ -13,33 +13,34 @@ open FIO.Runtime.Advanced
 open System
 open System.Threading
 
+// TODO: Is this necessary?
 let private maxThreads = 32767
 ThreadPool.SetMaxThreads(maxThreads, maxThreads) |> ignore
 ThreadPool.SetMinThreads(maxThreads, maxThreads) |> ignore
 
 let private defaultRuntime = Runtime()
 
-let private mapResult (successHandler: 'R -> 'R1) (errorHandler: 'E -> 'E1) (result: Result<'R, 'E>) =
-    match result with
-    | Ok result -> Ok <| successHandler result
-    | Error error -> Error <| errorHandler error
+let private mapResult (successHandler: 'R -> 'R1) (errorHandler: 'E -> 'E1) (res: Result<'R, 'E>) =
+    match res with
+    | Ok res -> Ok <| successHandler res
+    | Error err -> Error <| errorHandler err
 
-let private mergeResult (successHandler: 'R -> 'F) (errorHandler: 'E -> 'F) (result: Result<'R, 'E>) =
-    match result with
-    | Ok result -> successHandler result
-    | Error error -> errorHandler error
+let private mergeResult (successHandler: 'R -> 'F) (errorHandler: 'E -> 'F) (res: Result<'R, 'E>) =
+    match res with
+    | Ok res -> successHandler res
+    | Error err -> errorHandler err
 
 let private mergeFiber (successHandler: 'R -> 'F) (errorHandler: 'E -> 'F) (fiber: Fiber<'R, 'E>) =
     mergeResult successHandler errorHandler (fiber.AwaitResult())
 
-let private defaultSuccessHandler result =
+let private defaultSuccessHandler res =
     Console.ForegroundColor <- ConsoleColor.DarkGreen
-    Console.WriteLine($"%A{Ok result}")
+    Console.WriteLine($"%A{Ok res}")
     Console.ResetColor()
 
-let private defaultErrorHandler error =
+let private defaultErrorHandler err =
     Console.ForegroundColor <- ConsoleColor.DarkRed
-    Console.WriteLine($"%A{Error error}")
+    Console.WriteLine($"%A{Error err}")
     Console.ResetColor()
 
 let private defaultFiberHandler fiber = mergeFiber defaultSuccessHandler defaultErrorHandler fiber
@@ -50,53 +51,53 @@ type FIOApp<'R, 'E> (successHandler: 'R -> unit, errorHandler: 'E -> unit, runti
 
     new() = FIOApp(defaultSuccessHandler, defaultErrorHandler, defaultRuntime)
 
-    static member Run(app: FIOApp<'R, 'E>) =
+    static member Run (app: FIOApp<'R, 'E>) =
         app.Run()
 
-    static member Run(app: FIOApp<'R, 'E>, runtime: FIORuntime) =
+    static member Run (app: FIOApp<'R, 'E>, runtime: FIORuntime) =
         app.Run runtime
 
-    static member Run(effect: FIO<'R, 'E>) =
-        let fiber = defaultRuntime.Run effect
+    static member Run (eff: FIO<'R, 'E>) =
+        let fiber = defaultRuntime.Run eff
         defaultFiberHandler fiber
 
-    static member AwaitResult(app: FIOApp<'R, 'E>) =
+    static member AwaitResult (app: FIOApp<'R, 'E>) =
         app.AwaitResult()
 
-    static member AwaitResult(app: FIOApp<'R, 'E>, runtime: FIORuntime) =
+    static member AwaitResult (app: FIOApp<'R, 'E>, runtime: FIORuntime) =
         app.AwaitResult runtime
 
-    static member AwaitResult(effect: FIO<'R, 'E>) =
-        let fiber = defaultRuntime.Run effect
-        fiber.AwaitResult()
+    static member AwaitResult (eff: FIO<'R, 'E>) =
+        let fiber = defaultRuntime.Run eff
+        fiber.Await()
 
     abstract member effect: FIO<'R, 'E>
 
-    member this.Run() =
+    member this.Run () =
         this.Run runtime
 
-    member this.Run(runtime: FIORuntime) =
+    member this.Run (runtime: FIORuntime) =
         let fiber = runtime.Run this.effect
         fiberHandler fiber
 
-    member this.Run(successHandler: 'R -> 'F, errorHandler: 'E -> 'F) =
-        this.Run(successHandler, errorHandler, runtime)
+    member this.Run (successHandler: 'R -> 'F, errorHandler: 'E -> 'F) =
+        this.Run (successHandler, errorHandler, runtime)
 
-    member this.Run(successHandler: 'R -> 'F, errorHandler: 'E -> 'F, runtime: FIORuntime) =
+    member this.Run (successHandler: 'R -> 'F, errorHandler: 'E -> 'F, runtime: FIORuntime) =
         let fiber = runtime.Run this.effect
         mergeFiber successHandler errorHandler fiber
 
-    member this.AwaitResult() =
+    member this.AwaitResult () =
         this.AwaitResult runtime
 
-    member this.AwaitResult(runtime: FIORuntime) =
+    member this.AwaitResult (runtime: FIORuntime) =
         let fiber = runtime.Run this.effect
-        fiber.AwaitResult()
+        fiber.Await()
 
-    member this.AwaitResult(successHandler: 'R -> 'R1, errorHandler: 'E -> 'E1) =
-        this.AwaitResult(successHandler, errorHandler, runtime)
+    member this.AwaitResult (successHandler: 'R -> 'R1, errorHandler: 'E -> 'E1) =
+        this.AwaitResult (successHandler, errorHandler, runtime)
 
-    member this.AwaitResult(successHandler: 'R -> 'R1, errorHandler: 'E -> 'E1, runtime: FIORuntime) =
+    member this.AwaitResult (successHandler: 'R -> 'R1, errorHandler: 'E -> 'E1, runtime: FIORuntime) =
         let fiber = runtime.Run this.effect
-        let result = fiber.AwaitResult()
-        mapResult successHandler errorHandler result
+        let res = fiber.AwaitResult()
+        mapResult successHandler errorHandler res

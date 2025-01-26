@@ -11,13 +11,13 @@ open System
 open FIO.Core
 
 let printfnf format : FIO<'R, 'E> =
-    !+ printfn(format)
+    FIO.Succeed <| printfn format
 
 let printff format : FIO<'R, 'E> =
-    !+ printf(format)
+    FIO.Succeed <| printf format
 
 let sprintff format : FIO<'R, 'E> =
-    !+ sprintf(format)
+    FIO.Succeed <| sprintf format
 
 let readLine () : FIO<string, 'E> =
-    !+ Console.ReadLine()
+    FIO.Succeed <| Console.ReadLine()
