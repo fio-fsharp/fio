@@ -79,9 +79,9 @@ let Create processCount roundCount : FIO<BenchmarkResult, obj> =
         createSendProcess p 0 roundCount timerChan goChan
         <!> createRecvProcess recvProc (processCount * roundCount) timerChan goChan
 
-    ! TimerEffect(processCount + 1, processCount + 1, 1, timerChan)
+    !~> TimerEffect(processCount + 1, processCount + 1, 1, timerChan)
     >>= fun fiber ->
         (TimerMessage.MessageChannel goChan) --> timerChan
         >>= fun _ ->
             createBang recvProc ps 10 effEnd timerChan goChan
-            >>= fun _ -> !? fiber >>= fun res -> FIO.Succeed res
+            >>= fun _ -> !<~ fiber >>= fun res -> FIO.Succeed res

@@ -23,14 +23,14 @@ type private Actor =
 [<TailCall>]
 let rec private createActorHelper rounds actor timerChannel = fio {
     if rounds = 0 then
-        do! timerChannel <!- TimerMessage.Stop
+        do! timerChannel <!-- TimerMessage.Stop
     else
         let! received = !<-- actor.ReceivingChannel
         #if DEBUG
         do! !+ printfn($"DEBUG: %s{actor.Name} received: %i{received}")
         #endif
         let! message = !+ (received + 1)
-        do! actor.SendingChannel <!- message
+        do! actor.SendingChannel <!-- message
         #if DEBUG
         do! !+ printfn($"DEBUG: %s{actor.Name} sent: %i{message}")
         #endif
@@ -38,7 +38,7 @@ let rec private createActorHelper rounds actor timerChannel = fio {
 }
 
 let private createActor rounds actor timerChannel = fio {
-    do! timerChannel <!- TimerMessage.Start
+    do! timerChannel <!-- TimerMessage.Start
     return! createActorHelper rounds actor timerChannel
 }
 
@@ -80,9 +80,9 @@ let internal Create actorCount (rounds : int) : FIO<BenchmarkResult, obj> = fio 
     let acc = createActor rounds secondActor timerChannel 
               <!> createActor rounds firstActor timerChannel
 
-    let! fiber = ! TimerEffect(actorCount, 1, actorCount, timerChannel)
-    do! timerChannel <!- TimerMessage.MessageChannel (firstActor.ReceivingChannel)
+    let! fiber = !~> TimerEffect(actorCount, 1, actorCount, timerChannel)
+    do! timerChannel <!-- TimerMessage.MessageChannel (firstActor.ReceivingChannel)
     do! createThreadring rounds rest timerChannel acc
-    let! time = !? fiber
+    let! time = !<~ fiber
     return time
 }

@@ -127,12 +127,12 @@ type RuntimeTests() =
         let expected = "ONE OK ROCK"
 
         let effect =
-            ! !+ expected >>= fun fiber ->
-            !? fiber >>= fun result ->
+            !~> !+ expected >>= fun fiber ->
+            !<~ fiber >>= fun result ->
             !+ result
 
         // Act
-        let fiber = runtime.Run(effect)
+        let fiber = runtime.Run effect
         let result = fiber.AwaitResult()
 
         // Assert
@@ -146,8 +146,8 @@ type RuntimeTests() =
         let expected = "Kanjou Effect"
 
         let effect =
-            ! !- expected >>= fun fiber ->
-            !? fiber >>= fun result ->
+            !~> !- expected >>= fun fiber ->
+            !<~ fiber >>= fun result ->
             !+ result
 
         // Act
@@ -185,7 +185,7 @@ type RuntimeTests() =
         let expected = "Bad Omens"
 
         let effect = 
-            !- 42 >>? fun _ ->
+            !- 42 >>=? fun _ ->
             !+ "will not succeed" >>= fun _ ->
             !- expected
 

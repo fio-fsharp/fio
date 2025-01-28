@@ -83,7 +83,7 @@ module internal ChannelTimer =
             | 0 -> 
                 return ()
             | count ->
-                do! message -!> messageChannel
+                do! message --!> messageChannel
                 return! loopMessage (count - 1) message
         }
 

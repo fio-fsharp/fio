@@ -151,6 +151,16 @@ and Runtime(config: WorkerConfig) as this =
                     handleSuccess res newEvalSteps stack
                 | Failure err ->
                     handleError err newEvalSteps stack
+                | Action func ->
+                    handleResult (func ()) newEvalSteps stack
+                | Send (msg, chan) ->
+                    chan.Add msg
+                    handleSuccess msg newEvalSteps stack
+                | Receive chan ->
+                    if prevAction = RescheduleForBlocking (BlockingChannel chan) then
+                        handleSuccess (chan.Take()) newEvalSteps stack
+                    else
+                        (Receive chan, stack, RescheduleForBlocking <| BlockingChannel chan, evalSteps)
                 | Concurrent (eff, fiber, ifiber) ->
                     workItemQueue.Add <| WorkItem.Create eff ifiber ContStack.Empty prevAction
                     handleSuccess fiber newEvalSteps stack
@@ -163,14 +173,6 @@ and Runtime(config: WorkerConfig) as this =
                     interpret eff ((SuccessCont, cont) :: stack) prevAction evalSteps
                 | ChainError (eff, cont) ->
                     interpret eff ((FailureCont, cont) :: stack) prevAction evalSteps
-                | Send (msg, chan) ->
-                    chan.Add msg
-                    handleSuccess msg newEvalSteps stack
-                | Receive chan ->
-                    if prevAction = RescheduleForBlocking (BlockingChannel chan) then
-                        handleSuccess (chan.Take()) newEvalSteps stack
-                    else
-                        (Receive chan, stack, RescheduleForBlocking <| BlockingChannel chan, evalSteps)
 
         interpret eff stack prevAction evalSteps
 

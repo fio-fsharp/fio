@@ -26,7 +26,7 @@ let rec private createPingerHelper rounds actor message (stopwatch: Stopwatch) =
         do! !+ stopwatch.Stop()
         return stopwatch.ElapsedMilliseconds    
     else
-        do! actor.SendingChannel <!- message
+        do! actor.SendingChannel <!-- message
         #if DEBUG
         do! !+ printfn($"DEBUG: %s{actor.Name} sent ping: %i{message}")
         #endif
@@ -47,7 +47,7 @@ let rec private createPongerHelper rounds actor : FIO<unit, obj> = fio {
         do! !+ printfn($"DEBUG: %s{actor.Name} received ping: %i{received}")
         #endif
         let! message = !+ (received + 1)
-        do! actor.SendingChannel <!- message
+        do! actor.SendingChannel <!-- message
         #if DEBUG
         do! !+ printfn($"DEBUG: %s{actor.Name} sent pong: %i{message}")
         #endif
@@ -56,13 +56,13 @@ let rec private createPongerHelper rounds actor : FIO<unit, obj> = fio {
 
 let private createPinger actor startSignalChannel rounds = fio {
     let! stopwatch = !+ Stopwatch()
-    do! !<!- startSignalChannel
+    do! !<!-- startSignalChannel
     do! !+ stopwatch.Start()
     return! createPingerHelper rounds actor 1 stopwatch
 }
 
 let private createPonger actor startSignalChannel rounds = fio {
-    do! startSignalChannel <!- 0
+    do! startSignalChannel <!-- 0
     return! createPongerHelper rounds actor
 }
 

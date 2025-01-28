@@ -32,7 +32,7 @@ let private createActor actor message roundCount timerChan goChan =
             return! createRecvPings actor.SendingChannels.Length rounds
         else
             let! channel, rest = !+ (List.head channels, List.tail channels)
-            do! channel <!- Ping (message, actor.PongReceivingChannel)
+            do! channel <!-- Ping (message, actor.PongReceivingChannel)
             return! createSendPings rounds rest
     }
 
@@ -131,9 +131,9 @@ let Create processCount roundCount : FIO<BenchmarkResult, obj> =
         createActor pa (10 * (processCount - 2)) roundCount timerChan goChan
         <!> createActor pb (10 * (processCount - 1)) roundCount timerChan goChan
 
-    ! TimerEffect(processCount, processCount, processCount, timerChan)
+    !~> TimerEffect(processCount, processCount, processCount, timerChan)
     >>= fun fiber ->
         (TimerMessage.MessageChannel goChan) --> timerChan
         >>= fun _ ->
             createBig ps 0 timerChan goChan effEnd
-            >>= fun _ -> !? fiber >>= fun res -> FIO.Succeed res
+            >>= fun _ -> !<~ fiber >>= fun res -> FIO.Succeed res

@@ -15,7 +15,7 @@ open FIO.Core
 open System.Diagnostics
 
 let rec private createActor timerChannel = fio {
-    return! timerChannel <!- TimerMessage.Stop
+    return! timerChannel <!-- TimerMessage.Stop
 }
 
 [<TailCall>]
@@ -32,12 +32,12 @@ let internal Create actorCount : FIO<BenchmarkResult, obj> = fio {
     let! timerChannel = !+ Channel<TimerMessage>()
     let! stopwatch = !+ Stopwatch()
     
-    let! timerFiber = ! TimerEffect(actorCount, timerChannel)
+    let! timerFiber = !~> TimerEffect(actorCount, timerChannel)
     do! !+ stopwatch.Start()
-    do! timerChannel <!- TimerMessage.Start stopwatch
+    do! timerChannel <!-- TimerMessage.Start stopwatch
 
     let acc = createActor timerChannel <!> createActor timerChannel
     do! createForkTime (actorCount - 2) timerChannel acc
-    let! result = !? timerFiber
+    let! result = !<~ timerFiber
     return result
 }

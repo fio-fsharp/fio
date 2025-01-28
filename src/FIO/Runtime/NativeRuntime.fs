@@ -36,6 +36,13 @@ type Runtime() =
                 handleSuccess res stack
             | Failure err ->
                 handleError err stack
+            | Action func ->
+                handleResult (func ()) stack
+            | Send (msg, chan) ->
+                chan.Add msg
+                handleSuccess msg stack
+            | Receive chan ->
+                handleSuccess (chan.Take()) stack
             | Concurrent (eff, fiber, ifiber) ->
                 async {
                     ifiber.Complete
@@ -49,11 +56,6 @@ type Runtime() =
                 interpret eff ((SuccessCont, cont) :: stack)
             | ChainError (eff, cont) ->
                 interpret eff ((FailureCont, cont) :: stack)
-            | Send (msg, chan) ->
-                chan.Add msg
-                handleSuccess msg stack
-            | Receive chan ->
-                handleSuccess (chan.Take()) stack
 
         interpret eff stack
 
