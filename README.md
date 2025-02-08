@@ -170,7 +170,7 @@ All benchmarks reside from the [**Savina - An Actor Benchmark Suite**](http://so
 The benchmarks can be given the following command line options:
 
 ```
-USAGE: FIO.Benchmarks [--help] [--naive-runtime] [--intermediate-runtime <evalworkers> <blockingworkers> <evalsteps>]
+USAGE: FIO.Benchmarks [--help] [--native-runtime] [--intermediate-runtime <evalworkers> <blockingworkers> <evalsteps>]
                       [--advanced-runtime <evalworkers> <blockingworkers> <evalsteps>]
                       [--deadlocking-runtime <evalworkers> <blockingworkers> <evalsteps>] --runs <runs>
                       [--process-increment <actor inc> <inc times>] [--pingpong <rounds>]
@@ -179,7 +179,7 @@ USAGE: FIO.Benchmarks [--help] [--naive-runtime] [--intermediate-runtime <evalwo
 
 OPTIONS:
 
-    --naive-runtime       specify naive runtime.
+    --native-runtime       specify native runtime.
     --intermediate-runtime <evalworkers> <blockingworkers> <evalsteps>
                           specify evaluation workers, blocking workers and eval steps for intermediate runtime.
     --advanced-runtime <evalworkers> <blockingworkers> <evalsteps>

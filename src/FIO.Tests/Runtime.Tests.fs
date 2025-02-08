@@ -128,7 +128,7 @@ type RuntimeTests() =
 
         let effect =
             !~> !+ expected >>= fun fiber ->
-            !<~ fiber >>= fun result ->
+            !~~> fiber >>= fun result ->
             !+ result
 
         // Act
@@ -147,7 +147,7 @@ type RuntimeTests() =
 
         let effect =
             !~> !- expected >>= fun fiber ->
-            !<~ fiber >>= fun result ->
+            !~~> fiber >>= fun result ->
             !+ result
 
         // Act

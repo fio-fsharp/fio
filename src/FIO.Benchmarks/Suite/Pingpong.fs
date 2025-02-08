@@ -12,76 +12,81 @@
 module internal FIO.Benchmarks.Suite.Pingpong
 
 open FIO.Core
-
-open System.Diagnostics
+open FIO.Benchmarks.Tools.Timer
 
 type private Actor =
     { Name: string
-      SendingChannel: int channel
-      ReceivingChannel: int channel }
+      SendChan: int channel
+      RecvChan: int channel }
 
 [<TailCall>]
-let rec private createPingerHelper rounds actor message (stopwatch: Stopwatch) = fio {
-    if rounds = 0 then
-        do! !+ stopwatch.Stop()
-        return stopwatch.ElapsedMilliseconds    
-    else
-        do! actor.SendingChannel <!-- message
-        #if DEBUG
-        do! !+ printfn($"DEBUG: %s{actor.Name} sent ping: %i{message}")
-        #endif
-        let! received = !<-- actor.ReceivingChannel
-        #if DEBUG
-        do! !+ printfn($"DEBUG: %s{actor.Name} received pong: %i{received}")
-        #endif
-        return! createPingerHelper (rounds - 1) actor (received + 1) stopwatch
-}
-
-[<TailCall>]
-let rec private createPongerHelper rounds actor : FIO<unit, obj> = fio {
-    if rounds = 0 then
+let rec private createPingerHelper pinger rounds ping timerChan = fio {
+    if rounds <= 0 then
+        let! _ = timerChan <-- Stop
         return ()
     else
-        let! received = !<-- actor.ReceivingChannel
+        let! _ = pinger.SendChan <-- ping
         #if DEBUG
-        do! !+ printfn($"DEBUG: %s{actor.Name} received ping: %i{received}")
+        printfn $"[DEBUG]: %s{pinger.Name} sent ping: %i{ping}"
         #endif
-        let! message = !+ (received + 1)
-        do! actor.SendingChannel <!-- message
+        let! pong = !<-- pinger.RecvChan
         #if DEBUG
-        do! !+ printfn($"DEBUG: %s{actor.Name} sent pong: %i{message}")
+        printfn $"[DEBUG]: %s{pinger.Name} received pong: %i{pong}"
         #endif
-        return! createPongerHelper (rounds - 1) actor
+        return! createPingerHelper pinger (rounds - 1) (pong + 1) timerChan
 }
 
-let private createPinger actor startSignalChannel rounds = fio {
-    let! stopwatch = !+ Stopwatch()
-    do! !<!-- startSignalChannel
-    do! !+ stopwatch.Start()
-    return! createPingerHelper rounds actor 1 stopwatch
+[<TailCall>]
+let rec private createPongerHelper ponger rounds = fio {
+    if rounds <= 0 then
+        return ()
+    else
+        let! ping = !<-- ponger.RecvChan
+        #if DEBUG
+        printfn $"[DEBUG]: %s{ponger.Name} received ping: %i{ping}"
+        #endif
+        let! pong = ponger.SendChan <-- ping + 1
+        #if DEBUG
+        printfn $"[DEBUG]: %s{ponger.Name} sent pong: %i{pong}"
+        #endif
+        return! createPongerHelper ponger (rounds - 1)
 }
 
-let private createPonger actor startSignalChannel rounds = fio {
-    do! startSignalChannel <!-- 0
-    return! createPongerHelper rounds actor
+let private createPinger pinger rounds startChan timerChan = fio {
+    let! _ = !<-- startChan
+    let! _ = timerChan <-- Start
+    return! createPingerHelper pinger rounds 1 timerChan
 }
 
-let internal Create rounds : FIO<BenchmarkResult, obj> = fio {
-    let startSignalChannel = Channel<int>()
-    let pingSendingChannel = Channel<int>()
-    let pongSendingChannel = Channel<int>()
+let private createPonger ponger rounds startChan = fio {
+    let! _ = startChan <-- 0
+    return! createPongerHelper ponger rounds
+}
+
+let internal Create config = fio {
+    let rounds =
+        match config with
+        | PingpongConfig rounds -> rounds
+        | _ -> invalidArg "config" "Pingpong benchmark requires a PingpongConfig!"
+
+    let startChan = Channel<int>()
+    let timerChan = Channel<TimerMessage<int>>()
+    let pingSendChan = Channel<int>()
+    let pongSendChan = Channel<int>()
 
     let pinger =
         { Name = "Pinger"
-          SendingChannel = pingSendingChannel
-          ReceivingChannel = pongSendingChannel }
+          SendChan = pingSendChan
+          RecvChan = pongSendChan }
 
     let ponger =
         { Name = "Ponger"
-          SendingChannel = pongSendingChannel
-          ReceivingChannel = pingSendingChannel }
+          SendChan = pongSendChan
+          RecvChan = pingSendChan }
 
-    let! (result, _) = createPinger pinger startSignalChannel rounds
-                       <*> createPonger ponger startSignalChannel rounds
-    return result
+    let! timerFiber = !<~ (TimerEff 1 0 1 timerChan)
+    do! createPinger pinger rounds startChan timerChan
+        <!> createPonger ponger rounds startChan
+    let! res = !<~~ timerFiber
+    return res
 }

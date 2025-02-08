@@ -6,11 +6,21 @@
 
 namespace FIO.Runtime
 
+open System.Globalization
+
 open FIO.Core
 
 [<AbstractClass>]
 type FIORuntime() =
     abstract member Run : FIO<'R, 'E> -> Fiber<'R, 'E>
+    abstract member Name : unit -> string
+    abstract member ConfigString : unit -> string
+
+    override this.ConfigString () =
+        this.Name()
+
+    override this.ToString () = 
+        this.ConfigString()
 
 type WorkerConfig =
     { EWCount: int
@@ -20,6 +30,7 @@ type WorkerConfig =
 [<AbstractClass>]
 type FIOWorkerRuntime(config: WorkerConfig) =
     inherit FIORuntime()
+    let ci = CultureInfo("en-US")
 
     let validateWorkerConfiguration () =
         if config.EWCount <= 0 ||
@@ -31,3 +42,9 @@ type FIOWorkerRuntime(config: WorkerConfig) =
 
     member this.GetWorkerConfiguration () =
         config
+
+    override this.ConfigString () =
+        $"""EWC: %s{config.EWCount.ToString("N0", ci)} EWS: %s{config.EWSteps.ToString("N0", ci)} BWC: %s{config.BWCount.ToString("N0", ci)}"""
+
+    override this.ToString () =
+        $"{this.Name()} ({this.ConfigString()})"

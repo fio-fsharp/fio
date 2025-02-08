@@ -72,4 +72,5 @@ type FIOBuilder() =
     member inline this.Match (value: 'T, cases: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
         cases value
 
+/// The FIO computation expression builder.
 let fio = FIOBuilder()

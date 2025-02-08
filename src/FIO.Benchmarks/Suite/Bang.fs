@@ -11,77 +11,90 @@
 
 module internal FIO.Benchmarks.Suite.Bang
 
-open FIO.Benchmarks.Tools.Timing.ChannelTimer
-
 open FIO.Core
+open FIO.Benchmarks.Tools.Timer
 
 type private Actor = 
     { Name: string; 
-      Channel: int channel }
+      Chan: int channel }
 
-let rec private createSendProcess proc msg roundCount timerChan goChan =
-    let rec create proc msg roundCount =
-        if roundCount = 0 then
-            !+ ()
-        else
-            msg --> proc.Channel
-            >>= fun _ ->
-#if DEBUG
-                printfn $"DEBUG: %s{proc.Name} sent: %i{msg}"
-#endif
-                create proc (msg + 10) (roundCount - 1)
+[<TailCall>]
+let rec private createSendActorHelper actor rounds msg = fio {
+    if rounds <= 0 then
+        return ()
+    else
+        let! _ = actor.Chan <-- msg
+        #if DEBUG
+        printfn $"DEBUG: %s{actor.Name} sent: %i{msg}"
+        #endif
+        return! createSendActorHelper actor (rounds - 1) msg
+}
 
-    TimerMessage.Start --> timerChan
-    >>= fun _ -> !--> goChan >>= fun _ -> create proc msg roundCount
+let rec private createSendActor actor rounds msg timerChan startChan = fio {
+    let! _ = timerChan <-- Start
+    let! _ = !<-- startChan
+    return! createSendActorHelper actor rounds msg
+}
 
-let rec private createRecvProcess proc roundCount timerChan goChan =
-    let rec create proc roundCount =
-        if roundCount = 0 then
-            TimerMessage.Stop --> timerChan >>= fun _ -> !+ ()
-        else
-            !--> proc.Channel
-            >>= fun x ->
-#if DEBUG
-                printfn $"DEBUG: %s{proc.Name} received: %i{x}"
-#endif
-                create proc (roundCount - 1)
+[<TailCall>]
+let rec private createRecvActorHelper actor rounds timerChan = fio {
+    if rounds <= 0 then
+        let! _ = timerChan <-- Stop
+        return ()
+    else
+        let! msg = !<-- actor.Chan
+        #if DEBUG
+        printfn $"DEBUG: %s{actor.Name} received: %i{msg}"
+        #endif
+        return! createRecvActorHelper actor (rounds - 1) timerChan
+}
 
-    TimerMessage.Start --> timerChan
-    >>= fun _ -> !--> goChan >>= fun _ -> create proc roundCount
+let rec private createRecvActor actor rounds timerChan startChan = fio {
+    let! _ = timerChan <-- Start
+    let! _ = !<-- startChan
+    return! createRecvActorHelper actor rounds timerChan
+}
 
-let Create processCount roundCount : FIO<BenchmarkResult, obj> =
-    let rec createSendProcesses recvProcChan processCount =
-        List.map
-            (fun count ->
-                { Name = $"p{count}"
-                  Channel = recvProcChan })
-            [ 1..processCount ]
+[<TailCall>]
+let rec private createBang recvActor sendActors rounds msg timerChan startChan acc = fio {
+    match sendActors with
+    | [] -> return! acc
+    | ac :: acs ->
+        let newAcc = createSendActor ac rounds msg timerChan startChan <!> acc
+        return! createBang recvActor acs rounds (msg + 1) timerChan startChan newAcc
+}
 
-    let rec createBang recvProc sendProcs msg acc timerChan goChan =
-        match sendProcs with
-        | [] -> acc
-        | p :: ps ->
-            let eff = createSendProcess p msg roundCount timerChan goChan <!> acc
-            createBang recvProc ps (msg + 10) eff timerChan goChan
+let private createSendActors recvActorChan actorCount =
+    List.map (fun index ->
+            { Name = $"Actor-{index}"
+              Chan = recvActorChan })
+        [ 1..actorCount ]
 
-    let recvProc = { Name = "p0"; Channel = Channel<int>() }
-    let sendProcs = createSendProcesses recvProc.Channel processCount
-
-    let p, ps =
-        match List.rev sendProcs with
-        | p :: ps -> (p, ps)
-        | _ -> failwith $"createBang failed! (at least 1 sending process should exist) processCount = %i{processCount}"
+let internal Create config = fio {
+    let (actorCount, rounds) =
+        match config with
+        | BangConfig (actors, rounds) -> (actors, rounds)
+        | _ -> invalidArg "config" "Bang benchmark requires a BangConfig!"
 
     let timerChan = Channel<TimerMessage<int>>()
-    let goChan = Channel<int>()
+    let startChan = Channel<int>()
 
-    let effEnd =
-        createSendProcess p 0 roundCount timerChan goChan
-        <!> createRecvProcess recvProc (processCount * roundCount) timerChan goChan
+    let recvActor =
+        { Name = "Actor-0"
+          Chan = Channel<int>() }
 
-    !~> TimerEffect(processCount + 1, processCount + 1, 1, timerChan)
-    >>= fun fiber ->
-        (TimerMessage.MessageChannel goChan) --> timerChan
-        >>= fun _ ->
-            createBang recvProc ps 10 effEnd timerChan goChan
-            >>= fun _ -> !<~ fiber >>= fun res -> FIO.Succeed res
+    let sendActors = createSendActors recvActor.Chan actorCount
+
+    let ac, acs =
+        match List.rev sendActors with
+        | ac :: acs -> (ac, acs)
+        | _ -> invalidArg "actorCount" $"createBang failed! (at least 1 sending actor should exist) actorCount = %i{actorCount}"
+
+    let acc = createSendActor ac rounds 1 timerChan startChan
+              <!> createRecvActor recvActor (actorCount * rounds) timerChan startChan
+    let! timerFiber = !<~ (TimerEff (actorCount + 1) (actorCount + 1) 1 timerChan)
+    let! _ = timerChan <-- MsgChannel startChan
+    do! createBang recvActor acs rounds 2 timerChan startChan acc
+    let! res = !<~~ timerFiber
+    return res
+}

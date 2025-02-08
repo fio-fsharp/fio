@@ -216,3 +216,6 @@ and Runtime(config: WorkerConfig) as this =
         workItemQueue.Add
         <| WorkItem.Create (effect.Upcast()) (fiber.ToInternal()) ContStack.Empty Evaluated
         fiber
+
+    override this.Name () =
+        "Deadlocking"

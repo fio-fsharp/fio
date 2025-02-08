@@ -84,19 +84,36 @@ let inline ( <^?> ) (eff: FIO<'R, 'E>) (eff': FIO<'R, 'E1>) : FIO<'R, 'E * 'E1> 
 
 /// An alias for `Fork`, which interprets an effect concurrently and returns the fiber that is interpreting it.
 /// The fiber can be awaited for the result of the effect.
+let inline ( !<~ ) (eff: FIO<'R, 'E>) : FIO<Fiber<'R, 'E>, 'E1> =
+    eff.Fork()
+
+/// An alias for `Fork`, which interprets an effect concurrently and returns the fiber that is interpreting it.
+/// The fiber can be awaited for the result of the effect.
 let inline ( !~> ) (eff: FIO<'R, 'E>) : FIO<Fiber<'R, 'E>, 'E1> =
     eff.Fork()
+
+/// An alias for `Fork`, which interprets an effect concurrently and returns `unit` when interpreted.
+let inline ( !!<~ ) (eff: FIO<'R, 'E>) : FIO<unit, 'E1> =
+    eff.Fork().Then <| FIO.Succeed ()
 
 /// An alias for `Fork`, which interprets an effect concurrently and returns `unit` when interpreted.
 let inline ( !!~> ) (eff: FIO<'R, 'E>) : FIO<unit, 'E1> =
     eff.Fork().Then <| FIO.Succeed ()
 
 /// An alias for `Await`, which waits for the result of the given fiber and succeeds with it.
-let inline ( !<~ ) (fiber: Fiber<'R, 'E>) : FIO<'R, 'E> =
+let inline ( !<~~ ) (fiber: Fiber<'R, 'E>) : FIO<'R, 'E> =
+    fiber.Await()
+
+/// An alias for `Await`, which waits for the result of the given fiber and succeeds with it.
+let inline ( !~~> ) (fiber: Fiber<'R, 'E>) : FIO<'R, 'E> =
     fiber.Await()
 
 /// An alias for `Await`, which waits for the completion of the fiber and returns `unit`.
-let inline ( !!<~ ) (fiber: Fiber<'R, 'E>) : FIO<unit, 'E> =
+let inline ( !!<~~ ) (fiber: Fiber<'R, 'E>) : FIO<unit, 'E> =
+    fiber.Await().Then <| FIO.Succeed ()
+
+/// An alias for `Await`, which waits for the completion of the fiber and returns `unit`.
+let inline ( !!~~> ) (fiber: Fiber<'R, 'E>) : FIO<unit, 'E> =
     fiber.Await().Then <| FIO.Succeed ()
 
 /// An alias for `Parallel`, which interprets two effects concurrently and succeeds with a tuple of their results when both complete.

@@ -181,3 +181,6 @@ and Runtime(config: WorkerConfig) as this =
         workItemQueue.Add
         <| WorkItem.Create (eff.Upcast()) (fiber.ToInternal()) ContStack.Empty Evaluated
         fiber
+
+    override this.Name () =
+        "Intermediate"

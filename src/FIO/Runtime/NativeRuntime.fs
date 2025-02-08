@@ -67,3 +67,6 @@ type Runtime() =
         }
         |> Async.Start
         fiber
+
+    override this.Name () =
+        "Native"
