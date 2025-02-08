@@ -6,21 +6,17 @@
 
 module private Program
 
-open FIO.Benchmarks.Suite.Runner
-
 open System.Threading
+
+open FIO.Benchmarks.Suite
 
 let maxThreads = 32767
 ThreadPool.SetMaxThreads(maxThreads, maxThreads) |> ignore
 ThreadPool.SetMinThreads(maxThreads, maxThreads) |> ignore
 
-let runBenchmarks parsedArgs =
-    let configs, runtime, runs, fiberIncrement = parsedArgs
-    Run configs runtime runs fiberIncrement
-
 [<EntryPoint>]
 let main args =
     let parser = ArgParser.Parser()
     parser.PrintArgs args
-    runBenchmarks <| parser.ParseArgs args
+    BenchmarkRunner.Run <| parser.ParseArgs args
     0

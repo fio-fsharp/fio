@@ -6,38 +6,36 @@
 (* Fork benchmark                                                                                            *)
 (*************************************************************************************************************)
 
-[<AutoOpen>]
 module internal FIO.Benchmarks.Suite.Fork
 
-open FIO.Benchmarks.Tools.Timing.StopwatchTimer
-
 open FIO.Core
-open System.Diagnostics
+open FIO.Benchmarks.Tools.Timer
 
-let rec private createActor timerChannel = fio {
-    return! timerChannel <!- TimerMessage.Stop
+let private createActor timerChan = fio {
+    let! _ = timerChan <-- Stop
+    return ()
 }
 
 [<TailCall>]
-let rec private createForkTime actorCount timerChannel acc = fio {
+let rec private createFork actorCount timerChan acc = fio {
     match actorCount with
-    | 0 -> 
-        return! acc
+    | 0 -> return! acc
     | count ->
-        let newAcc = createActor timerChannel <!> acc
-        return! createForkTime (count - 1) timerChannel newAcc
+        let newAcc = createActor timerChan <!> acc
+        return! createFork (count - 1) timerChan newAcc
 }
 
-let internal Create actorCount : FIO<BenchmarkResult, obj> = fio {
-    let! timerChannel = !+ Channel<TimerMessage>()
-    let! stopwatch = !+ Stopwatch()
-    
-    let! timerFiber = ! TimerEffect(actorCount, timerChannel)
-    do! !+ stopwatch.Start()
-    do! timerChannel <!- TimerMessage.Start stopwatch
+let internal Create config = fio {
+    let actorCount =
+        match config with
+        | ForkConfig actors -> actors
+        | _ -> invalidArg "config" "Fork benchmark requires a ForkConfig!"
 
-    let acc = createActor timerChannel <!> createActor timerChannel
-    do! createForkTime (actorCount - 2) timerChannel acc
-    let! result = !? timerFiber
-    return result
+    let timerChan = Channel<TimerMessage<int>>()
+    let! timerFiber = !<~ (TimerEff 1 0 actorCount timerChan)
+    let! _ = timerChan <-- Start
+    let acc = createActor timerChan
+    do! createFork (actorCount - 1) timerChan acc
+    let! res = !<~~ timerFiber
+    return res
 }

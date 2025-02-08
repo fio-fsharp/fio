@@ -185,6 +185,17 @@ and Runtime(config: WorkerConfig) as this =
                     handleSuccess res stack evalSteps newEvalSteps
                 | Failure err ->
                     handleError err stack evalSteps newEvalSteps
+                | Action func ->
+                    handleResult (func ()) stack evalSteps newEvalSteps
+                | Send (msg, chan) ->
+                    chan.Add msg
+                    blockingEventQueue.Add chan
+                    handleSuccess msg stack evalSteps newEvalSteps
+                | Receive chan ->
+                    if prevAction = RescheduleForBlocking (BlockingChannel chan) then
+                        handleSuccess (chan.Take()) stack evalSteps newEvalSteps
+                    else
+                        (Receive chan, stack, RescheduleForBlocking <| BlockingChannel chan, evalSteps)
                 | Concurrent (eff, fiber, ifiber) ->
                     workItemQueue.Add <| WorkItem.Create eff ifiber ContStack.Empty prevAction
                     handleSuccess fiber stack evalSteps newEvalSteps
@@ -197,15 +208,6 @@ and Runtime(config: WorkerConfig) as this =
                     interpret eff ((SuccessCont, cont) :: stack) prevAction evalSteps
                 | ChainError (eff, cont) ->
                     interpret eff ((FailureCont, cont) :: stack) prevAction evalSteps
-                | Send (msg, chan) ->
-                    chan.Add msg
-                    blockingEventQueue.Add chan
-                    handleSuccess msg stack evalSteps newEvalSteps
-                | Receive chan ->
-                    if prevAction = RescheduleForBlocking (BlockingChannel chan) then
-                        handleSuccess (chan.Take()) stack evalSteps newEvalSteps
-                    else
-                        (Receive chan, stack, RescheduleForBlocking <| BlockingChannel chan, evalSteps)
 
         interpret eff stack prevAction evalSteps
 
@@ -214,3 +216,6 @@ and Runtime(config: WorkerConfig) as this =
         workItemQueue.Add
         <| WorkItem.Create (effect.Upcast()) (fiber.ToInternal()) ContStack.Empty Evaluated
         fiber
+
+    override this.Name () =
+        "Deadlocking"

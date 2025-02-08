@@ -8,103 +8,119 @@ module internal ArgParser
 
 open Argu
 
-open FIO.Runtime
+open System
 
+open FIO.Runtime
 open FIO.Benchmarks.Suite
 
-type Arguments =
-    | Naive_Runtime
-    | Intermediate_Runtime of evalworkers: int * blockingworkers: int * evalsteps: int
-    | Advanced_Runtime of evalworkers: int * blockingworkers: int * evalsteps: int
-    | Deadlocking_Runtime of evalworkers: int * blockingworkers: int * evalsteps: int
-    | [<Mandatory>] Runs of runs: int
-    | Process_Increment of actor_inc: int * inc_times: int
+type internal Arguments =
+    | Native_Runtime
+    | Intermediate_Runtime of ewc: int * ews: int * bwc: int
+    | Advanced_Runtime of ewc: int * ews: int * bwc: int
+    | Deadlocking_Runtime of ewc: int * ews: int * bwc: int
+    | Runs of runs: int
+    | Actor_Increment of actorInc: int * times: int
+    | Round_Increment of roundInc: int * times: int
     | Pingpong of rounds: int
     | Threadring of actors: int * rounds: int
     | Big of actors: int * rounds: int
     | Bang of actors: int * rounds: int
     | Fork of actors: int
+    | Save of saveToCsv: bool
+    | SavePath of absolutePath: string
 
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Naive_Runtime -> "specify naive runtime."
-            | Intermediate_Runtime _ ->
-                "specify evaluation workers, blocking workers and eval steps for intermediate runtime."
-            | Advanced_Runtime _ -> "specify evaluation workers, blocking workers and eval steps for advanced runtime."
-            | Deadlocking_Runtime _ ->
-                "specify evaluation workers, blocking workers and eval steps for deadlocking runtime."
-            | Runs _ -> "specify the number of runs for each benchmark."
-            | Process_Increment _ -> "specify the value of actor increment and how many times."
-            | Pingpong _ -> "specify rounds for pingpong benchmark."
-            | Threadring _ -> "specify actors and rounds for threadring benchmark."
-            | Big _ -> "specify actors and rounds for big benchmark."
-            | Bang _ -> "specify actors and rounds for bang benchmark."
-            | Fork _ -> "specify actors for fork benchmark."
+            | Native_Runtime -> 
+                "specify Native runtime"
+            | Intermediate_Runtime _ -> 
+                "specify Intermediate runtime with ewc, ews and bwc"
+            | Advanced_Runtime _ -> 
+                "specify Advanced runtime with ewc, ews and bwc"
+            | Deadlocking_Runtime _ -> 
+                "specify Deadlocking runtime with ewc, ews and bwc"
+            | Runs _ -> 
+                "specify number of runs for each benchmark"
+            | Actor_Increment _ -> 
+                "specify the value of actor increment and the number of times"
+            | Round_Increment _ -> 
+                "specify the value of round increment and the number of times"
+            | Pingpong _ -> 
+                "specify number of rounds for Pingpong benchmark"
+            | Threadring _ -> 
+                "specify number of actors and rounds for Threadring benchmark"
+            | Big _ -> 
+                "specify number of actors and rounds for Big benchmark"
+            | Bang _ -> 
+                "specify number of actors and rounds for Bang benchmark"
+            | Fork _ -> 
+                "specify number of actors for Fork benchmark"
+            | Save _ -> 
+                "should save benchmark results to csv file"
+            | SavePath _ ->
+                "specify absolute path to save the benchmark results csv file"
 
-type Parser() =
+type internal Parser() =
     let parser = ArgumentParser.Create<Arguments>()
 
-    member _.PrintArgs args =
-        let args = List.fold (fun s acc -> s + " " + acc) "" (List.ofArray args)
-        printfn $"benchmark arguments:%s{args}"
+    member internal this.PrintArgs args =
+        let argsStr = String.concat " " (Array.toList args)
+        printfn $"benchmark arguments: %s{argsStr}"
 
-    member _.PrintUsage() = printfn $"%s{parser.PrintUsage()}"
+    member internal this.PrintUsage() =
+        printfn "%s" (parser.PrintUsage())
 
-    member _.ParseArgs args =
+    member internal this.ParseArgs args =
         let results = parser.Parse args
-        let runs = results.GetResult Runs
-
-        let processIncrement =
-            match results.TryGetResult Process_Increment with
-            | Some(x, y) -> x, y
-            | _ -> 0, 0
-
-        let pingpongConfig =
-            match results.TryGetResult Pingpong with
-            | Some rounds -> 
-                [ Runner.PingpongConfig (rounds) ]
-            | _ -> []
-
-        let threadringConfig =
-            match results.TryGetResult Threadring with
-            | Some(actors, rounds) ->
-                [ Runner.ThreadringConfig (actors, rounds) ]
-            | _ -> []
-
-        let bigConfig =
-            match results.TryGetResult Big with
-            | Some(actors, rounds) ->
-                [ Runner.BigConfig (actors, rounds) ]
-            | _ -> []
-
-        let bangConfig =
-            match results.TryGetResult Bang with
-            | Some(actors, rounds) ->
-                [ Runner.BangConfig (actors, rounds) ]
-            | _ -> []
-
-        let forkConfig =
-            match results.TryGetResult Fork with
-            | Some actors -> 
-                [ Runner.ForkConfig (actors) ]
-            | _ -> []
-
-        let configs =
-            pingpongConfig @ threadringConfig @ bigConfig @ bangConfig @ forkConfig
 
         let runtime: FIORuntime =
-            match results.TryGetResult Naive_Runtime with
-            | Some _ -> Native.Runtime()
-            | _ ->
-                match results.TryGetResult Intermediate_Runtime with
-                | Some(ewc, bwc, esc) -> Intermediate.Runtime({ EWCount = ewc; EWSteps = esc; BWCount = bwc })
-                | _ ->
-                    match results.TryGetResult Advanced_Runtime with
-                    | Some(ewc, bwc, esc) -> Advanced.Runtime({ EWCount = ewc; EWSteps = esc; BWCount = bwc })
-                    | _ ->
-                        match results.TryGetResult Deadlocking_Runtime with
-                        | Some(ewc, bwc, esc) -> Deadlocking.Runtime({ EWCount = ewc; EWSteps = esc; BWCount = bwc })
-                        | _ -> failwith "ArgParser: Invalid runtime specified!"
+            if results.Contains Native_Runtime then
+                Native.Runtime()
+            elif results.Contains Intermediate_Runtime then
+                let (ewc, ews, bwc) = results.GetResult Intermediate_Runtime
+                Intermediate.Runtime({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
+            elif results.Contains Advanced_Runtime then
+                let (ewc, ews, bwc) = results.GetResult Advanced_Runtime
+                Advanced.Runtime({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
+            elif results.Contains Deadlocking_Runtime then
+                let (ewc, ews, bwc) = results.GetResult Advanced_Runtime
+                Deadlocking.Runtime({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
+            else
+                invalidArg "args" "Runtime should be specified!"
 
-        (configs, runtime, runs, processIncrement)
+        let runs = results.TryGetResult Runs |> Option.defaultValue 1 
+
+        let actorInc = results.TryGetResult Actor_Increment |> Option.defaultValue (0, 0)
+
+        let roundInc = results.TryGetResult Round_Increment |> Option.defaultValue (0, 0)
+
+        let configs =
+            [ results.TryGetResult Pingpong |> Option.map (fun rounds -> PingpongConfig rounds)
+              results.TryGetResult Threadring |> Option.map (fun (actors, rounds) -> ThreadringConfig (actors, rounds))
+              results.TryGetResult Big |> Option.map (fun (actors, rounds) -> BigConfig (actors, rounds))
+              results.TryGetResult Bang |> Option.map (fun (actors, rounds) -> BangConfig (actors, rounds))
+              results.TryGetResult Fork |> Option.map  (fun actors -> ForkConfig actors) ]
+            |> List.choose id
+
+        if configs.IsEmpty then
+            invalidArg "args" "At least one benchmark should be specified!"
+
+        let saveToCsv = results.TryGetResult Save |> Option.defaultValue false
+
+        let homePath =
+            if Environment.OSVersion.Platform.Equals PlatformID.Unix
+               || Environment.OSVersion.Platform.Equals PlatformID.MacOSX
+            then
+                Environment.GetEnvironmentVariable("HOME")
+            else
+                Environment.ExpandEnvironmentVariables("%HOMEDRIVE%%HOMEPATH%")
+        let savePath = results.TryGetResult SavePath |> Option.defaultValue (homePath + @"\fio\benchmarks\")
+
+        { Runtime = runtime
+          Runs = runs
+          ActorIncrement = actorInc
+          RoundIncrement = roundInc
+          BenchmarkConfigs = configs
+          SaveToCsv = saveToCsv
+          SavePath = savePath }
