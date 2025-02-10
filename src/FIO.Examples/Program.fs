@@ -63,13 +63,13 @@ let helloWorld6 () =
     printfn $"%A{result}"
 
 let concurrency1 () =
-    let concurrent = (FIO.Succeed 42).Fork().FlatMap(fun fiber -> FIO.Succeed(fiber.Await()))
+    let concurrent = (FIO.Succeed 42).Fork().FlatMap(fun fiber -> fiber.Await())
     let fiber = Runtime().Run concurrent
     let result = fiber.AwaitResult()
     printfn $"%A{result}"
 
 let concurrency2 () =
-    let concurrent = !~> !+ 42 >>= fun fiber -> !~~> fiber >>= FIO.Succeed
+    let concurrent = !~> !+ 42 >>= fun fiber -> !~~> fiber
     let fiber = Runtime().Run concurrent
     let result = fiber.AwaitResult()
     printfn $"%A{result}"

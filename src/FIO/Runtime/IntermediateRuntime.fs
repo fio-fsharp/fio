@@ -118,7 +118,9 @@ and Runtime(config: WorkerConfig) as this =
 
     new() =
         Runtime(
-            { EWCount = Environment.ProcessorCount - 1
+            { EWCount =
+                let coreCount = Environment.ProcessorCount - 1
+                if coreCount >= 4 then coreCount else 4
               BWCount = 1
               EWSteps = 20 })
 

@@ -8,7 +8,7 @@ module internal ArgParser
 
 open Argu
 
-open System
+open System.IO
 
 open FIO.Runtime
 open FIO.Benchmarks.Suite
@@ -108,14 +108,15 @@ type internal Parser() =
 
         let saveToCsv = results.TryGetResult Save |> Option.defaultValue false
 
-        let homePath =
-            if Environment.OSVersion.Platform.Equals PlatformID.Unix
-               || Environment.OSVersion.Platform.Equals PlatformID.MacOSX
-            then
-                Environment.GetEnvironmentVariable("HOME")
-            else
-                Environment.ExpandEnvironmentVariables("%HOMEDRIVE%%HOMEPATH%")
-        let savePath = results.TryGetResult SavePath |> Option.defaultValue (homePath + @"\fio\benchmarks\")
+        let projectDirPath =
+            Directory.GetCurrentDirectory()
+            |> Directory.GetParent
+            |> (fun di -> di.Parent)
+            |> (fun di -> di.Parent)
+            |> function
+                | null -> failwith "Unexpected directory structure!"
+                | di -> di.FullName
+        let savePath = results.TryGetResult SavePath |> Option.defaultValue (projectDirPath + @"\data\")
 
         { Runtime = runtime
           Runs = runs

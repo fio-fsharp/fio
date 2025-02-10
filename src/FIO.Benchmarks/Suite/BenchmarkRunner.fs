@@ -25,6 +25,8 @@ let private writeResultToCsv result savePath =
             .Replace(")", "")
             .Replace(":", "")
             .Replace(" ", "-")
+            .Replace(",", "")
+            .Replace(".", "")
     let folderName = $"%s{benchName}-runs-%s{result.Times.Length.ToString()}"
     let dirPath = savePath + folderName + @"\" + result.RuntimeFileName.ToLower()
 
@@ -36,7 +38,7 @@ let private writeResultToCsv result savePath =
     let fileName = $"""{folderName}-{result.RuntimeFileName.ToLower()}-{DateTime.Now.ToString("dd_MM_yyyy-HH-mm-ss")}.csv"""
     let filePath = dirPath + @"\" + fileName
 
-    File.WriteAllText(filePath, "Time" + "\n" + csvContent result.Times "")
+    File.WriteAllText(filePath, "Execution Time (ms)\n" + csvContent result.Times "")
     printfn $"\nSaved benchmark results to file: '%s{filePath}'"
 
 let private printResult result =
