@@ -219,6 +219,38 @@ type PingPongCEApp() =
         return! pinger chan1 chan2 <!> ponger chan1 chan2
     }
 
+type Message =
+    | Ping
+    | Pong
+
+type PingPongMatchApp() =
+    inherit FIOApp<unit, string>()
+
+    let pinger (chan1: Channel<Message>) (chan2: Channel<Message>) = fio {
+        let! ping = chan1 <-- Ping
+        do! writeln $"pinger sent: %A{ping}"
+        match! !<-- chan2 with
+        | Pong -> do! writeln $"pinger received: %A{Pong}"
+        | Ping -> return! !- $"pinger received %A{Ping} when %A{Pong} was expected!"  
+    }
+
+    let ponger (chan1: Channel<Message>) (chan2: Channel<Message>) = fio {
+        match! !<-- chan1 with
+        | Ping -> do! writeln $"ponger received: %A{Ping}"
+        | Pong -> return! !- $"ponger received %A{Pong} when %A{Ping} was expected!"
+        let! sentMsg =
+            match Random().Next(0, 2) with
+            | 0 -> chan2 <-- Pong
+            | _ -> chan2 <-- Ping
+        do! writeln $"ponger sent: %A{sentMsg}"
+    }
+
+    override this.effect = fio {
+        let chan1 = Channel<Message>()
+        let chan2 = Channel<Message>()
+        return! pinger chan1 chan2 <!> ponger chan1 chan2
+    }
+
 type Error =
     | DbError of bool
     | WsError of int
@@ -334,45 +366,51 @@ type SocketApp(ip: string, port: int) =
     inherit FIOApp<unit, exn>()
 
     let server (ip: string) (port: int) =
-        let echo (clientSocket: Socket<string>) = fio {
+        let sendAscii (clientSocket: Socket<int, string>) = fio {
             while true do
-                let! received = clientSocket.Receive()
-                do! writeln $"Server received: %s{received}"
-                let! echo = !+ $"Echo: %s{received}"
-                do! clientSocket.Send echo
+                let! msg = clientSocket.Receive()
+                do! writeln $"Server received: %s{msg}"
+                let! ascii =
+                    if msg.Length > 0 then
+                        !+ (int <| msg.Chars 0)
+                    else
+                        !+ -1
+                do! clientSocket.Send ascii
         }
 
         fio {
-            let! listener = !+ (new TcpListener(IPAddress.Parse(ip), port))
+            let! listener = !+ (new TcpListener(IPAddress.Parse ip, port))
             do! !+ listener.Start()
             do! writeln $"Server listening on %s{ip}:%i{port}..."
 
             while true do
-                let! clientSocket = !+ Socket<string>(listener.AcceptSocket())
-                let! endpoint = clientSocket.RemoteEndPoint()
-                                >>= fun endPoint -> !+ endPoint.ToString()
+                let! clientSocket = !+ Socket<int, string>(listener.AcceptSocket())
+                let! endpoint = 
+                    clientSocket.RemoteEndPoint()
+                    >>= fun endPoint ->
+                    !+ endPoint.ToString()
                 do! writeln $"Client connected from %s{endpoint}"
-                do! !!~> echo(clientSocket)
+                do! !!~> sendAscii(clientSocket)
         }
 
     let client (ip: string) (port: int) =
-        let send (socket: Socket<string>) = fio {
+        let send (socket: Socket<string, int>) = fio {
             while true do
                 do! write "Enter a message: "
-                let! message = readln ()
-                do! socket.Send message
+                let! msg = readln ()
+                do! socket.Send msg
         }
 
-        let receive (socket: Socket<string>) = fio {
+        let receive (socket: Socket<string, int>) = fio {
             while true do
-                let! received = socket.Receive()
-                do! writeln $"Client received: %s{received}"
+                let! msg = socket.Receive()
+                do! writeln $"Client received: %i{msg}"
         }
     
         fio {
             let! socket = !+ (new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
             do! !+ socket.Connect(ip, port)
-            let! clientSocket = !+ Socket<string>(socket)
+            let! clientSocket = !+ Socket<string, int>(socket)
             do! send clientSocket <!> receive clientSocket
         }
 
@@ -384,44 +422,49 @@ type WebSocketApp(serverUrl, clientUrl) =
     inherit FIOApp<unit, exn>()
 
     let server url =
-        let echo (clientSocket: WebSocket<string>) = fio {
+        let sendAscii (clientSocket: WebSocket<int, string>) = fio {
             while clientSocket.State = WebSocketState.Open do
-                let! received = clientSocket.Receive()
-                do! writeln $"Server received: %s{received}"
-                let! echo = !+ $"Echo: %s{received}"
-                do! clientSocket.Send echo
+                let! msg = clientSocket.Receive()
+                do! writeln $"Server received: %s{msg}"
+                let! ascii =
+                    if msg.Length > 0 then
+                        !+ (int <| msg.Chars 0)
+                    else
+                        !+ -1
+                do! clientSocket.Send ascii
         }
     
         fio {
-            let! serverSocket = !+ ServerWebSocket<string>()
+            let! serverSocket = !+ ServerWebSocket<int, string>()
             do! serverSocket.Start url
             do! writeln $"Server listening on %s{url}..."
 
             while true do
                 let! clientSocket = serverSocket.Accept()
-                let! remoteEndPoint = 
+                let! endpoint = 
                     clientSocket.RemoteEndPoint()
-                    >>= fun endPoint -> !+ endPoint.ToString()                  
-                do! writeln $"Client connected from %s{remoteEndPoint}"
-                do! !!~> echo(clientSocket)
+                    >>= fun endPoint ->
+                    !+ endPoint.ToString()
+                do! writeln $"Client connected from %s{endpoint}"
+                do! !!~> sendAscii(clientSocket)
         }
 
     let client url =
-        let send (clientSocket: ClientWebSocket<string>) = fio {
+        let send (clientSocket: ClientWebSocket<string, int>) = fio {
             while true do
                 do! write "Enter a message: "
-                let! message = readln ()
-                do! clientSocket.Send message
+                let! msg = readln ()
+                do! clientSocket.Send msg
         }
 
-        let receive (clientSocket: ClientWebSocket<string>) = fio {
+        let receive (clientSocket: ClientWebSocket<string, int>) = fio {
             while true do
-                let! message = clientSocket.Receive()
-                do! writeln $"Client received: %s{message}"
+                let! msg = clientSocket.Receive()
+                do! writeln $"Client received: %i{msg}"
         }
 
         fio {
-            let! clientSocket = !+ ClientWebSocket<string>()
+            let! clientSocket = !+ ClientWebSocket<string, int>()
             do! clientSocket.Connect url
             do! send clientSocket <!> receive clientSocket
         }
@@ -439,7 +482,31 @@ Console.ReadLine() |> ignore
 helloWorld3 ()
 Console.ReadLine() |> ignore
 
+helloWorld4 ()
+Console.ReadLine() |> ignore
+
+helloWorld5 ()
+Console.ReadLine() |> ignore
+
+helloWorld6 ()
+Console.ReadLine() |> ignore
+
 concurrency1 ()
+Console.ReadLine() |> ignore
+
+concurrency2 ()
+Console.ReadLine() |> ignore
+
+concurrency3 ()
+Console.ReadLine() |> ignore
+
+computationExpression1 ()
+Console.ReadLine() |> ignore
+
+computationExpression2 ()
+Console.ReadLine() |> ignore
+
+computationExpression3 ()
 Console.ReadLine() |> ignore
 
 WelcomeApp().Run()
@@ -461,6 +528,9 @@ PingPongApp().Run()
 Console.ReadLine() |> ignore
 
 PingPongCEApp().Run()
+Console.ReadLine() |> ignore
+
+PingPongMatchApp().Run()
 Console.ReadLine() |> ignore
 
 ErrorHandlingApp().Run()

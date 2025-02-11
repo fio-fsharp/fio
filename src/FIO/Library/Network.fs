@@ -21,7 +21,7 @@ open FIO.Core
 
 module Sockets =
 
-    type Socket<'R>(socket: Socket) =
+    type Socket<'S, 'R>(socket: Socket) =
         let networkStream = new NetworkStream(socket)
         let reader = new StreamReader(networkStream)
         let writer = new StreamWriter(networkStream)
@@ -30,7 +30,7 @@ module Sockets =
 
         let options = JsonFSharpOptions.Default().ToJsonSerializerOptions()
 
-        member this.Send (msg: 'R) : FIO<unit, exn> =
+        member this.Send (msg: 'S) : FIO<unit, exn> =
             try
                 let serialized = JsonSerializer.Serialize(msg, options)
                 writer.WriteLine serialized
@@ -67,10 +67,10 @@ module Sockets =
 
 module WebSockets =
 
-    type WebSocket<'R> internal (webSocketContext: HttpListenerWebSocketContext, listenerContext: HttpListenerContext) =
+    type WebSocket<'S, 'R> internal (webSocketContext: HttpListenerWebSocketContext, listenerContext: HttpListenerContext) =
         let options = JsonFSharpOptions.Default().ToJsonSerializerOptions()
 
-        member this.Send (msg: 'R) : FIO<unit, exn> =
+        member this.Send (msg: 'S) : FIO<unit, exn> =
             try
                 let serialized = JsonSerializer.Serialize(msg, options)
                 let buffer = Encoding.UTF8.GetBytes serialized
@@ -118,7 +118,7 @@ module WebSockets =
                 with exn ->
                     !- exn
 
-    type ServerWebSocket<'R>() =
+    type ServerWebSocket<'S, 'R>() =
         let listener = new HttpListener()
 
         member this.Start url : FIO<unit, exn> =
@@ -129,12 +129,12 @@ module WebSockets =
             with exn ->
                 !- exn
 
-        member this.Accept () : FIO<WebSocket<'R>, exn> =
+        member this.Accept () : FIO<WebSocket<'S, 'R>, exn> =
             try
                 let context = listener.GetContextAsync().Result
                 if context.Request.IsWebSocketRequest then
                     let webSocketContext = context.AcceptWebSocketAsync(subProtocol = null).Result
-                    !+ WebSocket<'R>(webSocketContext, context)
+                    !+ WebSocket<'S, 'R>(webSocketContext, context)
                 else
                     context.Response.StatusCode <- 400
                     context.Response.Close()
@@ -149,7 +149,7 @@ module WebSockets =
             with exn ->
                 !- exn
 
-    and ClientWebSocket<'R>() =
+    and ClientWebSocket<'S, 'R>() =
         let clientSocket = new ClientWebSocket()
         let options = JsonFSharpOptions.Default().ToJsonSerializerOptions()
 
@@ -163,25 +163,25 @@ module WebSockets =
             with exn ->
                 !- exn
 
-        member this.Send (msg: 'R) : FIO<unit, exn> =
+        member this.Send (msg: 'S) : FIO<unit, exn> =
             try
                 let serialized = JsonSerializer.Serialize(msg, options)
                 let buffer = Encoding.UTF8.GetBytes serialized
-                clientSocket.SendAsync(ArraySegment<byte> buffer, WebSocketMessageType.Text, true, CancellationToken.None).Wait()
+                clientSocket.SendAsync(ArraySegment buffer, WebSocketMessageType.Text, true, CancellationToken.None).Wait()
                 !+ ()
             with exn ->
                 !- exn
 
-        member this.Receive () : FIO<'R, exn> = 
+        member this.Receive () : FIO<'R, exn> =
             try
-                let buffer = Array.zeroCreate<byte> 1024
-                let result = clientSocket.ReceiveAsync(ArraySegment<byte> buffer, CancellationToken.None).Result
+                let buffer = Array.zeroCreate 1024
+                let result = clientSocket.ReceiveAsync(ArraySegment buffer, CancellationToken.None).Result
                 let serialized = Encoding.UTF8.GetString(buffer, 0, result.Count)
                 !+ JsonSerializer.Deserialize<'R>(serialized, options)
             with exn ->
                 !- exn
 
-        member this.Close() : FIO<unit, exn> =
+        member this.Close () : FIO<unit, exn> =
             try
                 clientSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None).Wait()
                 !+ ()
