@@ -120,7 +120,7 @@ and Runtime(config: WorkerConfig) as this =
         Runtime(
             { EWCount =
                 let coreCount = Environment.ProcessorCount - 1
-                if coreCount >= 4 then coreCount else 4
+                if coreCount >= 2 then coreCount else 2
               BWCount = 1
               EWSteps = 20 })
 
@@ -155,22 +155,22 @@ and Runtime(config: WorkerConfig) as this =
                     handleError err newEvalSteps stack
                 | Action func ->
                     handleResult (func ()) newEvalSteps stack
-                | Send (msg, chan) ->
+                | SendChan (msg, chan) ->
                     chan.Add msg
                     handleSuccess msg newEvalSteps stack
-                | Receive chan ->
+                | ReceiveChan chan ->
                     if prevAction = RescheduleForBlocking (BlockingChannel chan) then
                         handleSuccess (chan.Take()) newEvalSteps stack
                     else
-                        (Receive chan, stack, RescheduleForBlocking <| BlockingChannel chan, evalSteps)
+                        (ReceiveChan chan, stack, RescheduleForBlocking <| BlockingChannel chan, evalSteps)
                 | Concurrent (eff, fiber, ifiber) ->
                     workItemQueue.Add <| WorkItem.Create eff ifiber ContStack.Empty prevAction
                     handleSuccess fiber newEvalSteps stack
-                | Await ifiber ->
+                | AwaitFiber ifiber ->
                     if ifiber.Completed() then
                         handleResult (ifiber.AwaitResult()) newEvalSteps stack
                     else
-                        (Await ifiber, stack, RescheduleForBlocking <| BlockingIFiber ifiber, evalSteps)
+                        (AwaitFiber ifiber, stack, RescheduleForBlocking <| BlockingIFiber ifiber, evalSteps)
                 | ChainSuccess (eff, cont) ->
                     interpret eff ((SuccessCont, cont) :: stack) prevAction evalSteps
                 | ChainError (eff, cont) ->

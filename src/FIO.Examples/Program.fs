@@ -423,7 +423,8 @@ type WebSocketApp(serverUrl, clientUrl) =
 
     let server url =
         let sendAscii (clientSocket: WebSocket<int, string>) = fio {
-            while clientSocket.State = WebSocketState.Open do
+            let! state = clientSocket.State()
+            while state = WebSocketState.Open do
                 let! msg = clientSocket.Receive()
                 do! writeln $"Server received: %s{msg}"
                 let! ascii =
@@ -534,6 +535,9 @@ PingPongMatchApp().Run()
 Console.ReadLine() |> ignore
 
 ErrorHandlingApp().Run()
+Console.ReadLine() |> ignore
+
+AsyncErrorHandlingApp().Run()
 Console.ReadLine() |> ignore
 
 RaceServersApp().Run()

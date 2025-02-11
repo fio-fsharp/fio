@@ -187,23 +187,23 @@ and Runtime(config: WorkerConfig) as this =
                     handleError err stack evalSteps newEvalSteps
                 | Action func ->
                     handleResult (func ()) stack evalSteps newEvalSteps
-                | Send (msg, chan) ->
+                | SendChan (msg, chan) ->
                     chan.Add msg
                     blockingEventQueue.Add chan
                     handleSuccess msg stack evalSteps newEvalSteps
-                | Receive chan ->
+                | ReceiveChan chan ->
                     if prevAction = RescheduleForBlocking (BlockingChannel chan) then
                         handleSuccess (chan.Take()) stack evalSteps newEvalSteps
                     else
-                        (Receive chan, stack, RescheduleForBlocking <| BlockingChannel chan, evalSteps)
+                        (ReceiveChan chan, stack, RescheduleForBlocking <| BlockingChannel chan, evalSteps)
                 | Concurrent (eff, fiber, ifiber) ->
                     workItemQueue.Add <| WorkItem.Create eff ifiber ContStack.Empty prevAction
                     handleSuccess fiber stack evalSteps newEvalSteps
-                | Await ifiber ->
+                | AwaitFiber ifiber ->
                     if ifiber.Completed() then
                         handleResult (ifiber.AwaitResult()) stack evalSteps newEvalSteps
                     else
-                        (Await ifiber, stack, RescheduleForBlocking <| BlockingIFiber ifiber, evalSteps)
+                        (AwaitFiber ifiber, stack, RescheduleForBlocking <| BlockingIFiber ifiber, evalSteps)
                 | ChainSuccess (eff, cont) ->
                     interpret eff ((SuccessCont, cont) :: stack) prevAction evalSteps
                 | ChainError (eff, cont) ->

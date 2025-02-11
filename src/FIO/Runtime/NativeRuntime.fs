@@ -38,11 +38,13 @@ type Runtime() =
                 handleError err stack
             | Action func ->
                 handleResult (func ()) stack
-            | Send (msg, chan) ->
+            | SendChan (msg, chan) ->
                 chan.Add msg
                 handleSuccess msg stack
-            | Receive chan ->
+            | ReceiveChan chan ->
                 handleSuccess (chan.Take()) stack
+            | AwaitTask task ->
+                handleResult (task.AwaitResult()) stack
             | Concurrent (eff, fiber, ifiber) ->
                 async {
                     ifiber.Complete
@@ -50,7 +52,7 @@ type Runtime() =
                 }
                 |> Async.Start
                 handleSuccess fiber stack
-            | Await ifiber ->
+            | AwaitFiber ifiber ->
                 handleResult (ifiber.AwaitResult()) stack
             | ChainSuccess (eff, cont) ->
                 interpret eff ((SuccessCont, cont) :: stack)
