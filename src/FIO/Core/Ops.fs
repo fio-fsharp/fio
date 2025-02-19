@@ -25,11 +25,11 @@ let inline ( =<< ) (cont: 'R -> FIO<'R1, 'E>) (eff: FIO<'R, 'E>)  : FIO<'R1, 'E>
 
 /// An alias for `FlatMapError`, which chains the error result of the effect to the continuation function.
 let inline ( >>=? ) (eff: FIO<'R, 'E>) (cont: 'E -> FIO<'R, 'E1>) : FIO<'R, 'E1> =
-    eff.FlapMapError cont
+    eff.FlatMapError cont
 
 /// An alias for `FlatMapError`, which chains the error result of the effect to the continuation function.
 let inline ( ?=<< ) (cont: 'E -> FIO<'R, 'E1>) (eff: FIO<'R, 'E>) : FIO<'R, 'E1> =
-    eff.FlapMapError cont
+    eff.FlatMapError cont
 
 /// An alias for `Map`, which maps a function over the result of an effect.
 let inline ( *> ) (eff: FIO<'R, 'E>) (cont: 'R -> 'R1) : FIO<'R1, 'E> =

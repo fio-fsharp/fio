@@ -297,11 +297,11 @@ type AsyncErrorHandlingApp() =
     }
 
     let databaseResult : FIO<string, Error> =
-        FIO<string, exn>.FromAsync databaseReadTask
+        FIO<string, exn>.FromAsync(databaseReadTask, "")
         >>=? fun exn -> !- (GeneralError exn.Message)
 
     let webserviceResult : FIO<int, Error> =
-        FIO<int, exn>.FromAsync webserviceAwaitTask
+        FIO<int, exn>.FromAsync(webserviceAwaitTask, "")
         >>=? fun exn -> !- (GeneralError exn.Message)
 
     override this.effect = fio {
@@ -366,7 +366,7 @@ type SocketApp(ip: string, port: int) =
     inherit FIOApp<unit, exn>()
 
     let server (ip: string) (port: int) =
-        let sendAscii (clientSocket: Socket<int, string>) = fio {
+        let sendAscii (clientSocket: FSocket<int, string>) = fio {
             while true do
                 let! msg = clientSocket.Receive()
                 do! writeln $"Server received: %s{msg}"
@@ -384,7 +384,7 @@ type SocketApp(ip: string, port: int) =
             do! writeln $"Server listening on %s{ip}:%i{port}..."
 
             while true do
-                let! clientSocket = !+ Socket<int, string>(listener.AcceptSocket())
+                let! clientSocket = !+ FSocket<int, string>(listener.AcceptSocket())
                 let! endpoint = 
                     clientSocket.RemoteEndPoint()
                     >>= fun endPoint ->
@@ -394,14 +394,14 @@ type SocketApp(ip: string, port: int) =
         }
 
     let client (ip: string) (port: int) =
-        let send (socket: Socket<string, int>) = fio {
+        let send (socket: FSocket<string, int>) = fio {
             while true do
                 do! write "Enter a message: "
                 let! msg = readln ()
                 do! socket.Send msg
         }
 
-        let receive (socket: Socket<string, int>) = fio {
+        let receive (socket: FSocket<string, int>) = fio {
             while true do
                 let! msg = socket.Receive()
                 do! writeln $"Client received: %i{msg}"
@@ -410,7 +410,7 @@ type SocketApp(ip: string, port: int) =
         fio {
             let! socket = !+ (new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
             do! !+ socket.Connect(ip, port)
-            let! clientSocket = !+ Socket<string, int>(socket)
+            let! clientSocket = !+ FSocket<string, int>(socket)
             do! send clientSocket <!> receive clientSocket
         }
 
@@ -422,7 +422,7 @@ type WebSocketApp(serverUrl, clientUrl) =
     inherit FIOApp<unit, exn>()
 
     let server url =
-        let sendAscii (clientSocket: WebSocket<int, string>) = fio {
+        let sendAscii (clientSocket: FWebSocket<int, string>) = fio {
             let! state = clientSocket.State()
             while state = WebSocketState.Open do
                 let! msg = clientSocket.Receive()
@@ -436,7 +436,7 @@ type WebSocketApp(serverUrl, clientUrl) =
         }
     
         fio {
-            let! serverSocket = !+ ServerWebSocket<int, string>()
+            let! serverSocket = !+ ServerFWebSocket<int, string>()
             do! serverSocket.Start url
             do! writeln $"Server listening on %s{url}..."
 
@@ -451,21 +451,21 @@ type WebSocketApp(serverUrl, clientUrl) =
         }
 
     let client url =
-        let send (clientSocket: ClientWebSocket<string, int>) = fio {
+        let send (clientSocket: ClientFWebSocket<string, int>) = fio {
             while true do
                 do! write "Enter a message: "
                 let! msg = readln ()
                 do! clientSocket.Send msg
         }
 
-        let receive (clientSocket: ClientWebSocket<string, int>) = fio {
+        let receive (clientSocket: ClientFWebSocket<string, int>) = fio {
             while true do
                 let! msg = clientSocket.Receive()
                 do! writeln $"Client received: %i{msg}"
         }
 
         fio {
-            let! clientSocket = !+ ClientWebSocket<string, int>()
+            let! clientSocket = !+ ClientFWebSocket<string, int>()
             do! clientSocket.Connect url
             do! send clientSocket <!> receive clientSocket
         }

@@ -50,11 +50,11 @@ and internal WorkItem =
 and internal BlockingItem =
     | BlockingChannel of Channel<obj>
     | BlockingIFiber of InternalFiber
-    | BlockingTask of InternalTask<obj>
+    | BlockingTask of TaskWrapper<obj>
 
-and internal InternalTask<'R> private (task: Task<'R>, blockingWorkItemQueue: BlockingQueue<WorkItem>) =
+and internal TaskWrapper<'R> private (task: Task<'R>, name: string, blockingWorkItemQueue: BlockingQueue<WorkItem>) =
 
-    new(task) = InternalTask(task, new BlockingQueue<WorkItem>())
+    new(task, name) = TaskWrapper(task, name, new BlockingQueue<WorkItem>())
    
     member internal this.AddBlockingWorkItem workItem =
         blockingWorkItemQueue.Add workItem
@@ -70,14 +70,16 @@ and internal InternalTask<'R> private (task: Task<'R>, blockingWorkItemQueue: Bl
         blockingWorkItemQueue.Count > 0
 
     member internal this.Upcast () =
-        InternalTask<obj>(task.ContinueWith(fun (t: Task<'R>) -> t.Result :> obj), blockingWorkItemQueue)
+        TaskWrapper<obj>(task.ContinueWith((fun (t: Task<'R>) -> t.Result :> obj), CancellationToken.None, TaskContinuationOptions.RunContinuationsAsynchronously, TaskScheduler.Default), name, blockingWorkItemQueue)
+
+    member internal this.Task () : Task<'R> =
+        task
+
+    member internal this.Name =
+       name
 
     member internal this.AwaitResult () =
-        task.Wait()
         Ok task.Result
-
-    member internal this.Completed () =
-        task.IsCompleted
 
 and internal InternalFiber internal (resQueue: BlockingQueue<Result<obj, obj>>, blockingWorkItemQueue: BlockingQueue<WorkItem>) =
 
@@ -184,7 +186,7 @@ and FIO<'R, 'E> =
     | Action of func: (unit -> Result<'R, 'E>)
     | SendChan of msg: 'R * chan: Channel<'R>
     | ReceiveChan of chan: Channel<'R>
-    | AwaitTask of itask: InternalTask<'R>
+    | AwaitTask of itask: TaskWrapper<'R>
     | Concurrent of eff: FIO<obj, obj> * fiber: obj * ifiber: InternalFiber
     | AwaitFiber of ifiber: InternalFiber
     | ChainSuccess of eff: FIO<obj, 'E> * cont: (obj -> FIO<'R, 'E>)
@@ -221,18 +223,18 @@ and FIO<'R, 'E> =
         | Choice2Of2 err -> FIO.Fail err
 
     /// Converts a Task into an effect.
-    static member FromGenericTask (task: Task<'R>) : FIO<'R, 'E> =
-        AwaitTask <| InternalTask task
+    static member FromGenericTask (task: Task<'R>, name) : FIO<'R, 'E> =
+        AwaitTask <| TaskWrapper (task, name)
 
     /// Converts a Task into an effect.
-    static member FromTask (task: Task) : FIO<unit, 'E> =
-        AwaitTask <| InternalTask (task.ContinueWith(fun _ ->
-            Task.FromResult(()))
-                |> fun t -> t.Result)
+    static member FromTask (task: Task, name) : FIO<unit, 'E> =
+        AwaitTask <| TaskWrapper (task.ContinueWith((fun _ ->
+            Task.FromResult(())), CancellationToken.None, TaskContinuationOptions.RunContinuationsAsynchronously, TaskScheduler.Default)
+                |> fun t -> t.Result, name)
 
     /// Converts an Async computation into an effect.
-    static member FromAsync (async: Async<'R>) : FIO<'R, 'E> =
-        FIO.FromGenericTask <| Async.StartAsTask async
+    static member FromAsync (async: Async<'R>, name) : FIO<'R, 'E> =
+        FIO.FromGenericTask <| (Async.StartAsTask async, name)
 
     /// Binds a continuation to the result of an effect.
     /// If the effect fails, the error is immediately returned.
@@ -241,7 +243,7 @@ and FIO<'R, 'E> =
 
     /// Binds a continuation to the error of an effect.
     /// If the effect succeeds, the result is immediately returned.
-    member this.FlapMapError (cont: 'E -> FIO<'R, 'E1>) : FIO<'R, 'E1> =
+    member this.FlatMapError (cont: 'E -> FIO<'R, 'E1>) : FIO<'R, 'E1> =
         ChainError (this.Upcast(), fun err -> cont (err :?> 'E))
 
     /// Maps a function over the result of an effect.
@@ -251,7 +253,7 @@ and FIO<'R, 'E> =
 
     // Maps a function over the error of an effect.
     member inline this.MapError (cont: 'E -> 'E1) : FIO<'R, 'E1> =
-        this.FlapMapError <| fun err ->
+        this.FlatMapError <| fun err ->
             FIO.Fail <| cont err
 
     /// Sequences two effects, ignoring the result of the first effect.
@@ -262,7 +264,7 @@ and FIO<'R, 'E> =
     /// Sequences two effects, ignoring the error of the first effect.
     /// If the first effect succeeds, the result is immediately returned.
     member inline this.ThenError (eff: FIO<'R, 'E1>) : FIO<'R, 'E1> =
-        this.FlapMapError <| fun _ -> eff
+        this.FlatMapError <| fun _ -> eff
 
     /// Combines two effects: one produces a result function and the other produces a result value.
     /// The function is applied to the value, and the result is returned.
@@ -274,7 +276,7 @@ and FIO<'R, 'E> =
     /// Combines two effects: one produces an error function and the other produces an error value.
     /// The function is applied to the value, and the error is returned.
     member inline this.ApplyError (eff: FIO<'R, 'E -> 'E1>) : FIO<'R, 'E1> =
-        eff.FlapMapError <| fun func ->
+        eff.FlatMapError <| fun func ->
             this.MapError func
 
     /// Combines two effects and succeeds with a tuple of their results when both complete.
@@ -286,8 +288,8 @@ and FIO<'R, 'E> =
 
     /// Combines two effects and succeeds with a tuple of their errors when both complete.
     member inline this.ZipError (eff: FIO<'R, 'E1>) : FIO<'R, 'E * 'E1> =
-        this.FlapMapError <| fun err ->
-            eff.FlapMapError <| fun err' ->
+        this.FlatMapError <| fun err ->
+            eff.FlatMapError <| fun err' ->
                 FIO.Fail (err, err')
 
     /// Interprets an effect concurrently and returns the fiber that is interpreting it.
@@ -307,8 +309,8 @@ and FIO<'R, 'E> =
     /// Interprets two effects concurrently and succeeds with a tuple of their errors when both complete.
     member inline this.ParallelError (eff: FIO<'R, 'E1>) : FIO<'R, 'E * 'E1> =
         eff.Fork().FlatMap <| fun fiber ->
-            this.FlapMapError <| fun err ->
-                fiber.Await().FlapMapError <| fun err' ->
+            this.FlatMapError <| fun err ->
+                fiber.Await().FlatMapError <| fun err' ->
                     FIO.Fail (err, err')
 
     /// Interprets two effects concurrently and succeeds with the result of the first effect that completes.

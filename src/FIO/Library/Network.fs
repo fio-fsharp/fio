@@ -15,20 +15,20 @@ open System.Net.Sockets
 open System.Net.WebSockets
 open System.Threading
 open System.Text.Json
-open System.Text.Json.Serialization
 
 open FIO.Core
 
 module Sockets =
 
-    type Socket<'S, 'R>(socket: Socket) =
+    type FSocket<'S, 'R>(socket: Socket, options: JsonSerializerOptions) =
         let networkStream = new NetworkStream(socket)
         let reader = new StreamReader(networkStream)
         let writer = new StreamWriter(networkStream)
 
-        do writer.AutoFlush <- true
+        do 
+            writer.AutoFlush <- true
 
-        let options = JsonFSharpOptions.Default().ToJsonSerializerOptions()
+        new(socket) = FSocket(socket, new JsonSerializerOptions())
 
         member this.Send (msg: 'S) : FIO<unit, exn> =
             try
@@ -67,15 +67,15 @@ module Sockets =
 
 module WebSockets =
 
-    type WebSocket<'S, 'R> internal (webSocketContext: HttpListenerWebSocketContext, listenerContext: HttpListenerContext) =
-        let options = JsonFSharpOptions.Default().ToJsonSerializerOptions()
+    type FWebSocket<'S, 'R> internal (webSocketContext: HttpListenerWebSocketContext, listenerContext: HttpListenerContext, options: JsonSerializerOptions) =
+
+        new(webSocketContext, listenerContext) = FWebSocket(webSocketContext, listenerContext, new JsonSerializerOptions())
 
         member this.Send (msg: 'S) : FIO<unit, exn> = fio {
             try
                 let! serialized = !+ JsonSerializer.Serialize(msg, options)
                 let! buffer = !+ Encoding.UTF8.GetBytes(serialized)
-                do! FIO<unit, exn>.FromTask
-                    <| webSocketContext.WebSocket.SendAsync(ArraySegment<byte> buffer, WebSocketMessageType.Text, true, CancellationToken.None)
+                do! FIO<unit, exn>.FromTask(webSocketContext.WebSocket.SendAsync(ArraySegment<byte> buffer, WebSocketMessageType.Text, true, CancellationToken.None), "SendAsync, Spawned Socket")
                 return ()
             with exn ->
                 return! !- exn
@@ -85,19 +85,16 @@ module WebSockets =
             try
                 let! buffer = !+ Array.zeroCreate(1024)
                 let! result =
-                    FIO<WebSocketReceiveResult, exn>.FromGenericTask
-                    <| webSocketContext.WebSocket.ReceiveAsync(ArraySegment<byte> buffer, CancellationToken.None)
+                    FIO<WebSocketReceiveResult, exn>.FromGenericTask(webSocketContext.WebSocket.ReceiveAsync(ArraySegment<byte> buffer, CancellationToken.None), "ReceiveAsync, Spawned Socket")
                 if result.MessageType = WebSocketMessageType.Close then
-                    do! FIO<unit, exn>.FromTask
-                        <| webSocketContext.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None)
+                    do! FIO<unit, exn>.FromTask(webSocketContext.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None), "CloseAsync, Spawned Socket")
                     return! !- Exception("Received Close message")
                 else 
                     let! serialized = !+ Encoding.UTF8.GetString(buffer, 0, result.Count)
                     return JsonSerializer.Deserialize<'R>(serialized, options)
             with exn ->
                 try
-                    do! FIO<unit, exn>.FromTask
-                        <| webSocketContext.WebSocket.CloseAsync(WebSocketCloseStatus.InternalServerError, exn.Message, CancellationToken.None)
+                    do! FIO<unit, exn>.FromTask(webSocketContext.WebSocket.CloseAsync(WebSocketCloseStatus.InternalServerError, exn.Message, CancellationToken.None), "CloseAsync, Spawned Socket")
                     return ()
                 with _ -> 
                     return ()
@@ -106,8 +103,7 @@ module WebSockets =
 
         member this.Close () : FIO<unit, exn> = fio {
             try
-                do! FIO<unit, exn>.FromTask
-                    <| webSocketContext.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None)
+                do! FIO<unit, exn>.FromTask(webSocketContext.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None), "CloseAsync, Spawned Socket")
                 return ()
             with exn ->
                 return! !- exn
@@ -131,8 +127,10 @@ module WebSockets =
                 return! !- exn
         }
 
-    type ServerWebSocket<'S, 'R>() =
+    type ServerFWebSocket<'S, 'R>(options: JsonSerializerOptions) =
         let listener = new HttpListener()
+
+        new() = ServerFWebSocket(new JsonSerializerOptions())
 
         member this.Start url : FIO<unit, exn> = fio {
             try
@@ -143,16 +141,14 @@ module WebSockets =
                 return! !- exn
         }
 
-        member this.Accept () : FIO<WebSocket<'S, 'R>, exn> = fio {
+        member this.Accept () : FIO<FWebSocket<'S, 'R>, exn> = fio {
             try
                 let! context =
-                    FIO<HttpListenerContext, exn>.FromGenericTask
-                    <| listener.GetContextAsync()
+                    FIO<HttpListenerContext, exn>.FromGenericTask(listener.GetContextAsync(), "GetContextAsync, ServerSocket")
                 if context.Request.IsWebSocketRequest then
                     let! webSocketContext =
-                        FIO<HttpListenerWebSocketContext, exn>.FromGenericTask
-                        <| context.AcceptWebSocketAsync(subProtocol = null)
-                    return WebSocket<'S, 'R>(webSocketContext, context)
+                        FIO<HttpListenerWebSocketContext, exn>.FromGenericTask(context.AcceptWebSocketAsync(subProtocol = null), "AcceptWebSocketAsync, ServerSocket")
+                    return FWebSocket<'S, 'R>(webSocketContext, context, options)
                 else
                     do! !+ (context.Response.StatusCode <- 400)
                     do! !+ context.Response.Close()
@@ -169,15 +165,15 @@ module WebSockets =
                 return! !- exn
         }
 
-    and ClientWebSocket<'S, 'R>() =
+    and ClientFWebSocket<'S, 'R>(options: JsonSerializerOptions) =
         let clientSocket = new ClientWebSocket()
-        let options = JsonFSharpOptions.Default().ToJsonSerializerOptions()
+
+        new() = ClientFWebSocket(new JsonSerializerOptions())
 
         member this.Connect url : FIO<unit, exn> = fio {
             try
                 let! uri = !+ (Uri url)
-                do! FIO<unit, exn>.FromTask
-                    <| clientSocket.ConnectAsync(uri, CancellationToken.None)
+                do! FIO<unit, exn>.FromTask(clientSocket.ConnectAsync(uri, CancellationToken.None), "ConnectAsync, ClientSocket")
                 return ()
             with exn ->
                 return! !- exn
@@ -187,8 +183,7 @@ module WebSockets =
             try
                 let! serialized = !+ JsonSerializer.Serialize(msg, options)
                 let! buffer = !+ Encoding.UTF8.GetBytes(serialized)
-                do! FIO<unit, exn>.FromTask
-                    <| clientSocket.SendAsync(ArraySegment buffer, WebSocketMessageType.Text, true, CancellationToken.None)
+                do! FIO<unit, exn>.FromTask(clientSocket.SendAsync(ArraySegment buffer, WebSocketMessageType.Text, true, CancellationToken.None), "SendAsync, ClientSocket")
                 return ()
             with exn ->
                 return! !- exn
@@ -198,8 +193,7 @@ module WebSockets =
             try
                 let! buffer = !+ Array.zeroCreate(1024)
                 let! result = 
-                    FIO<WebSocketReceiveResult, exn>.FromGenericTask
-                    <| clientSocket.ReceiveAsync(ArraySegment buffer, CancellationToken.None)
+                    FIO<WebSocketReceiveResult, exn>.FromGenericTask(clientSocket.ReceiveAsync(ArraySegment buffer, CancellationToken.None), "ReceiveAsync, ClientSocket")
                 let! serialized = !+ Encoding.UTF8.GetString(buffer, 0, result.Count)
                 return JsonSerializer.Deserialize<'R>(serialized, options)
             with exn ->
@@ -208,8 +202,7 @@ module WebSockets =
 
         member this.Close () : FIO<unit, exn> = fio {
             try
-                do! FIO<unit, exn>.FromTask
-                    <| clientSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None)
+                do! FIO<unit, exn>.FromTask(clientSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None), "CloseAsync, ClientSocket")
                 return ()
             with exn ->
                 return! !- exn

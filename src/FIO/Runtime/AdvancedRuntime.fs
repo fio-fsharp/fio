@@ -10,6 +10,7 @@ open System
 open System.Threading
 
 open FIO.Core
+open System.Threading.Tasks
 
 type private EvaluationWorkerConfig =
     { Runtime: Runtime
@@ -19,7 +20,7 @@ type private EvaluationWorkerConfig =
 
 and private BlockingWorkerConfig =
     { WorkItemQueue: BlockingQueue<WorkItem>
-      BlockingItemQueue: BlockingQueue<BlockingItem>}
+      BlockingItemQueue: BlockingQueue<BlockingItem> }
 
 and private EvaluationWorker(config: EvaluationWorkerConfig) =
 
@@ -42,7 +43,7 @@ and private EvaluationWorker(config: EvaluationWorkerConfig) =
             completeWorkItem workItem
             <| Error err
         | eff, stack, RescheduleForRunning, _ ->
-            config.WorkItemQueue.Add 
+            config.WorkItemQueue.Add
             <| WorkItem.Create eff workItem.IFiber stack RescheduleForRunning
         | eff, stack, RescheduleForBlocking blockingItem, _ ->
             config.BlockingWorker.RescheduleForBlocking blockingItem
@@ -60,7 +61,7 @@ and private EvaluationWorker(config: EvaluationWorkerConfig) =
 
     let cancellationTokenSource = new CancellationTokenSource()
     do startWorker cancellationTokenSource.Token
-
+    
     interface IDisposable with
         member this.Dispose() =
             cancellationTokenSource.Cancel()
@@ -73,15 +74,12 @@ and private BlockingWorker(config: BlockingWorkerConfig) =
         else
             config.BlockingItemQueue.Add <| BlockingChannel blockingChan
 
-    let processBlockingTask (blockingTask: InternalTask<obj>) =
-        if blockingTask.Completed() then
-            if blockingTask.HasBlockingWorkItems() then
-                blockingTask.RescheduleBlockingWorkItems config.WorkItemQueue
-            else
-                ()
-        else
-            config.BlockingItemQueue.Add (BlockingTask blockingTask)
-
+    let processBlockingTask (blockingTask: TaskWrapper<obj>) =
+        blockingTask.Task().ContinueWith((fun (_: Tasks.Task) ->
+            blockingTask.RescheduleBlockingWorkItems config.WorkItemQueue
+        ), CancellationToken.None, TaskContinuationOptions.RunContinuationsAsynchronously, TaskScheduler.Default)
+        |> ignore
+ 
     let processBlockingItem blockingItem =
         match blockingItem with
         | BlockingChannel chan -> processBlockingChannel chan
@@ -185,11 +183,13 @@ and Runtime(config: WorkerConfig) as this =
                     blockingItemQueue.Add <| BlockingChannel chan
                     handleSuccess msg stack evalSteps newEvalSteps
                 | ReceiveChan chan ->
+                    // TODO: Optimize this. Why are we just assuming it is blocking?
                     if prevAction = RescheduleForBlocking (BlockingChannel chan) then
                         handleSuccess (chan.Take()) stack evalSteps newEvalSteps
                     else
                         (ReceiveChan chan, stack, RescheduleForBlocking <| BlockingChannel chan, evalSteps)
                 | AwaitTask task ->
+                    // TODO: Optimize this. Why are we just assuming it is blocking?
                     if prevAction = RescheduleForBlocking (BlockingTask task) then
                         handleResult (task.AwaitResult()) stack evalSteps newEvalSteps
                     else
