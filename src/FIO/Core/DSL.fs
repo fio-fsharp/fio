@@ -9,7 +9,7 @@ module FIO.Core.DSL
 
 open System.Threading
 open System.Threading.Tasks
-open System.Collections.Concurrent
+open System.Threading.Channels
 
 type internal Cont =
     obj -> FIO<obj, obj>
@@ -23,9 +23,6 @@ and internal ContStackFrame =
 
 and internal ContStack =
     ContStackFrame list
-
-and internal BlockingQueue<'T> =
-    BlockingCollection<'T>
 
 and internal RuntimeAction =
     | RescheduleForRunning
@@ -50,130 +47,121 @@ and internal WorkItem =
 and internal BlockingItem =
     | BlockingChannel of Channel<obj>
     | BlockingIFiber of InternalFiber
-    | BlockingTask of TaskWrapper<obj>
 
-and internal TaskWrapper<'R> private (task: Task<'R>, name: string, blockingWorkItemQueue: BlockingQueue<WorkItem>) =
+and internal InternalChannel<'R>() =
 
-    new(task, name) = TaskWrapper(task, name, new BlockingQueue<WorkItem>())
-   
-    member internal this.AddBlockingWorkItem workItem =
-        blockingWorkItemQueue.Add workItem
+    let chan = Channel.CreateUnbounded<'R>()
+    let mutable count = 0
+    let lockObj = obj()
 
-    member internal this.RescheduleBlockingWorkItems (workItemQueue: BlockingQueue<WorkItem>) =
-        while blockingWorkItemQueue.Count > 0 do
-            workItemQueue.Add <| blockingWorkItemQueue.Take ()
+    member internal this.WriteAsync (msg: 'R) =
+        lock lockObj (fun () -> count <- count + 1)
+        (chan.Writer.WriteAsync msg).AsTask()
+            .ContinueWith(fun _ -> Task.FromResult ()).Unwrap()
+    
+    member internal this.ReadAsync () =
+        chan.Reader.ReadAsync().AsTask()
 
-    member internal this.BlockingWorkItemsCount () =
-        blockingWorkItemQueue.Count
+    member internal this.WaitToReadAsync () =
+        lock lockObj (fun () -> count <- count - 1)
+        chan.Reader.WaitToReadAsync().AsTask()
 
-    member internal this.HasBlockingWorkItems () =
-        blockingWorkItemQueue.Count > 0
+    member internal this.Count =
+        lock lockObj (fun () -> count)
 
-    member internal this.Upcast () =
-        TaskWrapper<obj>(task.ContinueWith((fun (t: Task<'R>) -> t.Result :> obj), CancellationToken.None, TaskContinuationOptions.RunContinuationsAsynchronously, TaskScheduler.Default), name, blockingWorkItemQueue)
+and internal InternalFiber internal (chan: InternalChannel<Result<obj, obj>>, blockingWorkItemChan: InternalChannel<WorkItem>) =
 
-    member internal this.Task () : Task<'R> =
-        task
-
-    member internal this.Name =
-       name
-
-    member internal this.AwaitResult () =
-        Ok task.Result
-
-and internal InternalFiber internal (resQueue: BlockingQueue<Result<obj, obj>>, blockingWorkItemQueue: BlockingQueue<WorkItem>) =
-
-    // Use semaphore instead?
     member internal this.Complete res =
-        if resQueue.Count = 0 then
-            resQueue.Add res
+        if chan.Count = 0 then
+            chan.WriteAsync res
         else
             invalidOp "InternalFiber: Complete was called on an already completed InternalFiber!"
 
-    member internal this.AwaitResult () =
-        let res = resQueue.Take ()
+    member internal this.AwaitResult () = task {
+        let! res = chan.ReadAsync ()
         // Re-add the result to the queue to allow concurrent awaits
-        resQueue.Add res
-        res
+        do! chan.WriteAsync res
+        return res
+    }
 
     member internal this.Completed () =
-        resQueue.Count > 0
+        chan.Count > 0
 
     member internal this.AddBlockingWorkItem workItem =
-        blockingWorkItemQueue.Add workItem
+        blockingWorkItemChan.WriteAsync workItem
 
-    member internal this.RescheduleBlockingWorkItems (workItemQueue: BlockingQueue<WorkItem>) =
-        while blockingWorkItemQueue.Count > 0 do
-            workItemQueue.Add <| blockingWorkItemQueue.Take ()
+    member internal this.RescheduleBlockingWorkItems (workItemChan: InternalChannel<WorkItem>) = task {
+        while blockingWorkItemChan.Count > 0 do
+            let! item = blockingWorkItemChan.ReadAsync()
+            do! workItemChan.WriteAsync item
+    }
 
     member internal this.BlockingWorkItemsCount () =
-        blockingWorkItemQueue.Count
+        blockingWorkItemChan.Count
 
 /// A Fiber is a construct that represents a lightweight-thread. Fibers are used to interpret multiple effects in parallel and
 /// can be awaited to retrieve the result of the effect.
-and Fiber<'R, 'E> private (resQueue: BlockingQueue<Result<obj, obj>>, blockingWorkItemQueue: BlockingQueue<WorkItem>) =
+and Fiber<'R, 'E> private (resChan: InternalChannel<Result<obj, obj>>, blockingWorkItemChan: InternalChannel<WorkItem>) =
 
-    new() = Fiber(new BlockingQueue<Result<obj, obj>>(), new BlockingQueue<WorkItem>())
+    new() = Fiber(InternalChannel<Result<obj, obj>>(), InternalChannel<WorkItem>())
 
     /// Creates an effect that waits for the fiber and succeeds with its result.
     member this.Await () : FIO<'R, 'E> =
         AwaitFiber <| this.ToInternal ()
 
     /// Waits for the fiber and succeeds with its result.
-    member this.AwaitResult () =
-        let res = resQueue.Take ()
+    member this.AwaitAsync () = task {
+        let! res = resChan.ReadAsync ()
         // Re-add the result to the queue to allow concurrent awaits
-        resQueue.Add res
+        do! resChan.WriteAsync res
         match res with
-        | Ok res -> Ok (res :?> 'R)
-        | Error err -> Error (err :?> 'E)
+        | Ok res -> return Ok (res :?> 'R)
+        | Error err -> return Error (err :?> 'E)
+    }
 
     member internal this.ToInternal () =
-        InternalFiber(resQueue, blockingWorkItemQueue)
+        InternalFiber(resChan, blockingWorkItemChan)
 
 /// A channel represents a communication queue that holds data of the type 'R. Data can be both be sent and
 /// received (blocking) on a channel.
-and Channel<'R> private (resQueue: BlockingQueue<obj>, blockingWorkItemQueue: BlockingQueue<WorkItem>, dataCounter: int64 ref) =
+and Channel<'R> private (resChan: InternalChannel<obj>, blockingWorkItemChan: InternalChannel<WorkItem>) =
 
-    new() = Channel(new BlockingQueue<obj>(), new BlockingQueue<WorkItem>(), ref 0)
+    new() = Channel(InternalChannel<obj>(), InternalChannel<WorkItem>())
 
     /// Send puts the message on the channel and succeeds with the message.
     member this.Send msg : FIO<'R, 'E> =
-        SendChan (msg, this)
+        WriteChan (msg, this)
 
     /// Receive retrieves a message from the channel and succeeds with it.
     member this.Receive () : FIO<'R, 'E> =
-        ReceiveChan this
+        ReadChan this
 
     member this.Count () =
-        resQueue.Count
+        resChan.Count
 
-    member internal this.Add (msg: 'R) =
-        Interlocked.Increment dataCounter |> ignore
-        resQueue.Add msg
+    member internal this.SendAsync (msg: 'R) = task {
+        do! resChan.WriteAsync msg
+    }
 
-    member internal this.Take () =
-        resQueue.Take() :?> 'R
+    member internal this.ReceiveAsync () = task {
+        let! res = resChan.ReadAsync()
+        return res :?> 'R
+    }
 
-    member internal this.AddBlockingWorkItem workItem =
-        blockingWorkItemQueue.Add workItem
+    member internal this.WriteBlockingWorkItem workItem =
+        blockingWorkItemChan.WriteAsync workItem
 
-    member internal this.RescheduleBlockingWorkItems (workItemQueue: BlockingQueue<WorkItem>) =
-        if blockingWorkItemQueue.Count > 0 then
-            workItemQueue.Add <| blockingWorkItemQueue.Take ()
+    member internal this.RescheduleBlockingWorkItems (workItemChan: InternalChannel<WorkItem>) = task {
+        if blockingWorkItemChan.Count > 0 then
+            let! item = blockingWorkItemChan.ReadAsync()
+            do! workItemChan.WriteAsync item
+    }
 
     member internal this.HasBlockingWorkItems () =
-        blockingWorkItemQueue.Count > 0
-
-    member internal this.UseAvailableData () =
-        Interlocked.Decrement dataCounter |> ignore
-
-    member internal this.DataAvailable () =
-        let mutable temp = dataCounter.Value
-        Interlocked.Read &temp > 0
+        blockingWorkItemChan.Count > 0
 
     member internal this.Upcast () =
-        Channel<obj>(resQueue, blockingWorkItemQueue, dataCounter)
+        Channel<obj>(resChan, blockingWorkItemChan)
 
 and channel<'R> = Channel<'R>
 
@@ -183,12 +171,12 @@ and FIO<'R, 'E> =
     internal
     | Success of res: 'R
     | Failure of err: 'E
-    | Action of func: (unit -> Result<'R, 'E>)
-    | SendChan of msg: 'R * chan: Channel<'R>
-    | ReceiveChan of chan: Channel<'R>
-    | AwaitTask of itask: TaskWrapper<'R>
+    | Action of func: (unit -> 'R) * onError: (exn -> 'E)
+    | WriteChan of msg: 'R * chan: Channel<'R>
+    | ReadChan of chan: Channel<'R>
     | Concurrent of eff: FIO<obj, obj> * fiber: obj * ifiber: InternalFiber
     | AwaitFiber of ifiber: InternalFiber
+    | AwaitTask of task: Task<obj> * onError: (exn -> 'E)
     | ChainSuccess of eff: FIO<obj, 'E> * cont: (obj -> FIO<'R, 'E>)
     | ChainError of eff: FIO<obj, obj> * cont: (obj -> FIO<'R, 'E>)
 
@@ -201,8 +189,11 @@ and FIO<'R, 'E> =
         Failure err
 
     /// Converts a function into an effect.
-    static member FromFunc (func: unit -> Result<'R, 'E>) : FIO<'R, 'E> =
-        Action func
+    static member FromFunc (func: unit -> 'R, onError: exn -> 'E) : FIO<'R, 'E> =
+        Action (func, onError)
+
+    static member FromFunc<'R> (func: unit -> 'R) : FIO<'R, exn> =
+        Action (func, fun exn -> exn)
 
     /// Converts an Option into an effect.
     static member inline FromOption (opt: Option<'R>) (err: 'E) : FIO<'R, 'E> =
@@ -223,18 +214,36 @@ and FIO<'R, 'E> =
         | Choice2Of2 err -> FIO.Fail err
 
     /// Converts a Task into an effect.
-    static member FromGenericTask (task: Task<'R>, name) : FIO<'R, 'E> =
-        AwaitTask <| TaskWrapper (task, name)
+    static member FromGenericTask (task: Task<'R>, onError: exn -> 'E) : FIO<'R, 'E> =
+        AwaitTask (task.ContinueWith(fun (t: Task<'R>) -> 
+            if t.IsFaulted then
+                Task.FromException<obj> (t.Exception.GetBaseException())
+            elif t.IsCanceled then
+                Task.FromCanceled<obj> CancellationToken.None
+            else 
+                Task.FromResult (box t.Result)
+        ).Unwrap(), onError)
+
+    static member FromGenericTask (task: Task<'R>) : FIO<'R, exn> =
+        AwaitTask (task.ContinueWith(fun (t: Task<'R>) -> 
+            if t.IsFaulted then
+                Task.FromException<obj> (t.Exception.GetBaseException())
+            elif t.IsCanceled then
+                Task.FromCanceled<obj>(CancellationToken.None)
+            else 
+                Task.FromResult (box t.Result)
+        ).Unwrap(), fun exn -> exn)
 
     /// Converts a Task into an effect.
-    static member FromTask (task: Task, name) : FIO<unit, 'E> =
-        AwaitTask <| TaskWrapper (task.ContinueWith((fun _ ->
-            Task.FromResult(())), CancellationToken.None, TaskContinuationOptions.RunContinuationsAsynchronously, TaskScheduler.Default)
-                |> fun t -> t.Result, name)
+    static member FromTask (task: Task, onError: exn -> 'E) : FIO<unit, 'E> =
+        AwaitTask (task.ContinueWith(fun (_: Task) -> box ()), onError)
+
+    static member FromTask (task: Task) : FIO<unit, exn> =
+        AwaitTask (task.ContinueWith(fun (_: Task) -> box ()), fun exn -> exn)
 
     /// Converts an Async computation into an effect.
-    static member FromAsync (async: Async<'R>, name) : FIO<'R, 'E> =
-        FIO.FromGenericTask <| (Async.StartAsTask async, name)
+    static member FromAsync (async: Async<'R>, onError: exn -> 'E) : FIO<'R, 'E> =
+        FIO<'R, 'E>.FromGenericTask (Async.StartAsTask async, onError)
 
     /// Binds a continuation to the result of an effect.
     /// If the effect fails, the error is immediately returned.
@@ -313,66 +322,51 @@ and FIO<'R, 'E> =
                 fiber.Await().FlatMapError <| fun err' ->
                     FIO.Fail (err, err')
 
-    /// Interprets two effects concurrently and succeeds with the result of the first effect that completes.
-    /// If both effects fail, the first error is returned.
-    member this.Race (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
-        let chan = new Channel<Result<'R, 'E>>()
-        let interpret (eff: FIO<'R, 'E>) (chan: Channel<Result<'R, 'E>>) =
-            eff.Fork().FlatMap <| fun fiber ->
-                chan.Add <| fiber.AwaitResult()
-                FIO.Succeed ()
-        (interpret this chan).Parallel (interpret eff chan) |> _.Then <|
-        match chan.Take() with
-        | Ok res -> FIO.Succeed res
-        | Error err -> FIO.Fail err
-
     member internal this.UpcastResult () : FIO<obj, 'E> =
+        let castFunc (f: unit -> 'R) : unit -> obj =
+            fun () -> f () :> obj
         match this with
         | Success res ->
             Success (res :> obj)
         | Failure err ->
             Failure err
-        | Action func ->
-            Action <| fun () ->
-            match func () with
-            | Ok res -> Ok (res :> obj)
-            | Error err -> Error err
-        | SendChan (msg, chan) ->
-            SendChan (msg :> obj, chan.Upcast())
-        | ReceiveChan chan ->
-            ReceiveChan <| chan.Upcast()
-        | AwaitTask task ->
-            AwaitTask <| task.Upcast()
+        | Action (func, onError) ->
+            Action(castFunc func, onError)
+        | WriteChan (msg, chan) ->
+            WriteChan (msg :> obj, chan.Upcast())
+        | ReadChan chan ->
+            ReadChan <| chan.Upcast()
         | Concurrent (eff, fiber, ifiber) ->
             Concurrent (eff, fiber, ifiber)
         | AwaitFiber ifiber ->
             AwaitFiber ifiber
+        | AwaitTask (task, onError) ->
+            AwaitTask (task, onError)
         | ChainSuccess (eff, cont) ->
             ChainSuccess (eff, fun res -> (cont res).UpcastResult())
         | ChainError (eff, cont) ->
             ChainError (eff, fun err -> (cont err).UpcastResult())
 
     member internal this.UpcastError () : FIO<'R, obj> =
+        let castOnError (f: exn -> 'E) : (exn -> obj) =
+            fun (exn: exn) -> f exn :> obj
         match this with
         | Success res ->
             Success res
         | Failure err ->
             Failure (err :> obj)
-        | Action func ->
-            Action <| fun () ->
-            match func () with
-            | Ok res -> Ok res
-            | Error err -> Error (err :> obj)
-        | SendChan (msg, chan) ->
-            SendChan (msg, chan)
-        | ReceiveChan chan ->
-            ReceiveChan chan
-        | AwaitTask task ->
-            AwaitTask task
+        | Action (func, onError) ->
+            Action (func, castOnError onError)
+        | WriteChan (msg, chan) ->
+            WriteChan (msg, chan)
+        | ReadChan chan ->
+            ReadChan chan
         | Concurrent (eff, fiber, ifiber) ->
             Concurrent (eff, fiber, ifiber)
         | AwaitFiber ifiber ->
             AwaitFiber ifiber
+        | AwaitTask (task, onError) ->
+            AwaitTask (task, castOnError onError)
         | ChainSuccess (eff, cont) ->
             ChainSuccess (eff.UpcastError(), fun res -> (cont res).UpcastError())
         | ChainError (eff, cont) ->

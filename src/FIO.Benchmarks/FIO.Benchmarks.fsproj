@@ -21,6 +21,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Argu" Version="6.2.5" />
+		<PackageReference Update="FSharp.Core" Version="9.0.202" />
 	</ItemGroup>
 
 	<ItemGroup>

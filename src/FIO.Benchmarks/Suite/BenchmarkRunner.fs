@@ -81,8 +81,10 @@ let private runBenchmark (runtime: FIORuntime) totalRuns (config: BenchmarkConfi
             #if DEBUG
             printfn $"[DEBUG]: Executing benchmark: Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Current run (%i{thisRun}/%i{totalRuns})"
             #endif
-            let res = runtime.Run(eff).AwaitResult()
+            let res = runtime.Run(eff).AwaitAsync()
             let time =
+                res.Wait()
+                let res = res.Result
                 match res with
                 | Ok time -> time
                 | Error err -> invalidOp $"BenchmarkRunner: Failed executing benchmark with error: %A{err}"

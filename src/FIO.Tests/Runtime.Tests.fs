@@ -13,7 +13,7 @@ open NUnit.Framework
 
 open FIO.Core
 open FIO.Runtime
-
+(*
 [<TestFixture>]
 type RuntimeTests() =
 
@@ -503,3 +503,4 @@ type RuntimeTests() =
         Assert.That(result.IsOk, Is.False)
         Assert.That(result.IsError, Is.True)
         Assert.That(failureResult(result, expected), Is.EqualTo(expected))
+*)

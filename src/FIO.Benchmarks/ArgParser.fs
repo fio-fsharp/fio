@@ -17,7 +17,6 @@ type internal Arguments =
     | Native_Runtime
     | Intermediate_Runtime of ewc: int * ews: int * bwc: int
     | Advanced_Runtime of ewc: int * ews: int * bwc: int
-    | Deadlocking_Runtime of ewc: int * ews: int * bwc: int
     | Runs of runs: int
     | Actor_Increment of actorInc: int * times: int
     | Round_Increment of roundInc: int * times: int
@@ -38,8 +37,6 @@ type internal Arguments =
                 "specify Intermediate runtime with ewc, ews and bwc"
             | Advanced_Runtime _ -> 
                 "specify Advanced runtime with ewc, ews and bwc"
-            | Deadlocking_Runtime _ -> 
-                "specify Deadlocking runtime with ewc, ews and bwc"
             | Runs _ -> 
                 "specify number of runs for each benchmark"
             | Actor_Increment _ -> 
@@ -83,9 +80,6 @@ type internal Parser() =
             elif results.Contains Advanced_Runtime then
                 let (ewc, ews, bwc) = results.GetResult Advanced_Runtime
                 Advanced.Runtime({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
-            elif results.Contains Deadlocking_Runtime then
-                let (ewc, ews, bwc) = results.GetResult Advanced_Runtime
-                Deadlocking.Runtime({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
             else
                 invalidArg "args" "Runtime should be specified!"
 

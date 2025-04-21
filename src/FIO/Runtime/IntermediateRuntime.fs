@@ -6,20 +6,22 @@
 
 module FIO.Runtime.Intermediate
 
-open System
-open System.Threading
-
 open FIO.Core
 
+open System
+open System.Threading
+open System.Threading.Tasks
+
+(*
 type private EvaluationWorkerConfig =
     { Runtime: Runtime
-      WorkItemQueue: BlockingQueue<WorkItem>
+      WorkItemChan: InternalChannel<WorkItem>
       BlockingWorker: BlockingWorker
       EWSteps: int }
 
 and private BlockingWorkerConfig =
-    { WorkItemQueue: BlockingQueue<WorkItem>
-      BlockingItemQueue: BlockingQueue<BlockingItem * WorkItem> }
+    { WorkItemChan: InternalChannel<WorkItem>
+      BlockingItemChan: InternalChannel<BlockingItem * WorkItem> }
 
 and private EvaluationWorker(config: EvaluationWorkerConfig) =
 
@@ -32,8 +34,9 @@ and private EvaluationWorker(config: EvaluationWorkerConfig) =
             workItem.Complete
             <| Error err
         | eff, stack, RescheduleForRunning, _ ->
-            config.WorkItemQueue.Add
-            <| WorkItem.Create eff workItem.IFiber stack RescheduleForRunning
+            // config.WorkItemChan.WriteAsync
+            // <| WorkItem.Create eff workItem.IFiber stack RescheduleForRunning
+            Task.FromResult ()
         | eff, stack, RescheduleForBlocking blockingItem, _ ->
             config.BlockingWorker.RescheduleForBlocking blockingItem 
             <| WorkItem.Create eff workItem.IFiber stack (RescheduleForBlocking blockingItem)
@@ -41,11 +44,18 @@ and private EvaluationWorker(config: EvaluationWorkerConfig) =
             invalidOp "EvaluationWorker: Unexpected state encountered during effect evaluation."
 
     let startWorker (cancellationToken: CancellationToken) =
-        async {
-            config.WorkItemQueue.GetConsumingEnumerable()
-            |> Seq.takeWhile (fun _ -> not cancellationToken.IsCancellationRequested)
-            |> Seq.iter processWorkItem
-        } |> Async.Start
+        let rec loop () =
+            task {
+                let! hasItem = config.WorkItemChan.WaitToReadAsync()
+                if hasItem then
+                    let! item = config.WorkItemChan.ReadAsync()
+                    processWorkItem item
+                    |> ignore
+                    return! loop ()
+            }
+    
+        loop ()
+        |> ignore
 
     let cancellationTokenSource = new CancellationTokenSource()
     do startWorker cancellationTokenSource.Token
@@ -59,23 +69,31 @@ and private BlockingWorker(config: BlockingWorkerConfig) =
     let handleBlockingItem (blockingItem, workItem) =
         match blockingItem with
         | BlockingChannel chan ->
-            if chan.DataAvailable() then
-                chan.UseAvailableData()
-                config.WorkItemQueue.Add workItem
-            else
-              config.BlockingItemQueue.Add((blockingItem, workItem))
+            // if chan.DataAvailable() then
+            //     chan.UseAvailableData()
+            config.WorkItemChan.WriteAsync workItem
+            // else
+            //  config.BlockingItemQueue.Add((blockingItem, workItem))
         | BlockingIFiber ifiber ->
-            if ifiber.Completed() then
-                config.WorkItemQueue.Add workItem
+            // if ifiber.Completed() then
+            if true then
+                config.WorkItemChan.WriteAsync workItem
             else
-                config.BlockingItemQueue.Add((blockingItem, workItem))
+                config.BlockingItemChan.WriteAsync (blockingItem, workItem)
 
     let startWorker (cancellationToken: CancellationToken) =
-        async {
-            config.BlockingItemQueue.GetConsumingEnumerable()
-            |> Seq.takeWhile (fun _ -> not cancellationToken.IsCancellationRequested)
-            |> Seq.iter handleBlockingItem
-        } |> Async.Start
+        let rec loop () =
+            task {
+                let! hasItem = config.BlockingItemChan.WaitToReadAsync()
+                if hasItem then
+                    let! item = config.BlockingItemChan.ReadAsync()
+                    handleBlockingItem item
+                    |> ignore
+                    return! loop ()
+            }
+    
+        loop ()
+        |> ignore
 
     let cancellationTokenSource = new CancellationTokenSource()
     do startWorker cancellationTokenSource.Token
@@ -85,44 +103,44 @@ and private BlockingWorker(config: BlockingWorkerConfig) =
             cancellationTokenSource.Cancel()
 
     member internal this.RescheduleForBlocking blockingItem workItem =
-        config.BlockingItemQueue.Add((blockingItem, workItem))
-
-and Runtime(config: WorkerConfig) as this =
+        config.BlockingItemChan.WriteAsync (blockingItem, workItem)
+*)
+type Runtime(config: WorkerConfig) as this =
     inherit FIOWorkerRuntime(config)
-
-    let workItemQueue = new BlockingQueue<WorkItem>()
-    let blockingItemQueue = new BlockingQueue<BlockingItem * WorkItem>()
+    (*
+    let workItemChan = new InternalChannel<WorkItem>()
+    let blockingItemChan = new InternalChannel<BlockingItem * WorkItem>()
 
     let createBlockingWorkers workItemQueue blockingItemQueue count =
         List.init count <| fun _ ->
             new BlockingWorker({
-                WorkItemQueue = workItemQueue
-                BlockingItemQueue = blockingItemQueue
+                WorkItemChan = workItemChan
+                BlockingItemChan = blockingItemChan
             })
 
     let createEvaluationWorkers runtime workItemQueue blockingWorker evalSteps count =
         List.init count <| fun _ -> 
             new EvaluationWorker({ 
                 Runtime = runtime
-                WorkItemQueue = workItemQueue
+                WorkItemChan = workItemQueue
                 BlockingWorker = blockingWorker
                 EWSteps = evalSteps 
             })
 
     do
-        let blockingWorkers = createBlockingWorkers workItemQueue blockingItemQueue config.BWCount
-        // Currently we take head of the list, as the AdvancedRuntime
+        let blockingWorkers = createBlockingWorkers workItemChan blockingItemChan config.BWCount
+        // Currently we take head of the list, as the IntermediateRuntime
         // only supports a single blocking worker.
-        createEvaluationWorkers this workItemQueue (List.head blockingWorkers) config.EWSteps config.EWCount
+        createEvaluationWorkers this workItemChan (List.head blockingWorkers) config.EWSteps config.EWCount
         |> ignore
 
     new() =
-        Runtime(
+        Runtime
             { EWCount =
                 let coreCount = Environment.ProcessorCount - 1
                 if coreCount >= 2 then coreCount else 2
               BWCount = 1
-              EWSteps = 20 })
+              EWSteps = 20 }
 
     member internal this.InternalRun eff stack prevAction evalSteps : FIO<obj, obj> * ContStack * RuntimeAction * int =
 
@@ -153,22 +171,26 @@ and Runtime(config: WorkerConfig) as this =
                     handleSuccess res newEvalSteps stack
                 | Failure err ->
                     handleError err newEvalSteps stack
-                | Action func ->
-                    handleResult (func ()) newEvalSteps stack
-                | SendChan (msg, chan) ->
-                    chan.Add msg
+                | Action (func, onError) ->
+                    handleResult (Ok 1) newEvalSteps stack
+                | WriteChan (msg, chan) ->
+                    chan.WriteAsync msg
+                    |> ignore
                     handleSuccess msg newEvalSteps stack
-                | ReceiveChan chan ->
+                | ReadChan chan ->
                     if prevAction = RescheduleForBlocking (BlockingChannel chan) then
-                        handleSuccess (chan.Take()) newEvalSteps stack
+                        handleSuccess (chan.ReadAsync()) newEvalSteps stack
                     else
-                        (ReceiveChan chan, stack, RescheduleForBlocking <| BlockingChannel chan, evalSteps)
+                        (ReadChan chan, stack, RescheduleForBlocking <| BlockingChannel chan, evalSteps)
                 | Concurrent (eff, fiber, ifiber) ->
-                    workItemQueue.Add <| WorkItem.Create eff ifiber ContStack.Empty prevAction
+                    workItemChan.WriteAsync <| WorkItem.Create eff ifiber ContStack.Empty prevAction
+                    |> ignore
                     handleSuccess fiber newEvalSteps stack
                 | AwaitFiber ifiber ->
-                    if ifiber.Completed() then
-                        handleResult (ifiber.AwaitResult()) newEvalSteps stack
+                    // if ifiber.Completed() then
+                    if true then
+                        // handleResult (ifiber.AwaitResult()) newEvalSteps stack
+                        handleResult (Ok 1) newEvalSteps stack
                     else
                         (AwaitFiber ifiber, stack, RescheduleForBlocking <| BlockingIFiber ifiber, evalSteps)
                 | ChainSuccess (eff, cont) ->
@@ -177,11 +199,12 @@ and Runtime(config: WorkerConfig) as this =
                     interpret eff ((FailureCont, cont) :: stack) prevAction evalSteps
 
         interpret eff stack prevAction evalSteps
-
+*)
     override this.Run (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
         let fiber = Fiber<'R, 'E>()
-        workItemQueue.Add
-        <| WorkItem.Create (eff.Upcast()) (fiber.ToInternal()) ContStack.Empty Evaluated
+        //workItemChan.WriteAsync
+        //<|  WorkItem.Create (eff.Upcast()) (fiber.ToInternal()) ContStack.Empty Evaluated
+        // |> ignore
         fiber
 
     override this.Name () =
