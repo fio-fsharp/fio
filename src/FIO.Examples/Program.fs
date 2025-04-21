@@ -610,9 +610,11 @@ Console.ReadLine() |> ignore
 ErrorHandlingApp().Run()
 Console.ReadLine() |> ignore
 
-AsyncErrorHandlingApp().Run()
-Console.ReadLine() |> ignore
+// TODO: Should be rewritten.
+// AsyncErrorHandlingApp().Run()
+// Console.ReadLine() |> ignore
 
+// TODO: Intermediate seems to be awfully slow.
 HighlyConcurrentApp().Run()
 Console.ReadLine() |> ignore
 

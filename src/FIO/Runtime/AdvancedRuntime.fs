@@ -42,7 +42,7 @@ and private EvaluationWorker(config: EvaluationWorkerConfig) =
         | Failure err, _, Evaluated ->
             do! completeWorkItem workItem <| Error err
         | eff, stack, RescheduleForRunning ->
-            do! config.WorkItemChan.WriteAsync
+            do! config.WorkItemChan.SendAsync
                 <| WorkItem.Create eff workItem.IFiber stack RescheduleForRunning
         | eff, stack, RescheduleForBlocking blockingItem ->
             do! config.BlockingWorker.RescheduleForBlocking blockingItem
@@ -55,9 +55,9 @@ and private EvaluationWorker(config: EvaluationWorkerConfig) =
     let startWorker (cancellationToken: CancellationToken) =
         let rec loop () =
             task {
-                let! hasWorkItem = config.WorkItemChan.WaitToReadAsync()
+                let! hasWorkItem = config.WorkItemChan.WaitToReceiveAsync()
                 if hasWorkItem then
-                    let! workItem = config.WorkItemChan.ReadAsync()
+                    let! workItem = config.WorkItemChan.ReceiveAsync()
                     do! processWorkItem workItem
                     return! loop ()
             }
@@ -78,7 +78,7 @@ and private BlockingWorker(config: BlockingWorkerConfig) =
         if blockingChan.HasBlockingWorkItems() then
             do! blockingChan.RescheduleBlockingWorkItems config.WorkItemChan
         else
-            do! config.BlockingItemChan.WriteAsync <| BlockingChannel blockingChan
+            do! config.BlockingItemChan.SendAsync <| BlockingChannel blockingChan
     }
  
     let processBlockingItem blockingItem = task {
@@ -92,9 +92,9 @@ and private BlockingWorker(config: BlockingWorkerConfig) =
     let startWorker (cancellationToken: CancellationToken) =
         let rec loop () =
             task {
-                let! hasBlockingItem = config.BlockingItemChan.WaitToReadAsync()
+                let! hasBlockingItem = config.BlockingItemChan.WaitToReceiveAsync()
                 if hasBlockingItem then
-                    let! blockingItem = config.BlockingItemChan.ReadAsync()
+                    let! blockingItem = config.BlockingItemChan.ReceiveAsync()
                     do! processBlockingItem blockingItem
                     return! loop ()
             }
@@ -215,32 +215,33 @@ and Runtime(config: WorkerConfig) as this =
                             handleSuccess res
                         with exn ->
                             handleResult (Error <| onError exn)
-                    | WriteChan (msg, chan) ->
+                    | SendChan (msg, chan) ->
                         do! chan.SendAsync msg
-                        do! blockingItemChan.WriteAsync <| BlockingChannel chan
+                        do! blockingItemChan.SendAsync <| BlockingChannel chan
                         handleSuccess msg
-                    | ReadChan chan ->
+                    | ReceiveChan chan ->
                         // TODO: Optimize this. Why are we just assuming it is blocking?
                         if currentPrevAction = RescheduleForBlocking (BlockingChannel chan) then
                             let! res = chan.ReceiveAsync()
                             handleSuccess res
                         else
                             currentPrevAction <- RescheduleForBlocking <| BlockingChannel chan
-                            result <- Some (ReadChan chan, currentContStack, RescheduleForBlocking <| BlockingChannel chan)
+                            result <- Some (ReceiveChan chan, currentContStack, RescheduleForBlocking <| BlockingChannel chan)
                     | Concurrent (eff, fiber, ifiber) ->
-                        do! workItemChan.WriteAsync
+                        do! workItemChan.SendAsync
                             <| WorkItem.Create eff ifiber ContStack.Empty currentPrevAction
                         handleSuccess fiber
                     | AwaitFiber ifiber ->
                         if ifiber.Completed() then
-                            let! res = ifiber.AwaitResult()
+                            let! res = ifiber.AwaitAsync()
                             handleResult res
                         else
                             result <- Some (AwaitFiber ifiber, currentContStack, RescheduleForBlocking <| BlockingIFiber ifiber)
                     | AwaitTask (task, onError) ->
+                        // TODO: We are just awaiting the task here. Can this be done smarter?
                         try
                             let! res = task
-                            handleResult (Ok res)
+                            handleResult <| Ok res
                         with exn ->
                             handleResult (Error <| onError exn)
                     | ChainSuccess (eff, cont) ->
@@ -255,7 +256,7 @@ and Runtime(config: WorkerConfig) as this =
 
     override this.Run (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
         let fiber = Fiber<'R, 'E>()
-        workItemChan.WriteAsync
+        workItemChan.SendAsync
         <| WorkItem.Create (eff.Upcast()) (fiber.ToInternal()) ContStack.Empty Evaluated
         |> ignore
         fiber

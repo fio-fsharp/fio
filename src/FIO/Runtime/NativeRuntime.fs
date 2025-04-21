@@ -67,10 +67,10 @@ type Runtime() =
                         handleSuccess res
                     with exn ->
                         handleResult (Error <| onError exn)
-                | WriteChan (msg, chan) ->
+                | SendChan (msg, chan) ->
                     do! chan.SendAsync msg
                     handleSuccess msg
-                | ReadChan chan ->
+                | ReceiveChan chan ->
                     let! res = chan.ReceiveAsync()
                     handleSuccess res
                 | Concurrent (eff, fiber, ifiber) ->
@@ -84,12 +84,12 @@ type Runtime() =
                     |> ignore
                     handleSuccess fiber
                 | AwaitFiber ifiber ->
-                    let! res = ifiber.AwaitResult()
+                    let! res = ifiber.AwaitAsync()
                     handleResult res
                 | AwaitTask (task, onError) ->
                     try
                         let! res = task
-                        handleResult (Ok res)
+                        handleResult <| Ok res
                     with exn ->
                         handleResult (Error <| onError exn)
                 | ChainSuccess (eff, cont) ->

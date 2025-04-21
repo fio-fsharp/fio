@@ -54,15 +54,15 @@ and internal InternalChannel<'R>() =
     let mutable count = 0
     let lockObj = obj()
 
-    member internal this.WriteAsync (msg: 'R) =
+    member internal this.SendAsync (msg: 'R) =
         lock lockObj (fun () -> count <- count + 1)
         (chan.Writer.WriteAsync msg).AsTask()
             .ContinueWith(fun _ -> Task.FromResult ()).Unwrap()
     
-    member internal this.ReadAsync () =
+    member internal this.ReceiveAsync () =
         chan.Reader.ReadAsync().AsTask()
 
-    member internal this.WaitToReadAsync () =
+    member internal this.WaitToReceiveAsync () =
         lock lockObj (fun () -> count <- count - 1)
         chan.Reader.WaitToReadAsync().AsTask()
 
@@ -73,14 +73,14 @@ and internal InternalFiber internal (chan: InternalChannel<Result<obj, obj>>, bl
 
     member internal this.Complete res =
         if chan.Count = 0 then
-            chan.WriteAsync res
+            chan.SendAsync res
         else
             invalidOp "InternalFiber: Complete was called on an already completed InternalFiber!"
 
-    member internal this.AwaitResult () = task {
-        let! res = chan.ReadAsync ()
+    member internal this.AwaitAsync () = task {
+        let! res = chan.ReceiveAsync ()
         // Re-add the result to the queue to allow concurrent awaits
-        do! chan.WriteAsync res
+        do! chan.SendAsync res
         return res
     }
 
@@ -88,12 +88,12 @@ and internal InternalFiber internal (chan: InternalChannel<Result<obj, obj>>, bl
         chan.Count > 0
 
     member internal this.AddBlockingWorkItem workItem =
-        blockingWorkItemChan.WriteAsync workItem
+        blockingWorkItemChan.SendAsync workItem
 
     member internal this.RescheduleBlockingWorkItems (workItemChan: InternalChannel<WorkItem>) = task {
         while blockingWorkItemChan.Count > 0 do
-            let! item = blockingWorkItemChan.ReadAsync()
-            do! workItemChan.WriteAsync item
+            let! item = blockingWorkItemChan.ReceiveAsync()
+            do! workItemChan.SendAsync item
     }
 
     member internal this.BlockingWorkItemsCount () =
@@ -111,9 +111,9 @@ and Fiber<'R, 'E> private (resChan: InternalChannel<Result<obj, obj>>, blockingW
 
     /// Waits for the fiber and succeeds with its result.
     member this.AwaitAsync () = task {
-        let! res = resChan.ReadAsync ()
+        let! res = resChan.ReceiveAsync ()
         // Re-add the result to the queue to allow concurrent awaits
-        do! resChan.WriteAsync res
+        do! resChan.SendAsync res
         match res with
         | Ok res -> return Ok (res :?> 'R)
         | Error err -> return Error (err :?> 'E)
@@ -124,44 +124,52 @@ and Fiber<'R, 'E> private (resChan: InternalChannel<Result<obj, obj>>, blockingW
 
 /// A channel represents a communication queue that holds data of the type 'R. Data can be both be sent and
 /// received (blocking) on a channel.
-and Channel<'R> private (resChan: InternalChannel<obj>, blockingWorkItemChan: InternalChannel<WorkItem>) =
+and Channel<'R> private (resChan: InternalChannel<obj>, blockingWorkItemChan: InternalChannel<WorkItem>, dataCounter: int64 ref) =
 
-    new() = Channel(InternalChannel<obj>(), InternalChannel<WorkItem>())
+    new() = Channel(InternalChannel<obj>(), InternalChannel<WorkItem>(), ref 0)
 
     /// Send puts the message on the channel and succeeds with the message.
     member this.Send msg : FIO<'R, 'E> =
-        WriteChan (msg, this)
+        SendChan (msg, this)
 
     /// Receive retrieves a message from the channel and succeeds with it.
     member this.Receive () : FIO<'R, 'E> =
-        ReadChan this
+        ReceiveChan this
 
     member this.Count () =
         resChan.Count
 
-    member internal this.SendAsync (msg: 'R) = task {
-        do! resChan.WriteAsync msg
-    }
+    member internal this.SendAsync (msg: 'R) =
+        Interlocked.Increment dataCounter
+        |> ignore
+        resChan.SendAsync msg
 
     member internal this.ReceiveAsync () = task {
-        let! res = resChan.ReadAsync()
+        let! res = resChan.ReceiveAsync()
         return res :?> 'R
     }
 
     member internal this.WriteBlockingWorkItem workItem =
-        blockingWorkItemChan.WriteAsync workItem
+        blockingWorkItemChan.SendAsync workItem
 
     member internal this.RescheduleBlockingWorkItems (workItemChan: InternalChannel<WorkItem>) = task {
         if blockingWorkItemChan.Count > 0 then
-            let! item = blockingWorkItemChan.ReadAsync()
-            do! workItemChan.WriteAsync item
+            let! item = blockingWorkItemChan.ReceiveAsync()
+            do! workItemChan.SendAsync item
     }
 
     member internal this.HasBlockingWorkItems () =
         blockingWorkItemChan.Count > 0
+        
+    member internal this.UseAvailableData () =
+        Interlocked.Decrement dataCounter |> ignore
+
+    member internal this.DataAvailable () =
+        let mutable temp = dataCounter.Value
+        Interlocked.Read &temp > 0
 
     member internal this.Upcast () =
-        Channel<obj>(resChan, blockingWorkItemChan)
+        Channel<obj>(resChan, blockingWorkItemChan, dataCounter)
 
 and channel<'R> = Channel<'R>
 
@@ -172,8 +180,8 @@ and FIO<'R, 'E> =
     | Success of res: 'R
     | Failure of err: 'E
     | Action of func: (unit -> 'R) * onError: (exn -> 'E)
-    | WriteChan of msg: 'R * chan: Channel<'R>
-    | ReadChan of chan: Channel<'R>
+    | SendChan of msg: 'R * chan: Channel<'R>
+    | ReceiveChan of chan: Channel<'R>
     | Concurrent of eff: FIO<obj, obj> * fiber: obj * ifiber: InternalFiber
     | AwaitFiber of ifiber: InternalFiber
     | AwaitTask of task: Task<obj> * onError: (exn -> 'E)
@@ -332,10 +340,10 @@ and FIO<'R, 'E> =
             Failure err
         | Action (func, onError) ->
             Action(castFunc func, onError)
-        | WriteChan (msg, chan) ->
-            WriteChan (msg :> obj, chan.Upcast())
-        | ReadChan chan ->
-            ReadChan <| chan.Upcast()
+        | SendChan (msg, chan) ->
+            SendChan (msg :> obj, chan.Upcast())
+        | ReceiveChan chan ->
+            ReceiveChan <| chan.Upcast()
         | Concurrent (eff, fiber, ifiber) ->
             Concurrent (eff, fiber, ifiber)
         | AwaitFiber ifiber ->
@@ -357,10 +365,10 @@ and FIO<'R, 'E> =
             Failure (err :> obj)
         | Action (func, onError) ->
             Action (func, castOnError onError)
-        | WriteChan (msg, chan) ->
-            WriteChan (msg, chan)
-        | ReadChan chan ->
-            ReadChan chan
+        | SendChan (msg, chan) ->
+            SendChan (msg, chan)
+        | ReceiveChan chan ->
+            ReceiveChan chan
         | Concurrent (eff, fiber, ifiber) ->
             Concurrent (eff, fiber, ifiber)
         | AwaitFiber ifiber ->
