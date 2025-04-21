@@ -12,6 +12,7 @@ open FIO.Runtime.Advanced
 
 open System
 open System.Threading
+open System.Threading.Tasks
 
 // TODO: Is this necessary?
 let private maxThreads = 32767
@@ -20,34 +21,34 @@ ThreadPool.SetMinThreads(maxThreads, maxThreads) |> ignore
 
 let private defaultRuntime = Runtime()
 
-let private mapResult successHandler errorHandler = function
-    | Ok res -> Ok <| successHandler res
-    | Error err -> Error <| errorHandler err
+let private mergeResult onSuccess onError = function
+    | Ok res -> onSuccess res
+    | Error err -> onError err
 
-let private mergeResult successHandler errorHandler = function
-    | Ok res -> successHandler res
-    | Error err -> errorHandler err
+let private mergeFiber onSuccess onError (fiber: Fiber<'R, 'E>) = task {
+    let! res = fiber.AwaitAsync()
+    return! mergeResult onSuccess onError res
+}
 
-let private mergeFiber successHandler errorHandler (fiber: Fiber<'R, 'E>) =
-    mergeResult successHandler errorHandler (fiber.AwaitResult())
-
-let private defaultSuccessHandler res =
+let private defaultOnSuccess res = task {
     Console.ForegroundColor <- ConsoleColor.DarkGreen
     Console.WriteLine $"%A{Ok res}"
     Console.ResetColor()
+}
 
-let private defaultErrorHandler err =
+let private defaultOnError err = task {
     Console.ForegroundColor <- ConsoleColor.DarkRed
     Console.WriteLine $"%A{Error err}"
     Console.ResetColor()
+}
 
-let private defaultFiberHandler fiber = mergeFiber defaultSuccessHandler defaultErrorHandler fiber
+let private defaultFiberHandler fiber = mergeFiber defaultOnSuccess defaultOnError fiber
 
 [<AbstractClass>]
-type FIOApp<'R, 'E> (successHandler: 'R -> unit, errorHandler: 'E -> unit, runtime: FIORuntime) =
-    let fiberHandler = mergeFiber successHandler errorHandler
+type FIOApp<'R, 'E> (onSuccess: 'R -> Task<unit>, onError: 'E -> Task<unit>, runtime: FIORuntime) =
+    let fiberHandler = mergeFiber onSuccess onError
 
-    new() = FIOApp(defaultSuccessHandler, defaultErrorHandler, defaultRuntime)
+    new() = FIOApp(defaultOnSuccess, defaultOnError, defaultRuntime)
 
     abstract member effect: FIO<'R, 'E>
 
@@ -56,34 +57,19 @@ type FIOApp<'R, 'E> (successHandler: 'R -> unit, errorHandler: 'E -> unit, runti
 
     static member Run (eff: FIO<'R, 'E>) =
         let fiber = defaultRuntime.Run eff
-        defaultFiberHandler fiber
+        let t = defaultFiberHandler fiber
+        t.Wait()
 
     member this.Run () =
         this.Run runtime
+        |> ignore
 
     member this.Run runtime =
         let fiber = runtime.Run this.effect
-        fiberHandler fiber
+        let t = fiberHandler fiber
+        t.Wait()
 
-    member this.Run (successHandler: 'R -> 'F, errorHandler: 'E -> 'F) =
+    member this.Run (onSuccess: 'R -> 'F, onError: 'E -> 'F) =
         let fiber = runtime.Run this.effect
-        mergeFiber successHandler errorHandler fiber
-
-    static member AwaitResult (app: FIOApp<'R, 'E>) =
-        app.AwaitResult()
-
-    static member AwaitResult (eff: FIO<'R, 'E>) =
-        let fiber = defaultRuntime.Run eff
-        fiber.AwaitResult()
-
-    member this.AwaitResult () =
-        this.AwaitResult runtime
-
-    member this.AwaitResult runtime =
-        let fiber = runtime.Run this.effect
-        fiber.AwaitResult()
-
-    member this.AwaitResult (successHandler: 'R -> 'R1, errorHandler: 'E -> 'E1) =
-        let fiber = runtime.Run this.effect
-        let res = fiber.AwaitResult()
-        mapResult successHandler errorHandler res
+        let t = mergeFiber onSuccess onError fiber
+        t.Wait()

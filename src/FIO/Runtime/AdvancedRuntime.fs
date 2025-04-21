@@ -6,94 +6,101 @@
 
 module FIO.Runtime.Advanced
 
+open FIO.Core
+
 open System
 open System.Threading
 
-open FIO.Core
-
 type private EvaluationWorkerConfig =
     { Runtime: Runtime
-      WorkItemQueue: BlockingQueue<WorkItem>
+      WorkItemChan: InternalChannel<WorkItem>
       BlockingWorker: BlockingWorker
       EWSteps: int }
 
 and private BlockingWorkerConfig =
-    { WorkItemQueue: BlockingQueue<WorkItem>
-      BlockingItemQueue: BlockingQueue<BlockingItem>}
+    { WorkItemChan: InternalChannel<WorkItem>
+      BlockingItemChan: InternalChannel<BlockingItem> }
 
 and private EvaluationWorker(config: EvaluationWorkerConfig) =
 
-    let completeWorkItem (workItem: WorkItem) res =
-        workItem.Complete res
-        workItem.IFiber.RescheduleBlockingWorkItems config.WorkItemQueue
+    let completeWorkItem (workItem: WorkItem) res = task {
+        do! workItem.Complete res
+        do! workItem.IFiber.RescheduleBlockingWorkItems config.WorkItemChan
+    }
 
-    let handleBlockingFiber blockingItem =
+    let handleBlockingFiber blockingItem = task {
         match blockingItem with
         | BlockingIFiber ifiber when ifiber.Completed() ->
-            ifiber.RescheduleBlockingWorkItems config.WorkItemQueue
-        | _ -> ()
+            do! ifiber.RescheduleBlockingWorkItems config.WorkItemChan
+        | _ -> return ()
+    }
 
-    let processWorkItem workItem =
-        match config.Runtime.InternalRun workItem.Eff workItem.Stack workItem.PrevAction config.EWSteps with
-        | Success res, _, Evaluated, _ ->
-            completeWorkItem workItem
-            <| Ok res
-        | Failure err, _, Evaluated, _ ->
-            completeWorkItem workItem
-            <| Error err
-        | eff, stack, RescheduleForRunning, _ ->
-            config.WorkItemQueue.Add 
-            <| WorkItem.Create eff workItem.IFiber stack RescheduleForRunning
-        | eff, stack, RescheduleForBlocking blockingItem, _ ->
-            config.BlockingWorker.RescheduleForBlocking blockingItem
-            <| WorkItem.Create eff workItem.IFiber stack (RescheduleForBlocking blockingItem)
-            handleBlockingFiber blockingItem
+    let processWorkItem workItem = task {
+        match! config.Runtime.InternalRunAsync workItem config.EWSteps with
+        | Success res, _, Evaluated ->
+            do! completeWorkItem workItem <| Ok res
+        | Failure err, _, Evaluated ->
+            do! completeWorkItem workItem <| Error err
+        | eff, stack, RescheduleForRunning ->
+            do! config.WorkItemChan.SendAsync
+                <| WorkItem.Create eff workItem.IFiber stack RescheduleForRunning
+        | eff, stack, RescheduleForBlocking blockingItem ->
+            do! config.BlockingWorker.RescheduleForBlocking blockingItem
+                <| WorkItem.Create eff workItem.IFiber stack (RescheduleForBlocking blockingItem)
+            do! handleBlockingFiber blockingItem
         | _ ->
             invalidOp "EvaluationWorker: Unexpected state encountered during effect interpretation."
+    }
 
     let startWorker (cancellationToken: CancellationToken) =
-        async {
-            config.WorkItemQueue.GetConsumingEnumerable()
-            |> Seq.takeWhile (fun _ -> not cancellationToken.IsCancellationRequested)
-            |> Seq.iter processWorkItem
-        } |> Async.Start
+        let rec loop () =
+            task {
+                let! hasWorkItem = config.WorkItemChan.WaitToReceiveAsync()
+                if hasWorkItem then
+                    let! workItem = config.WorkItemChan.ReceiveAsync()
+                    do! processWorkItem workItem
+                    return! loop ()
+            }
+    
+        loop ()
+        |> ignore
 
     let cancellationTokenSource = new CancellationTokenSource()
     do startWorker cancellationTokenSource.Token
-
+    
     interface IDisposable with
         member this.Dispose() =
             cancellationTokenSource.Cancel()
 
 and private BlockingWorker(config: BlockingWorkerConfig) =
 
-    let processBlockingChannel (blockingChan: Channel<obj>) =
+    let processBlockingChannel (blockingChan: Channel<obj>) = task {
         if blockingChan.HasBlockingWorkItems() then
-            blockingChan.RescheduleBlockingWorkItems config.WorkItemQueue
+            do! blockingChan.RescheduleBlockingWorkItems config.WorkItemChan
         else
-            config.BlockingItemQueue.Add <| BlockingChannel blockingChan
-
-    let processBlockingTask (blockingTask: InternalTask<obj>) =
-        if blockingTask.Completed() then
-            if blockingTask.HasBlockingWorkItems() then
-                blockingTask.RescheduleBlockingWorkItems config.WorkItemQueue
-            else
-                ()
-        else
-            config.BlockingItemQueue.Add (BlockingTask blockingTask)
-
-    let processBlockingItem blockingItem =
+            do! config.BlockingItemChan.SendAsync <| BlockingChannel blockingChan
+    }
+ 
+    let processBlockingItem blockingItem = task {
         match blockingItem with
-        | BlockingChannel chan -> processBlockingChannel chan
-        | BlockingTask task -> processBlockingTask task
-        | _ -> ()
+        | BlockingChannel chan -> 
+            do! processBlockingChannel chan
+        | _ -> 
+            return ()
+    }
 
     let startWorker (cancellationToken: CancellationToken) =
-        async {
-            config.BlockingItemQueue.GetConsumingEnumerable()
-            |> Seq.takeWhile (fun _ -> not cancellationToken.IsCancellationRequested)
-            |> Seq.iter processBlockingItem
-        } |> Async.Start
+        let rec loop () =
+            task {
+                let! hasBlockingItem = config.BlockingItemChan.WaitToReceiveAsync()
+                if hasBlockingItem then
+                    let! blockingItem = config.BlockingItemChan.ReceiveAsync()
+                    do! processBlockingItem blockingItem
+                    return! loop ()
+            }
+    
+        loop ()
+        |> ignore
 
     let cancellationTokenSource = new CancellationTokenSource()
     do startWorker cancellationTokenSource.Token
@@ -102,117 +109,156 @@ and private BlockingWorker(config: BlockingWorkerConfig) =
         member this.Dispose() =
             cancellationTokenSource.Cancel()
 
-    member internal this.RescheduleForBlocking blockingItem workItem =
+    member internal this.RescheduleForBlocking blockingItem workItem = task {
         match blockingItem with
         | BlockingChannel chan ->
-            chan.AddBlockingWorkItem workItem
+            do! chan.WriteBlockingWorkItem workItem
         | BlockingIFiber ifiber ->
-            ifiber.AddBlockingWorkItem workItem
-        | BlockingTask task ->
-            config.BlockingItemQueue.Add <| BlockingTask task
-            task.AddBlockingWorkItem workItem
+            do! ifiber.AddBlockingWorkItem workItem
+    }
 
 and Runtime(config: WorkerConfig) as this =
     inherit FIOWorkerRuntime(config)
 
-    let workItemQueue = new BlockingQueue<WorkItem>()
-    let blockingItemQueue = new BlockingQueue<BlockingItem>()
+    let workItemChan = InternalChannel<WorkItem>()
+    let blockingItemChan = InternalChannel<BlockingItem>()
 
-    let createBlockingWorkers workItemQueue blockingItemQueue count =
+    let createBlockingWorkers workItemChan blockingItemChan count =
         List.init count <| fun _ ->
             new BlockingWorker({
-                WorkItemQueue = workItemQueue
-                BlockingItemQueue = blockingItemQueue
+                WorkItemChan = workItemChan
+                BlockingItemChan = blockingItemChan
             })
 
-    let createEvaluationWorkers runtime workItemQueue blockingWorker evalSteps count =
+    let createEvaluationWorkers runtime workItemChan blockingWorker evalSteps count =
         List.init count <| fun _ -> 
             new EvaluationWorker({ 
                 Runtime = runtime
-                WorkItemQueue = workItemQueue
+                WorkItemChan = workItemChan
                 BlockingWorker = blockingWorker
                 EWSteps = evalSteps 
             })
 
     do
-        let blockingWorkers = createBlockingWorkers workItemQueue blockingItemQueue config.BWCount
+        let blockingWorkers = createBlockingWorkers workItemChan blockingItemChan config.BWCount
         // Currently we take head of the list, as the AdvancedRuntime
         // only supports a single blocking worker.
-        createEvaluationWorkers this workItemQueue (List.head blockingWorkers) config.EWSteps config.EWCount
+        createEvaluationWorkers this workItemChan (List.head blockingWorkers) config.EWSteps config.EWCount
         |> ignore
 
     new() =
-        Runtime(
+        Runtime
             { EWCount =
                 let coreCount = Environment.ProcessorCount - 1
                 if coreCount >= 2 then coreCount else 2
               BWCount = 1
-              EWSteps = 20 })
+              EWSteps = 20 }
 
-    member internal this.InternalRun eff stack prevAction evalSteps : FIO<obj, obj> * ContStack * RuntimeAction * int =
+    [<TailCall>]
+    member internal this.InternalRunAsync (workItem: WorkItem) evalSteps =
+        let mutable currentEff = workItem.Eff
+        let mutable currentContStack = workItem.Stack
+        let mutable currentPrevAction = workItem.PrevAction
+        let mutable currentEWSteps = evalSteps
+        let mutable result = None
 
-        let rec handleSuccess res stack evalSteps newEvalSteps =
-            match stack with
-            | [] -> (Success res, [], Evaluated, newEvalSteps)
-            | (SuccessCont, cont) :: ss -> interpret (cont res) ss Evaluated evalSteps
-            | (FailureCont, _) :: ss -> handleSuccess res ss evalSteps newEvalSteps
+        let handleSuccess res =
+            let mutable loop = true
+            while loop do
+                match currentContStack with
+                | [] -> 
+                    result <- Some (Success res, ContStack.Empty, Evaluated)
+                    loop <- false
+                | (SuccessCont, cont) :: ss -> 
+                    currentEff <- cont res
+                    currentPrevAction <- Evaluated
+                    currentContStack <- ss
+                    loop <- false
+                | (FailureCont, _) :: ss -> 
+                    currentContStack <- ss
 
-        and handleError err stack evalSteps newEvalSteps =
-            match stack with
-            | [] -> (Failure err, [], Evaluated, newEvalSteps)
-            | (SuccessCont, _) :: ss -> handleError err ss evalSteps newEvalSteps
-            | (FailureCont, cont) :: ss -> interpret (cont err) ss Evaluated evalSteps
+        let handleError err =
+            let mutable loop = true
+            while loop do
+                match currentContStack with
+                | [] -> 
+                    result <- Some (Failure err, ContStack.Empty, Evaluated)
+                    loop <- false
+                | (SuccessCont, _) :: ss -> 
+                    currentContStack <- ss
+                | (FailureCont, cont) :: ss ->
+                    currentEff <- cont err
+                    currentContStack <- ss
+                    currentPrevAction <- Evaluated
 
-        and handleResult res stack evalSteps newEvalSteps =
+        let handleResult res =
             match res with
-            | Ok res -> handleSuccess res stack evalSteps newEvalSteps
-            | Error err -> handleError err stack evalSteps newEvalSteps
+            | Ok res ->
+                handleSuccess res
+            | Error err ->
+                handleError err
 
-        and interpret eff stack prevAction evalSteps =
-            if evalSteps = 0 then
-                (eff, stack, RescheduleForRunning, 0)
-            else
-                let newEvalSteps = evalSteps - 1
-                match eff with
-                | Success res ->
-                    handleSuccess res stack evalSteps newEvalSteps
-                | Failure err ->
-                    handleError err stack evalSteps newEvalSteps
-                | Action func ->
-                    handleResult (func ()) stack evalSteps newEvalSteps
-                | SendChan (msg, chan) ->
-                    chan.Add msg
-                    blockingItemQueue.Add <| BlockingChannel chan
-                    handleSuccess msg stack evalSteps newEvalSteps
-                | ReceiveChan chan ->
-                    if prevAction = RescheduleForBlocking (BlockingChannel chan) then
-                        handleSuccess (chan.Take()) stack evalSteps newEvalSteps
-                    else
-                        (ReceiveChan chan, stack, RescheduleForBlocking <| BlockingChannel chan, evalSteps)
-                | AwaitTask task ->
-                    if prevAction = RescheduleForBlocking (BlockingTask task) then
-                        handleResult (task.AwaitResult()) stack evalSteps newEvalSteps
-                    else
-                        (AwaitTask task, stack, RescheduleForBlocking <| BlockingTask task, evalSteps)
-                | Concurrent (eff, fiber, ifiber) ->
-                    workItemQueue.Add <| WorkItem.Create eff ifiber ContStack.Empty prevAction
-                    handleSuccess fiber stack evalSteps newEvalSteps
-                | AwaitFiber ifiber ->
-                    if ifiber.Completed() then
-                        handleResult (ifiber.AwaitResult()) stack evalSteps newEvalSteps
-                    else
-                        (AwaitFiber ifiber, stack, RescheduleForBlocking <| BlockingIFiber ifiber, evalSteps)
-                | ChainSuccess (eff, cont) ->
-                    interpret eff ((SuccessCont, cont) :: stack) prevAction evalSteps
-                | ChainError (eff, cont) ->
-                    interpret eff ((FailureCont, cont) :: stack) prevAction evalSteps
+        task {
+            while result.IsNone do
+                if currentEWSteps = 0 then
+                    result <- Some (currentEff, currentContStack, RescheduleForRunning)
+                else
+                    currentEWSteps <- currentEWSteps - 1
+                    match currentEff with
+                    | Success res ->
+                        handleSuccess res
+                    | Failure err ->
+                        handleError err
+                    | Action (func, onError) ->
+                        try 
+                            let res = func ()
+                            handleSuccess res
+                        with exn ->
+                            handleResult (Error <| onError exn)
+                    | SendChan (msg, chan) ->
+                        do! chan.SendAsync msg
+                        do! blockingItemChan.SendAsync <| BlockingChannel chan
+                        handleSuccess msg
+                    | ReceiveChan chan ->
+                        // TODO: Optimize this. Why are we just assuming it is blocking?
+                        if currentPrevAction = RescheduleForBlocking (BlockingChannel chan) then
+                            let! res = chan.ReceiveAsync()
+                            handleSuccess res
+                        else
+                            currentPrevAction <- RescheduleForBlocking <| BlockingChannel chan
+                            result <- Some (ReceiveChan chan, currentContStack, RescheduleForBlocking <| BlockingChannel chan)
+                    | Concurrent (eff, fiber, ifiber) ->
+                        do! workItemChan.SendAsync
+                            <| WorkItem.Create eff ifiber ContStack.Empty currentPrevAction
+                        handleSuccess fiber
+                    | AwaitFiber ifiber ->
+                        if ifiber.Completed() then
+                            let! res = ifiber.AwaitAsync()
+                            handleResult res
+                        else
+                            result <- Some (AwaitFiber ifiber, currentContStack, RescheduleForBlocking <| BlockingIFiber ifiber)
+                    | AwaitTask (task, onError) ->
+                        // TODO: We are just awaiting the task here. Can this be done smarter?
+                        try
+                            let! res = task
+                            handleResult <| Ok res
+                        with exn ->
+                            handleResult (Error <| onError exn)
+                    | ChainSuccess (eff, cont) ->
+                        currentEff <- eff
+                        currentContStack <- (SuccessCont, cont) :: currentContStack
+                    | ChainError (eff, cont) ->
+                        currentEff <- eff
+                        currentContStack <- (FailureCont, cont) :: currentContStack
 
-        interpret eff stack prevAction evalSteps
+            return result.Value
+        }
 
     override this.Run (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
         let fiber = Fiber<'R, 'E>()
-        workItemQueue.Add
+        workItemChan.SendAsync
         <| WorkItem.Create (eff.Upcast()) (fiber.ToInternal()) ContStack.Empty Evaluated
+        |> ignore
         fiber
 
     override this.Name () =

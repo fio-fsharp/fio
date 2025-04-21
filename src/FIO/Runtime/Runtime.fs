@@ -6,9 +6,9 @@
 
 namespace FIO.Runtime
 
-open System.Globalization
-
 open FIO.Core
+
+open System.Globalization
 
 [<AbstractClass>]
 type FIORuntime() =
@@ -30,7 +30,7 @@ type WorkerConfig =
 [<AbstractClass>]
 type FIOWorkerRuntime(config: WorkerConfig) =
     inherit FIORuntime()
-    let ci = CultureInfo("en-US")
+    let ci = CultureInfo "en-US"
 
     let validateWorkerConfiguration () =
         if config.EWCount <= 0 ||

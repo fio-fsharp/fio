@@ -25,11 +25,11 @@ let inline ( =<< ) (cont: 'R -> FIO<'R1, 'E>) (eff: FIO<'R, 'E>)  : FIO<'R1, 'E>
 
 /// An alias for `FlatMapError`, which chains the error result of the effect to the continuation function.
 let inline ( >>=? ) (eff: FIO<'R, 'E>) (cont: 'E -> FIO<'R, 'E1>) : FIO<'R, 'E1> =
-    eff.FlapMapError cont
+    eff.FlatMapError cont
 
 /// An alias for `FlatMapError`, which chains the error result of the effect to the continuation function.
 let inline ( ?=<< ) (cont: 'E -> FIO<'R, 'E1>) (eff: FIO<'R, 'E>) : FIO<'R, 'E1> =
-    eff.FlapMapError cont
+    eff.FlatMapError cont
 
 /// An alias for `Map`, which maps a function over the result of an effect.
 let inline ( *> ) (eff: FIO<'R, 'E>) (cont: 'R -> 'R1) : FIO<'R1, 'E> =
@@ -63,6 +63,7 @@ let inline ( >>? ) (eff: FIO<'R, 'E>) (eff': FIO<'R, 'E1>) : FIO<'R, 'E1> =
 let inline ( ?<< ) (eff: FIO<'R, 'E1>) (eff': FIO<'R, 'E>) : FIO<'R, 'E1> =
     eff'.ThenError eff
 
+// TODO: What is the Haskell symbol for this?
 /// An alias for `Apply`, which combines two effects: one producing a function and the other a value, 
 /// and applies the function to the value.
 let inline ( <|> ) (eff: FIO<'R, 'E>) (eff': FIO<'R -> 'R1, 'E>) : FIO<'R1, 'E> =
@@ -129,10 +130,6 @@ let inline ( <!> ) (eff: FIO<'R, 'E>) (eff': FIO<'R1, 'E>) : FIO<unit, 'E> =
 /// An alias for `ParallelError`, which interprets two effects concurrently and succeeds with a tuple of their errors when both fail.
 let inline ( <?> ) (eff: FIO<'R, 'E>) (eff': FIO<'R, 'E1>) : FIO<'R, 'E * 'E1> =
     eff.ParallelError eff'
-
-/// An alias for `Race`, which succeeds with the result of the effect that completes first.
-let inline ( <%> ) (eff: FIO<'R, 'E>) (eff': FIO<'R, 'E>) : FIO<'R, 'E> =
-    eff.Race eff'
 
 /// An alias for `Send`, which puts the message on the channel and succeeds with the message.
 let inline ( --> ) (msg: 'R) (chan: Channel<'R>) : FIO<'R, 'E> =

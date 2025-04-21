@@ -6,29 +6,37 @@
 
 namespace FIO.Library.Network
 
+open FIO.Core
+
 open System
 open System.IO
-open System.Text
 open System.Net
-open System.Net.Http
-open System.Net.Sockets
-open System.Net.WebSockets
+open System.Text
 open System.Threading
 open System.Text.Json
-open System.Text.Json.Serialization
-
-open FIO.Core
+open System.Net.Sockets
+open System.Net.WebSockets
 
 module Sockets =
 
-    type Socket<'S, 'R>(socket: Socket) =
+    type FSocket<'S, 'R>(socket: Socket, options: JsonSerializerOptions) =
+        // This requires that the socket is already connected.
         let networkStream = new NetworkStream(socket)
         let reader = new StreamReader(networkStream)
         let writer = new StreamWriter(networkStream)
 
-        do writer.AutoFlush <- true
+        do 
+            writer.AutoFlush <- true
 
-        let options = JsonFSharpOptions.Default().ToJsonSerializerOptions()
+        new(socket) = FSocket(socket, JsonSerializerOptions())
+
+        static member Create (socket: Socket, address: string, port: int) : FIO<FSocket<'S, 'R>, 'E> = fio {
+            try 
+                do! !+ socket.Connect(address, port)
+                return! !+ FSocket<'S, 'R>(socket)
+            with exn ->
+                return! !- exn
+        }
 
         member this.Send (msg: 'S) : FIO<unit, exn> =
             try
@@ -67,8 +75,9 @@ module Sockets =
 
 module WebSockets =
 
-    type WebSocket<'S, 'R> internal (webSocketContext: HttpListenerWebSocketContext, listenerContext: HttpListenerContext) =
-        let options = JsonFSharpOptions.Default().ToJsonSerializerOptions()
+    type FWebSocket<'S, 'R> internal (webSocketContext: HttpListenerWebSocketContext, listenerContext: HttpListenerContext, options: JsonSerializerOptions) =
+
+        new(webSocketContext, listenerContext) = FWebSocket(webSocketContext, listenerContext, JsonSerializerOptions())
 
         member this.Send (msg: 'S) : FIO<unit, exn> = fio {
             try
@@ -86,7 +95,7 @@ module WebSockets =
                 let! buffer = !+ Array.zeroCreate(1024)
                 let! result =
                     FIO<WebSocketReceiveResult, exn>.FromGenericTask
-                    <| webSocketContext.WebSocket.ReceiveAsync(ArraySegment<byte> buffer, CancellationToken.None)
+                        <| webSocketContext.WebSocket.ReceiveAsync(ArraySegment<byte> buffer, CancellationToken.None)
                 if result.MessageType = WebSocketMessageType.Close then
                     do! FIO<unit, exn>.FromTask
                         <| webSocketContext.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None)
@@ -131,8 +140,10 @@ module WebSockets =
                 return! !- exn
         }
 
-    type ServerWebSocket<'S, 'R>() =
+    type ServerFWebSocket<'S, 'R>(options: JsonSerializerOptions) =
         let listener = new HttpListener()
+
+        new() = ServerFWebSocket(JsonSerializerOptions())
 
         member this.Start url : FIO<unit, exn> = fio {
             try
@@ -143,16 +154,16 @@ module WebSockets =
                 return! !- exn
         }
 
-        member this.Accept () : FIO<WebSocket<'S, 'R>, exn> = fio {
+        member this.Accept () : FIO<FWebSocket<'S, 'R>, exn> = fio {
             try
                 let! context =
-                    FIO<HttpListenerContext, exn>.FromGenericTask
+                    FIO<HttpListenerContext, exn>.FromGenericTask 
                     <| listener.GetContextAsync()
                 if context.Request.IsWebSocketRequest then
                     let! webSocketContext =
                         FIO<HttpListenerWebSocketContext, exn>.FromGenericTask
                         <| context.AcceptWebSocketAsync(subProtocol = null)
-                    return WebSocket<'S, 'R>(webSocketContext, context)
+                    return FWebSocket<'S, 'R>(webSocketContext, context, options)
                 else
                     do! !+ (context.Response.StatusCode <- 400)
                     do! !+ context.Response.Close()
@@ -169,9 +180,10 @@ module WebSockets =
                 return! !- exn
         }
 
-    and ClientWebSocket<'S, 'R>() =
+    and ClientFWebSocket<'S, 'R>(options: JsonSerializerOptions) =
         let clientSocket = new ClientWebSocket()
-        let options = JsonFSharpOptions.Default().ToJsonSerializerOptions()
+
+        new() = ClientFWebSocket(JsonSerializerOptions())
 
         member this.Connect url : FIO<unit, exn> = fio {
             try
@@ -214,41 +226,3 @@ module WebSockets =
             with exn ->
                 return! !- exn
         }
-
-module Http =
-    
-        type HttpClient() =
-            let client = new Http.HttpClient()
-    
-            member this.Get(url: string) : FIO<string, exn> =
-                try
-                    let response = client.GetAsync(url).Result
-                    let result = response.Content.ReadAsStringAsync().Result
-                    !+ result
-                with exn ->
-                    !- exn  
-    
-            member this.Post(url: string, message: string) : FIO<string, exn> =
-                try
-                    let response = client.PostAsync(url, new StringContent(message)).Result
-                    let result = response.Content.ReadAsStringAsync().Result
-                    !+ result
-                with exn ->
-                    !- exn
-    
-            member this.Put(url: string, message: string) : FIO<string, exn> =
-                try
-                    let stringContent = new StringContent(message)
-                    let response = client.PutAsync(url, stringContent).Result
-                    let result = response.Content.ReadAsStringAsync().Result
-                    !+ result
-                with exn ->
-                    !- exn
-
-            member this.Delete(url: string) : FIO<string, exn> =
-                try
-                    let response = client.DeleteAsync(url).Result
-                    let result = response.Content.ReadAsStringAsync().Result
-                    !+ result
-                with exn ->
-                    !- exn

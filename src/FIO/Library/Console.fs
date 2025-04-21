@@ -6,9 +6,9 @@
 
 module FIO.Library.Console
 
-open System
-
 open FIO.Core
+
+open System
 
 let write format : FIO<'R, 'E> =
     FIO.Succeed <| printf format

@@ -37,7 +37,7 @@ type FIOBuilder() =
         eff
 
     member inline this.TryWith (eff: FIO<'R, 'E>, handler: 'E -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        eff.FlapMapError handler
+        eff.FlatMapError handler
 
     member inline this.TryFinally (eff: FIO<'R, 'E>, finalizer: unit -> unit) : FIO<'R, 'E> =
         eff.FlatMap <| fun res ->
