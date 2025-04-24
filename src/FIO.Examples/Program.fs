@@ -287,10 +287,10 @@ type ErrorHandlingApp() =
     let awaitWebservice : FIO<char, int> =
         if Random().Next(0, 2) = 1 then !+ 'S' else !- 404
 
-    let databaseResult : FIO<string, Error> =
+    let databaseResult : FIO<string, obj> =
         readFromDatabase >>=? fun error -> !- (DbError error)
 
-    let webserviceResult : FIO<char, Error> =
+    let webserviceResult : FIO<char, obj> =
         awaitWebservice >>=? fun error -> !- (WsError error)
 
     override this.effect =
@@ -405,13 +405,13 @@ type SocketApp(ip: string, port: int) =
         fio {
             try
                 let! listener = 
-                    FIO.FromFunc<TcpListener>(fun () -> new TcpListener(IPAddress.Parse ip, port))
-                do! FIO.FromFunc<unit>(fun () -> listener.Start())
+                    FIO<TcpListener, exn>.FromFunc(fun () -> new TcpListener(IPAddress.Parse ip, port))
+                do! FIO<unit, exn>.FromFunc(fun () -> listener.Start())
                 do! writeln $"Server listening on %s{ip}:%i{port}..."
 
                 while true do
                     try
-                        let! socket = FIO.FromFunc<Socket>(fun () -> listener.AcceptSocket())
+                        let! socket = FIO<Socket, exn>.FromFunc(fun () -> listener.AcceptSocket())
                         do! handleClient socket
                     with exn ->
                         do! writeln $"Error accepting client: %A{exn}"
@@ -447,7 +447,7 @@ type SocketApp(ip: string, port: int) =
         fio {
             do! writeln $"Connecting to %s{ip}:%i{port}..."
             let! socket =
-                FIO.FromFunc<Socket>(fun () -> new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+                FIO<Socket, exn>.FromFunc(fun () -> new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
             try
                 let! fsocket = FSocket<string, int>.Create(socket, ip, port)
                 do! writeln $"Connected to %s{ip}:%i{port}"
@@ -607,6 +607,7 @@ Console.ReadLine() |> ignore
 PingPongMatchApp().Run()
 Console.ReadLine() |> ignore
 
+// TODO: Some interesting stuff going on with the types here. Worth to investigate.
 ErrorHandlingApp().Run()
 Console.ReadLine() |> ignore
 
@@ -614,7 +615,6 @@ Console.ReadLine() |> ignore
 // AsyncErrorHandlingApp().Run()
 // Console.ReadLine() |> ignore
 
-// TODO: Intermediate seems to be awfully slow.
 HighlyConcurrentApp().Run()
 Console.ReadLine() |> ignore
 

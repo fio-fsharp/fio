@@ -48,26 +48,31 @@ and internal BlockingItem =
     | BlockingChannel of Channel<obj>
     | BlockingIFiber of InternalFiber
 
-and internal InternalChannel<'R>() =
+and internal InternalChannel<'R> internal () =
 
     let chan = Channel.CreateUnbounded<'R>()
     let mutable count = 0
-    let lockObj = obj()
 
     member internal this.SendAsync (msg: 'R) =
-        lock lockObj (fun () -> count <- count + 1)
         (chan.Writer.WriteAsync msg).AsTask()
-            .ContinueWith(fun _ -> Task.FromResult ()).Unwrap()
+            .ContinueWith(fun _ ->
+                Interlocked.Increment &count
+                |> ignore
+                Task.FromResult ()).Unwrap()
     
     member internal this.ReceiveAsync () =
         chan.Reader.ReadAsync().AsTask()
+            .ContinueWith(fun (t: Task<'R>) ->
+                Interlocked.Decrement &count
+                |> ignore
+                t.Result
+            )
 
     member internal this.WaitToReceiveAsync () =
-        lock lockObj (fun () -> count <- count - 1)
         chan.Reader.WaitToReadAsync().AsTask()
 
     member internal this.Count =
-        lock lockObj (fun () -> count)
+        Volatile.Read &count
 
 and internal InternalFiber internal (chan: InternalChannel<Result<obj, obj>>, blockingWorkItemChan: InternalChannel<WorkItem>) =
 
@@ -149,7 +154,7 @@ and Channel<'R> private (resChan: InternalChannel<obj>, blockingWorkItemChan: In
         return res :?> 'R
     }
 
-    member internal this.WriteBlockingWorkItem workItem =
+    member internal this.SendBlockingWorkItem workItem =
         blockingWorkItemChan.SendAsync workItem
 
     member internal this.RescheduleBlockingWorkItems (workItemChan: InternalChannel<WorkItem>) = task {
@@ -200,8 +205,9 @@ and FIO<'R, 'E> =
     static member FromFunc (func: unit -> 'R, onError: exn -> 'E) : FIO<'R, 'E> =
         Action (func, onError)
 
-    static member FromFunc<'R> (func: unit -> 'R) : FIO<'R, exn> =
-        Action (func, fun exn -> exn)
+    /// Converts a function into an effect with a default onError.
+    static member inline FromFunc (func: unit -> 'R) : FIO<'R, exn> =
+        FIO<'R, exn>.FromFunc (func, fun exn -> exn)
 
     /// Converts an Option into an effect.
     static member inline FromOption (opt: Option<'R>) (err: 'E) : FIO<'R, 'E> =
@@ -221,7 +227,7 @@ and FIO<'R, 'E> =
         | Choice1Of2 res -> FIO.Succeed res
         | Choice2Of2 err -> FIO.Fail err
 
-    /// Converts a Task into an effect.
+    /// Converts a generic Task into an effect.
     static member FromGenericTask (task: Task<'R>, onError: exn -> 'E) : FIO<'R, 'E> =
         AwaitTask (task.ContinueWith(fun (t: Task<'R>) -> 
             if t.IsFaulted then
@@ -232,26 +238,25 @@ and FIO<'R, 'E> =
                 Task.FromResult (box t.Result)
         ).Unwrap(), onError)
 
-    static member FromGenericTask (task: Task<'R>) : FIO<'R, exn> =
-        AwaitTask (task.ContinueWith(fun (t: Task<'R>) -> 
-            if t.IsFaulted then
-                Task.FromException<obj> (t.Exception.GetBaseException())
-            elif t.IsCanceled then
-                Task.FromCanceled<obj>(CancellationToken.None)
-            else 
-                Task.FromResult (box t.Result)
-        ).Unwrap(), fun exn -> exn)
+    /// Converts a generic Task into an effect with a default onError.
+    static member inline FromGenericTask (task: Task<'R>) : FIO<'R, exn> =
+        FIO<'R, exn>.FromGenericTask(task, fun exn -> exn)
 
     /// Converts a Task into an effect.
     static member FromTask (task: Task, onError: exn -> 'E) : FIO<unit, 'E> =
         AwaitTask (task.ContinueWith(fun (_: Task) -> box ()), onError)
 
-    static member FromTask (task: Task) : FIO<unit, exn> =
-        AwaitTask (task.ContinueWith(fun (_: Task) -> box ()), fun exn -> exn)
+    /// Converts a Task into an effect with a default onError.
+    static member inline FromTask (task: Task) : FIO<unit, exn> =
+        FIO<unit, exn>.FromTask (task, fun exn -> exn)
 
     /// Converts an Async computation into an effect.
-    static member FromAsync (async: Async<'R>, onError: exn -> 'E) : FIO<'R, 'E> =
+    static member inline FromAsync (async: Async<'R>, onError: exn -> 'E) : FIO<'R, 'E> =
         FIO<'R, 'E>.FromGenericTask (Async.StartAsTask async, onError)
+
+    /// Converts an Async computation into an effect with a default onError.
+    static member inline FromAsync (async: Async<'R>) : FIO<'R, exn> =
+        FIO<'R, exn>.FromAsync (async, fun exn -> exn)
 
     /// Binds a continuation to the result of an effect.
     /// If the effect fails, the error is immediately returned.
