@@ -73,7 +73,7 @@ let helloWorld6 () =
     } |> ignore
 
 let concurrency1 () =
-    let concurrent = (FIO.Succeed 42).Fork().FlatMap(fun fiber -> fiber.Await())
+    let concurrent = (FIO.Succeed 42).Fork().Bind(_.Await())
     let fiber = Runtime().Run concurrent
     task {
         let! result = fiber.AwaitAsync()
@@ -319,11 +319,11 @@ type AsyncErrorHandlingApp() =
     }
 
     let databaseResult : FIO<string, Error> =
-        FIO<string, exn>.FromAsync (databaseReadTask, fun x -> x)
+        FIO<string, exn>.AwaitAsync databaseReadTask
         >>=? fun exn -> !- (GeneralError exn.Message)
 
     let webserviceResult : FIO<int, Error> =
-        FIO<int, exn>.FromAsync (webserviceAwaitTask, fun x -> x)
+        FIO<int, exn>.AwaitAsync webserviceAwaitTask
         >>=? fun exn -> !- (GeneralError exn.Message)
 
     override this.effect = fio {
@@ -546,6 +546,37 @@ type WebSocketApp(serverUrl, clientUrl) =
     override this.effect = fio {
         do! server serverUrl <!> client clientUrl
     }
+    
+let tt = task {
+    let x = 1
+    printfn "Started"
+    do! System.Threading.Tasks.Task.Delay(100) // Wait for 1 second (1000 milliseconds)
+    let z = 2
+    printfn "Doing some work..."
+    do! System.Threading.Tasks.Task.Delay(1000)
+    let y = 3
+    printfn "Done!"
+    printfn "Finished!"
+    return x + z + y
+}
+let test () =
+    let eff = (FIO<int, exn>.ToFiber tt).Bind(_.Await())
+    let fiber = Runtime().Run eff
+    task {
+        let! result = fiber.AwaitAsync()
+        printfn $"Success: %A{result}"
+        match result with
+        | Ok result -> printfn $"Success: %i{result}"
+        | Error error -> printfn $"Error: %A{error}"
+    } |> ignore
+    
+    
+// SocketApp("127.0.0.1", 5000).Run()
+//Console.ReadLine() |> ignore
+
+test()
+Console.ReadLine() |> ignore
+
 
 helloWorld1 ()
 Console.ReadLine() |> ignore

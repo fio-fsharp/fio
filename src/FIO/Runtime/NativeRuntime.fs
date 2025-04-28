@@ -6,6 +6,7 @@
 
 module FIO.Runtime.Native
 
+open System.Threading
 open FIO.Core
 
 open System.Threading.Tasks
@@ -66,14 +67,15 @@ type Runtime() =
                         let res = func ()
                         handleSuccess res
                     with exn ->
-                        handleResult (Error <| onError exn)
+                        handleError
+                        <| onError exn
                 | SendChan (msg, chan) ->
                     do! chan.SendAsync msg
                     handleSuccess msg
                 | ReceiveChan chan ->
                     let! res = chan.ReceiveAsync()
                     handleSuccess res
-                | Concurrent (eff, fiber, ifiber) ->
+                | ConcurrentEffect (eff, fiber, ifiber) ->
                     // This runs the task on a separate thread pool.
                     Task.Run(fun () ->
                         task {
@@ -86,12 +88,27 @@ type Runtime() =
                 | AwaitFiber ifiber ->
                     let! res = ifiber.AwaitAsync()
                     handleResult res
-                | AwaitTask (task, onError) ->
+                | AwaitGenericTPLTask (task, onError) ->
                     try
                         let! res = task
-                        handleResult <| Ok res
+                        handleSuccess res
                     with exn ->
-                        handleResult (Error <| onError exn)
+                        handleError <| onError exn
+                | FiberFromTask (task, onError, fiber, ifiber) ->
+                    task.ContinueWith((fun (t: Task<obj>) ->
+                        if t.IsFaulted then
+                            ifiber.Complete <| Error (onError t.Exception.InnerException)
+                        elif t.IsCanceled then
+                            ifiber.Complete <| Error (onError <| TaskCanceledException("Task has been cancelled."))
+                        elif t.IsCompleted then
+                            ifiber.Complete <| Ok t.Result
+                        else
+                            Task.FromResult ()
+                        ),
+                        CancellationToken.None,
+                        TaskContinuationOptions.RunContinuationsAsynchronously,
+                        TaskScheduler.Default) |> ignore
+                    handleSuccess fiber
                 | ChainSuccess (eff, cont) ->
                     currentEff <- eff
                     contStack <- (SuccessCont, cont) :: contStack

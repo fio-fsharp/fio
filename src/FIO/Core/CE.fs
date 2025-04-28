@@ -13,7 +13,7 @@ open System.Collections.Generic
 type FIOBuilder() =
 
     member inline this.Bind (eff: FIO<'R1, 'E>, cont: 'R1 -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        eff.FlatMap cont
+        eff.Bind cont
 
     member inline this.Combine (eff: FIO<'R, 'E>, eff': FIO<'R1, 'E>) : FIO<'R1, 'E> =
         eff.Then eff'
@@ -37,10 +37,10 @@ type FIOBuilder() =
         eff
 
     member inline this.TryWith (eff: FIO<'R, 'E>, handler: 'E -> FIO<'R, 'E>) : FIO<'R, 'E> =
-        eff.FlatMapError handler
+        eff.BindError handler
 
     member inline this.TryFinally (eff: FIO<'R, 'E>, finalizer: unit -> unit) : FIO<'R, 'E> =
-        eff.FlatMap <| fun res ->
+        eff.Bind <| fun res ->
             try
                 finalizer ()
                 FIO.Succeed res
@@ -48,7 +48,7 @@ type FIOBuilder() =
                 FIO.Fail (exn :?> 'E)
 
     member inline this.Delay (func: unit -> FIO<'R, 'E>) : FIO<'R, 'E> =
-       (FIO.Succeed ()).FlatMap func
+       (FIO.Succeed ()).Bind func
 
     member inline this.For (sequence: seq<'T>, body: 'T -> FIO<unit, 'E>) : FIO<unit, 'E> =
         let rec loop (enumerator: IEnumerator<'T>) =
@@ -61,7 +61,7 @@ type FIOBuilder() =
     member inline this.While (guard: unit -> bool, eff: FIO<'R, 'E>) : FIO<unit, 'E> =
         let rec loop () =
             if guard () then
-                this.Delay <| fun () -> eff.FlatMap <| fun _ -> loop ()
+                this.Delay <| fun () -> eff.Bind <| fun _ -> loop ()
             else
                 FIO.Succeed ()
         loop ()

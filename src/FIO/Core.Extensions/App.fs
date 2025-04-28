@@ -62,7 +62,6 @@ type FIOApp<'R, 'E> (onSuccess: 'R -> Task<unit>, onError: 'E -> Task<unit>, run
 
     member this.Run () =
         this.Run runtime
-        |> ignore
 
     member this.Run runtime =
         let fiber = runtime.Run this.effect
