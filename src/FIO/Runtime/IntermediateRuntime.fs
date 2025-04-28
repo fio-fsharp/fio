@@ -6,11 +6,11 @@
 
 module FIO.Runtime.Intermediate
 
-open System.Threading.Tasks
 open FIO.Core
 
 open System
 open System.Threading
+open System.Threading.Tasks
 
 type private EvaluationWorkerConfig =
     { Runtime: Runtime
@@ -217,6 +217,25 @@ and Runtime(config: WorkerConfig) as this =
                         do! workItemChan.AddAsync
                             <| WorkItem.Create eff ifiber ContStack.Empty currentPrevAction
                         handleSuccess fiber
+                    | ConcurrentTask (task, onError, fiber, ifiber) ->
+                        task.ContinueWith((fun (t: Task<obj>) ->
+                            if t.IsFaulted then
+                                ifiber.Complete
+                                <| Error (onError t.Exception.InnerException)
+                            elif t.IsCanceled then
+                                ifiber.Complete
+                                <| Error (onError <| TaskCanceledException "Task has been cancelled.")
+                            elif t.IsCompleted then
+                                ifiber.Complete
+                                <| Ok t.Result
+                            else
+                                ifiber.Complete
+                                <| Error (onError <| InvalidOperationException "Task not completed.")),
+                            CancellationToken.None,
+                            TaskContinuationOptions.RunContinuationsAsynchronously,
+                            TaskScheduler.Default)
+                        |> ignore
+                        handleSuccess fiber
                     | AwaitFiber ifiber ->
                         if ifiber.Completed() then
                             let! res = ifiber.AwaitAsync()
@@ -231,21 +250,6 @@ and Runtime(config: WorkerConfig) as this =
                             handleSuccess res
                         with exn ->
                             handleError <| onError exn
-                    | FiberFromTask (task, onError, fiber, ifiber) ->
-                        task.ContinueWith((fun (t: Task<obj>) ->
-                            if t.IsFaulted then
-                                ifiber.Complete <| Error (onError t.Exception.InnerException)
-                            elif t.IsCanceled then
-                                ifiber.Complete <| Error (onError <| TaskCanceledException("Task has been cancelled."))
-                            elif t.IsCompleted then
-                                ifiber.Complete <| Ok t.Result
-                            else
-                                Task.FromResult ()
-                            ),
-                            CancellationToken.None,
-                            TaskContinuationOptions.RunContinuationsAsynchronously,
-                            TaskScheduler.Default) |> ignore
-                        handleSuccess fiber
                     | ChainSuccess (eff, cont) ->
                         currentEff <- eff
                         currentContStack <- (SuccessCont, cont) :: currentContStack

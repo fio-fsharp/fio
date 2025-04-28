@@ -559,24 +559,23 @@ let tt = task {
     printfn "Finished!"
     return x + z + y
 }
+
+
+// TODO: Create more examples with the FromTask functions.
 let test () =
-    let eff = (FIO<int, exn>.ToFiber tt).Bind(_.Await())
+    let eff = (FIO<int, exn>.FromGenericTask tt).Bind(fun fiber ->
+        printfn $"task fiber id: %A{fiber.Id}"
+        fiber.Await())
     let fiber = Runtime().Run eff
-    task {
+    let t = task {
         let! result = fiber.AwaitAsync()
         printfn $"Success: %A{result}"
         match result with
         | Ok result -> printfn $"Success: %i{result}"
         | Error error -> printfn $"Error: %A{error}"
-    } |> ignore
+    }
+    t.Wait()
     
-    
-// SocketApp("127.0.0.1", 5000).Run()
-//Console.ReadLine() |> ignore
-
-test()
-Console.ReadLine() |> ignore
-
 
 helloWorld1 ()
 Console.ReadLine() |> ignore

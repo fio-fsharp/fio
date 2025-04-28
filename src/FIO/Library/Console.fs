@@ -10,6 +10,7 @@ open FIO.Core
 
 open System
 
+// TODO: Make these pure.
 let write format : FIO<'R, 'E> =
     FIO.Succeed <| printf format
 

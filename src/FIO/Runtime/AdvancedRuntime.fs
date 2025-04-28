@@ -6,11 +6,11 @@
 
 module FIO.Runtime.Advanced
 
-open System.Threading.Tasks
 open FIO.Core
 
 open System
 open System.Threading
+open System.Threading.Tasks
 
 type private EvaluationWorkerConfig =
     { Runtime: Runtime
@@ -23,32 +23,19 @@ and private BlockingWorkerConfig =
       BlockingItemChan: InternalChannel<BlockingItem> }
 
 and private EvaluationWorker(config: EvaluationWorkerConfig) =
-
-    let completeWorkItem (workItem: WorkItem) res = task {
-        do! workItem.Complete res
-        do! workItem.IFiber.RescheduleBlockingWorkItems config.WorkItemChan
-    }
-
-    let handleBlockingFiber blockingItem = task {
-        match blockingItem with
-        | BlockingIFiber ifiber when ifiber.Completed() ->
-            do! ifiber.RescheduleBlockingWorkItems config.WorkItemChan
-        | _ -> return ()
-    }
-
+    
     let processWorkItem workItem = task {
         match! config.Runtime.InternalRunAsync workItem config.EWSteps with
         | Success res, _, Evaluated ->
-            do! completeWorkItem workItem <| Ok res
+            do! workItem.CompleteAndReschedule (Ok res) config.WorkItemChan
         | Failure err, _, Evaluated ->
-            do! completeWorkItem workItem <| Error err
+            do! workItem.CompleteAndReschedule (Error err) config.WorkItemChan
         | eff, stack, RescheduleForRunning ->
             do! config.WorkItemChan.AddAsync
                 <| WorkItem.Create eff workItem.IFiber stack RescheduleForRunning
         | eff, stack, RescheduleForBlocking blockingItem ->
             do! config.BlockingWorker.RescheduleForBlocking blockingItem
                 <| WorkItem.Create eff workItem.IFiber stack (RescheduleForBlocking blockingItem)
-            do! handleBlockingFiber blockingItem
         | _ ->
             invalidOp "EvaluationWorker: Unexpected state encountered during effect interpretation."
     }
@@ -76,7 +63,7 @@ and private BlockingWorker(config: BlockingWorkerConfig) =
 
     let processBlockingChannel (blockingChan: Channel<obj>) = task {
         if blockingChan.HasBlockingWorkItems() then
-            do! blockingChan.RescheduleBlockingWorkItems config.WorkItemChan
+            do! blockingChan.RescheduleNextBlockingWorkItem config.WorkItemChan
         else
             do! config.BlockingItemChan.AddAsync <| BlockingChannel blockingChan
     }
@@ -227,6 +214,25 @@ and Runtime(config: WorkerConfig) as this =
                         do! workItemChan.AddAsync
                             <| WorkItem.Create eff ifiber ContStack.Empty currentPrevAction
                         handleSuccess fiber
+                    | ConcurrentTask (task, onError, fiber, ifiber) ->
+                        task.ContinueWith((fun (t: Task<obj>) ->
+                            if t.IsFaulted then
+                                ifiber.CompleteAndReschedule
+                                    (Error <| onError t.Exception.InnerException) workItemChan
+                            elif t.IsCanceled then
+                                ifiber.CompleteAndReschedule
+                                    (Error (onError <| TaskCanceledException "Task has been cancelled.")) workItemChan
+                            elif t.IsCompleted then
+                                ifiber.CompleteAndReschedule
+                                    (Ok t.Result) workItemChan
+                            else
+                                ifiber.CompleteAndReschedule
+                                    (Error (onError <| InvalidOperationException "Task not completed.")) workItemChan),
+                            CancellationToken.None,
+                            TaskContinuationOptions.RunContinuationsAsynchronously,
+                            TaskScheduler.Default)
+                        |> ignore
+                        handleSuccess fiber
                     | AwaitFiber ifiber ->
                         if ifiber.Completed() then
                             let! res = ifiber.AwaitAsync()
@@ -241,24 +247,6 @@ and Runtime(config: WorkerConfig) as this =
                             handleSuccess res
                         with exn ->
                             handleError <| onError exn
-                    | FiberFromTask (task, onError, fiber, ifiber) ->
-                        task.ContinueWith((
-                            fun (t: Task<obj>) ->
-                                if t.IsFaulted then
-                                    ifiber.Complete (Error (onError t.Exception.InnerException)) |> ignore
-                                elif t.IsCanceled then
-                                    ifiber.Complete (Error (onError (TaskCanceledException("Task was cancelled.")))) |> ignore
-                                elif t.IsCompletedSuccessfully then
-                                    ifiber.Complete (Ok t.Result) |> ignore
-                                else
-                                    // shouldn't happen, but just in case:
-                                    ifiber.Complete (Error (onError (InvalidOperationException("Task not completed.")))) |> ignore),
-                            CancellationToken.None,
-                            TaskContinuationOptions.RunContinuationsAsynchronously,
-                            TaskScheduler.Default
-                        )
-                        |> ignore
-                        handleSuccess fiber
                     | ChainSuccess (eff, cont) ->
                         currentEff <- eff
                         currentContStack <- (SuccessCont, cont) :: currentContStack
