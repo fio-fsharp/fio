@@ -15,6 +15,14 @@ let inline ( !+ ) (res: 'R) : FIO<'R, 'E> =
 let inline ( !- ) (err: 'E) : FIO<'R, 'E> =
     FIO.Fail err
 
+// TODO: Add alias.
+let inline ( !<<< ) (func: unit -> 'R) (onError: exn -> 'E) =
+    FIO.FromFunc<'R, 'E> (func, onError)
+    
+// TODO: Add alias.
+let inline ( !<< ) (func: unit -> 'R) =
+    FIO.FromFunc<'R, exn> func
+
 /// An alias for `Send`, which puts the message on the channel and succeeds with the message.
 let inline ( --> ) (msg: 'R) (chan: Channel<'R>) : FIO<'R, 'E> =
     chan.Send msg

@@ -230,12 +230,12 @@ and FIO<'R, 'E> =
         Failure err
 
     /// Converts a function into an effect.
-    static member FromFunc (func: unit -> 'R, onError: exn -> 'E) : FIO<'R, 'E> =
+    static member FromFunc<'R, 'E> (func: unit -> 'R, onError: exn -> 'E) : FIO<'R, 'E> =
         Action (func, onError)
 
     /// Converts a function into an effect with a default onError.
-    static member inline FromFunc (func: unit -> 'R) : FIO<'R, exn> =
-        FIO<'R, exn>.FromFunc (func, id)
+    static member inline FromFunc<'R, 'E> (func: unit -> 'R) : FIO<'R, exn> =
+        FIO.FromFunc<'R, exn> (func, id)
 
     /// Converts a Result into an effect.
     static member inline FromResult (res: Result<'R, 'E>) : FIO<'R, 'E> =
@@ -256,68 +256,62 @@ and FIO<'R, 'E> =
         | Choice2Of2 err -> FIO.Fail err
 
     /// Awaits a Task and turns it into an effect.
-    static member AwaitTask (task: Task, onError: exn -> 'E) : FIO<unit, 'E> =
-        AwaitGenericTPLTask (task.ContinueWith(fun (_: Task) -> box ()), upcastOnError onError)
+    static member AwaitTask<'R, 'E> (task: Task, onError: exn -> 'E) : FIO<unit, 'E> =
+        AwaitGenericTPLTask (task.ContinueWith(fun _ -> box ()), upcastOnError onError)
 
     /// Awaits a Task and turns it into an effect with a default onError.
-    static member inline AwaitTask (task: Task) : FIO<unit, exn> =
-        FIO<unit, exn>.AwaitTask (task, id)
+    static member inline AwaitTask<'R, 'E> (task: Task) : FIO<unit, exn> =
+        FIO.AwaitTask<unit, exn> (task, id)
 
     /// Awaits a generic Task and turns it into an effect.
-    static member AwaitGenericTask (task: Task<'R>, onError: exn -> 'E) : FIO<'R, 'E> =
-        let task =
-            task.ContinueWith(fun (t: Task<'R>) ->
-                if t.IsFaulted then
-                    Task.FromException<obj> (t.Exception.GetBaseException())
-                elif t.IsCanceled then
-                    Task.FromCanceled<obj> CancellationToken.None
-                else 
-                    Task.FromResult (box t.Result)
-            ).Unwrap()
+    static member AwaitGenericTask<'R, 'E> (task: Task<'R>, onError: exn -> 'E) : FIO<'R, 'E> =
+        let task = task.ContinueWith(fun (outerTask: Task<'R>) ->
+                    if outerTask.IsFaulted then
+                        Task.FromException<obj> (outerTask.Exception.GetBaseException())
+                    elif outerTask.IsCanceled then
+                        Task.FromCanceled<obj> CancellationToken.None
+                    else 
+                        Task.FromResult (box outerTask.Result)
+                   ).Unwrap()
         AwaitGenericTPLTask (task, upcastOnError onError)
 
     /// Awaits a generic Task and turns it into an effect with a default onError.
-    static member inline AwaitGenericTask (task: Task<'R>) : FIO<'R, exn> =
-        FIO<'R, exn>.AwaitGenericTask (task, id)
+    static member inline AwaitGenericTask<'R, 'E> (task: Task<'R>) : FIO<'R, exn> =
+        FIO.AwaitGenericTask<'R, exn> (task, id)
 
     /// Awaits an Async computation and turns it into an effect.
-    static member inline AwaitAsync (async: Async<'R>, onError: exn -> 'E) : FIO<'R, 'E>  =
-        FIO<'R, 'E>.AwaitGenericTask (Async.StartAsTask async, onError)
+    static member inline AwaitAsync<'R, 'E> (async: Async<'R>, onError: exn -> 'E) : FIO<'R, 'E>  =
+        FIO.AwaitGenericTask<'R, 'E> (Async.StartAsTask async, onError)
 
     /// Awaits an Async computation and turns it into an effect with a default onError.
-    static member inline AwaitAsync (async: Async<'R>) : FIO<'R, exn> =
-        FIO<'R, exn>.AwaitAsync (async, id)
+    static member inline AwaitAsync<'R, 'E> (async: Async<'R>) : FIO<'R, exn> =
+        FIO.AwaitAsync<'R, exn> (async, id)
 
     // Converts a Task into a Fiber.
-    static member FromTask (task: Task, onError: exn -> 'E) : FIO<Fiber<unit, exn>, 'E> =
+    static member FromTask<'R, 'E> (task: Task, onError: exn -> 'E) : FIO<Fiber<unit, exn>, 'E> =
         let fiber = Fiber<unit, exn>()
-        ConcurrentTask (
-            task.ContinueWith(fun (_: Task) -> box ()),
-            upcastOnError onError,
-            fiber,
-            fiber.ToInternal())
+        ConcurrentTask (task.ContinueWith(fun _ -> box ()), upcastOnError onError, fiber, fiber.ToInternal())
 
     // Converts a Task into a Fiber with a default onError.
     static member FromTask (task: Task) : FIO<Fiber<unit, exn>, exn> =
-        FIO<unit, exn>.FromTask (task, id)
+        FIO.FromTask<Fiber<unit, exn>, exn> (task, id)
     
     // Converts a generic Task into a Fiber.
-    static member FromGenericTask (task: Task<'R>, onError: exn -> 'E) : FIO<Fiber<'R, exn>, 'E> =
+    static member FromGenericTask<'R, 'E> (task: Task<'R>, onError: exn -> 'E) : FIO<Fiber<'R, exn>, 'E> =
         let fiber = Fiber<'R, exn>()
-        let task =
-            task.ContinueWith(fun (t: Task<'R>) ->
-                if t.IsFaulted then
-                    Task.FromException<obj> (t.Exception.GetBaseException())
-                elif t.IsCanceled then
-                    Task.FromCanceled<obj> CancellationToken.None
-                else 
-                    Task.FromResult (box t.Result)
-            ).Unwrap()
+        let task = task.ContinueWith(fun (outerTask: Task<'R>) ->
+                    if outerTask.IsFaulted then
+                        Task.FromException<obj> (outerTask.Exception.GetBaseException())
+                    elif outerTask.IsCanceled then
+                        Task.FromCanceled<obj> CancellationToken.None
+                    else 
+                        Task.FromResult (box outerTask.Result)
+                   ).Unwrap()
         ConcurrentTask (task, upcastOnError onError, fiber, fiber.ToInternal())
 
     // Converts a generic Task into a Fiber with a default onError.        
-    static member FromGenericTask (task: Task<'R>) : FIO<Fiber<'R, exn>, exn> =
-        FIO<'R, exn>.FromGenericTask (task, id)
+    static member FromGenericTask<'R, 'E> (task: Task<'R>) : FIO<Fiber<'R, exn>, exn> =
+        FIO.FromGenericTask<Fiber<'R, exn>, exn> (task, id)
         
     /// Interprets an effect concurrently and returns the fiber interpreting it.
     /// The fiber can be awaited for the result of the effect.
@@ -355,7 +349,6 @@ and FIO<'R, 'E> =
     member inline this.ThenError (eff: FIO<'R, 'E1>) : FIO<'R, 'E1> =
         this.BindError <| fun _ -> eff
 
-    // TODO: What is the Haskell name of this? It's an applicative.
     /// Combines two effects: one produces a result function and the other produces a result value.
     /// The function is applied to the value, and the result is returned.
     /// Errors are immediately returned if any effect fails.
