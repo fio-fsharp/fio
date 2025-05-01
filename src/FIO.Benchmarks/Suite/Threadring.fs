@@ -46,7 +46,7 @@ let rec private createThreadring actors rounds timerChan acc = fio {
     match actors with
     | [] -> return! acc
     | ac :: acs ->
-        let newAcc = createActor ac rounds timerChan <!> acc
+        let newAcc = createActor ac rounds timerChan <~> acc
         return! createThreadring acs rounds timerChan newAcc
 }
 
@@ -65,7 +65,7 @@ let rec private createActors chans (allChans: Channel<int> list) index acc =
         createActors chans' allChans (index + 1) (acc @ [actor])
 
 let internal Create config = fio {
-    let (actorCount, rounds) =
+    let actorCount, rounds =
         match config with
         | ThreadringConfig (actors, rounds) -> (actors, rounds)
         | _ -> invalidArg "config" "Threadring benchmark requires a ThreadringConfig!"
@@ -80,7 +80,7 @@ let internal Create config = fio {
         | _ -> invalidArg "actorCount" $"Threadring failed: At least two actors should exist. actorCount = %i{actorCount}"
 
     let acc = createActor second rounds timerChan 
-              <!> createActor first rounds timerChan
+              <~> createActor first rounds timerChan
     let! fiber = !~> (TimerEff actorCount 1 actorCount timerChan)
     let! _ = timerChan <-- MsgChannel first.RecvChan
     do! createThreadring acs rounds timerChan acc

@@ -25,21 +25,22 @@ and private BlockingWorkerConfig =
 and private EvaluationWorker(config: EvaluationWorkerConfig) =
 
     let processWorkItem workItem = task {
-        match! config.Runtime.InternalRunAsync workItem config.EWSteps with
+        match! config.Runtime.InterpretAsync workItem config.EWSteps with
+        // TODO: Can we make this matching more concise? Make a type for it, for example.
         | Success res, _, Evaluated ->
             do! workItem.Complete <| Ok res
         | Failure err, _, Evaluated ->
             do! workItem.Complete <| Error err
         | eff, stack, RescheduleForRunning ->
             do! config.WorkItemChan.AddAsync
-                <| WorkItem.Create eff workItem.IFiber stack RescheduleForRunning
+                <| WorkItem.Create (eff, workItem.IFiber, stack, RescheduleForRunning)
         | eff, stack, RescheduleForBlocking blockingItem ->
             do! config.BlockingWorker.RescheduleForBlocking blockingItem
-                <| WorkItem.Create eff workItem.IFiber stack (RescheduleForBlocking blockingItem)
+                <| WorkItem.Create (eff, workItem.IFiber, stack, RescheduleForBlocking blockingItem)
         | _ ->
             invalidOp "EvaluationWorker: Unexpected state encountered during effect evaluation."
     }
-    
+
     let startWorker () =
         task {
             let mutable loop = true
@@ -133,6 +134,9 @@ and Runtime(config: WorkerConfig) as this =
         createEvaluationWorkers this (List.head blockingWorkers) config.EWSteps config.EWCount
         |> ignore
 
+    override this.Name =
+        "Intermediate"
+
     new() =
         Runtime
             { EWCount =
@@ -142,7 +146,7 @@ and Runtime(config: WorkerConfig) as this =
               EWSteps = 100 }
 
     [<TailCall>]
-    member internal this.InternalRunAsync (workItem: WorkItem) evalSteps =
+    member internal this.InterpretAsync (workItem: WorkItem) evalSteps =
         let mutable currentEff = workItem.Eff
         let mutable currentContStack = workItem.Stack
         let mutable currentPrevAction = workItem.PrevAction
@@ -215,7 +219,7 @@ and Runtime(config: WorkerConfig) as this =
                             result <- Some (ReceiveChan chan, currentContStack, newPrevAction)
                     | ConcurrentEffect (eff, fiber, ifiber) ->
                         do! workItemChan.AddAsync
-                            <| WorkItem.Create eff ifiber ContStack.Empty currentPrevAction
+                            <| WorkItem.Create (eff, ifiber, ContStack.Empty, currentPrevAction)
                         handleSuccess fiber
                     | ConcurrentTask (task, onError, fiber, ifiber) ->
                         task.ContinueWith((fun (t: Task<obj>) ->
@@ -263,9 +267,6 @@ and Runtime(config: WorkerConfig) as this =
     override this.Run (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
         let fiber = Fiber<'R, 'E>()
         workItemChan.AddAsync
-        <| WorkItem.Create (eff.Upcast()) (fiber.ToInternal()) ContStack.Empty Evaluated
+        <| WorkItem.Create (eff.Upcast(), fiber.ToInternal(), ContStack.Empty, Evaluated)
         |> ignore
         fiber
-
-    override this.Name () =
-        "Intermediate"

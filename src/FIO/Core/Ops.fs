@@ -7,6 +7,8 @@
 [<AutoOpen>]
 module FIO.Core.Ops
 
+open System.Threading.Tasks
+
 /// An alias for `Succeed` which succeeds immediately with the result.
 let inline ( !+ ) (res: 'R) : FIO<'R, 'E> =
     FIO.Succeed res
@@ -15,11 +17,11 @@ let inline ( !+ ) (res: 'R) : FIO<'R, 'E> =
 let inline ( !- ) (err: 'E) : FIO<'R, 'E> =
     FIO.Fail err
 
-// TODO: Add alias.
+/// An alias for 'FromFunc' which succeeds with the result of a function and applies error handling if necessary.
 let inline ( !<<< ) (func: unit -> 'R) (onError: exn -> 'E) =
     FIO.FromFunc<'R, 'E> (func, onError)
     
-// TODO: Add alias.
+/// An alias for 'FromFunc' which succeeds with the result of a function and fails with Exception.
 let inline ( !<< ) (func: unit -> 'R) =
     FIO.FromFunc<'R, exn> func
 
@@ -75,16 +77,16 @@ let inline ( !!~> ) (eff: FIO<'R, 'E>) : FIO<unit, 'E1> =
 
 /// An alias for `Parallel`, which interprets two effects concurrently and succeeds with a tuple of their results when both complete.
 /// If either effect fails, the error is immediately returned.
-let inline ( <*> ) (eff: FIO<'R, 'E>) (eff': FIO<'R1, 'E>) : FIO<'R * 'R1, 'E> =
+let inline ( <!> ) (eff: FIO<'R, 'E>) (eff': FIO<'R1, 'E>) : FIO<'R * 'R1, 'E> =
     eff.Parallel eff'
 
 /// An alias for `Parallel`, which interprets two effects concurrently and succeeds with `unit` when completed.
 /// If either effect fails, the error is immediately returned.
-let inline ( <!> ) (eff: FIO<'R, 'E>) (eff': FIO<'R1, 'E>) : FIO<unit, 'E> =
+let inline ( <~> ) (eff: FIO<'R, 'E>) (eff': FIO<'R1, 'E>) : FIO<unit, 'E> =
     eff.Parallel eff' |> _.Then <| FIO.Succeed ()
 
 /// An alias for `ParallelError`, which interprets two effects concurrently and succeeds with a tuple of their errors when both fail.
-let inline ( <?> ) (eff: FIO<'R, 'E>) (eff': FIO<'R, 'E1>) : FIO<'R, 'E * 'E1> =
+let inline ( <!!> ) (eff: FIO<'R, 'E>) (eff': FIO<'R, 'E1>) : FIO<'R, 'E * 'E1> =
     eff.ParallelError eff'
 
 /// An alias for `Await`, which waits for the result of the given fiber and succeeds with it.
@@ -102,6 +104,18 @@ let inline ( !!<~~ ) (fiber: Fiber<'R, 'E>) : FIO<unit, 'E> =
 /// An alias for `Await`, which waits for the completion of the fiber and returns `unit`.
 let inline ( !!~~> ) (fiber: Fiber<'R, 'E>) : FIO<unit, 'E> =
     fiber.Await().Then <| FIO.Succeed ()
+
+let inline ( !<<~ ) (task: Task) (onError: exn -> 'E) =
+    FIO.AwaitTask<unit, 'E> (task, onError)
+
+let inline ( !!<<~ ) (task: Task)=
+    FIO.AwaitTask<unit, exn> task
+
+let inline ( !<<~~ ) (task: Task<'R>) (onError: exn -> 'E) =
+    FIO.AwaitGenericTask<'R, 'E> (task, onError)
+
+let inline ( !!<<~~ ) (task: Task<'R>) =
+    FIO.AwaitGenericTask<'R, exn> task
 
 /// An alias for `FlatMap`, which chains the success result of the effect to the continuation function.
 let inline ( >>= ) (eff: FIO<'R, 'E>) (cont: 'R -> FIO<'R1, 'E>) : FIO<'R1, 'E> =
@@ -154,12 +168,12 @@ let inline ( ?<< ) (eff: FIO<'R, 'E1>) (eff': FIO<'R, 'E>) : FIO<'R, 'E1> =
 // TODO: What is the Haskell symbol for this?
 /// An alias for `Apply`, which combines two effects: one producing a function and the other a value, 
 /// and applies the function to the value.
-let inline ( <|> ) (eff: FIO<'R, 'E>) (eff': FIO<'R -> 'R1, 'E>) : FIO<'R1, 'E> =
+let inline ( <*> ) (eff: FIO<'R, 'E>) (eff': FIO<'R -> 'R1, 'E>) : FIO<'R1, 'E> =
     eff.Apply eff'
 
 /// An alias for `ApplyError`, which combines two effects: one producing a function and the other a value, 
 /// and applies the function to the value.
-let inline ( <|?> ) (eff: FIO<'R, 'E>) (eff': FIO<'R, 'E -> 'E1>) : FIO<'R, 'E1> =
+let inline ( <**> ) (eff: FIO<'R, 'E>) (eff': FIO<'R, 'E -> 'E1>) : FIO<'R, 'E1> =
     eff.ApplyError eff'
 
 /// An alias for `Zip`, which combines the results of two effects into a tuple when both succeed.
@@ -168,5 +182,5 @@ let inline ( <^> ) (eff: FIO<'R, 'E>) (eff': FIO<'R1, 'E>) : FIO<'R * 'R1, 'E> =
     eff.Zip eff'
 
 /// An alias for `ZipError`, which combines the errors of two effects into a tuple when both fail.
-let inline ( <^?> ) (eff: FIO<'R, 'E>) (eff': FIO<'R, 'E1>) : FIO<'R, 'E * 'E1> =
+let inline ( <^^> ) (eff: FIO<'R, 'E>) (eff': FIO<'R, 'E1>) : FIO<'R, 'E * 'E1> =
     eff.ZipError eff'

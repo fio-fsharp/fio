@@ -44,7 +44,7 @@ and internal WorkItem =
       Stack: ContStack
       PrevAction: RuntimeAction }
 
-    static member internal Create eff ifiber stack prevAction =
+    static member internal Create (eff, ifiber, stack, prevAction) =
         { Eff = eff
           IFiber = ifiber
           Stack = stack
@@ -74,11 +74,10 @@ and internal InternalChannel<'R> internal () =
     
     member internal this.TakeAsync () =
         chan.Reader.ReadAsync().AsTask()
-            .ContinueWith(fun (t: Task<'R>) ->
+            .ContinueWith(fun (task: Task<'R>) ->
                 Interlocked.Decrement &count
                 |> ignore
-                t.Result
-            )
+                task.Result)
 
     member internal this.WaitToReceiveAsync () =
         chan.Reader.WaitToReadAsync().AsTask()
@@ -86,25 +85,25 @@ and internal InternalChannel<'R> internal () =
     member internal this.Count =
         Volatile.Read &count
 
-and internal InternalFiber internal (id: Guid, chan: InternalChannel<Result<obj, obj>>, blockingWorkItemChan: InternalChannel<WorkItem>) =
+and internal InternalFiber internal (id: Guid, resChan: InternalChannel<Result<obj, obj>>, blockingWorkItemChan: InternalChannel<WorkItem>) =
 
     member internal this.Complete res =
-        if chan.Count = 0 then
-            chan.AddAsync res
+        if resChan.Count = 0 then
+            resChan.AddAsync res
         else
             invalidOp "InternalFiber: Complete was called on an already completed InternalFiber!"
     
     member internal this.CompleteAndReschedule res workItemChan =
-        if chan.Count = 0 then
-            chan.AddAsync res |> ignore
+        if resChan.Count = 0 then
+            resChan.AddAsync res |> ignore
             this.RescheduleBlockingWorkItems workItemChan
         else
             invalidOp "InternalFiber: Complete was called on an already completed InternalFiber!"
     
     member internal this.AwaitAsync () = task {
-        let! res = chan.TakeAsync ()
+        let! res = resChan.TakeAsync ()
         // Re-add the result to the queue to allow concurrent awaits
-        do! chan.AddAsync res
+        do! resChan.AddAsync res
         return res
     }
     
@@ -118,7 +117,7 @@ and internal InternalFiber internal (id: Guid, chan: InternalChannel<Result<obj,
     }
 
     member internal this.Completed () =
-        chan.Count > 0
+        resChan.Count > 0
 
     member internal this.BlockingWorkItemsCount () =
         blockingWorkItemChan.Count
@@ -293,7 +292,7 @@ and FIO<'R, 'E> =
         ConcurrentTask (task.ContinueWith(fun _ -> box ()), upcastOnError onError, fiber, fiber.ToInternal())
 
     // Converts a Task into a Fiber with a default onError.
-    static member FromTask (task: Task) : FIO<Fiber<unit, exn>, exn> =
+    static member inline FromTask (task: Task) : FIO<Fiber<unit, exn>, exn> =
         FIO.FromTask<Fiber<unit, exn>, exn> (task, id)
     
     // Converts a generic Task into a Fiber.
@@ -310,7 +309,7 @@ and FIO<'R, 'E> =
         ConcurrentTask (task, upcastOnError onError, fiber, fiber.ToInternal())
 
     // Converts a generic Task into a Fiber with a default onError.        
-    static member FromGenericTask<'R, 'E> (task: Task<'R>) : FIO<Fiber<'R, exn>, exn> =
+    static member inline FromGenericTask<'R, 'E> (task: Task<'R>) : FIO<Fiber<'R, exn>, exn> =
         FIO.FromGenericTask<Fiber<'R, exn>, exn> (task, id)
         
     /// Interprets an effect concurrently and returns the fiber interpreting it.

@@ -15,8 +15,11 @@ open System.Threading.Tasks
 type Runtime() =
     inherit FIORuntime()
 
+    override this.Name =
+        "Native"
+
     [<TailCall>]
-    member private this.InternalRunAsync eff =
+    member private this.InterpretAsync eff =
         let mutable currentEff = eff
         let mutable contStack = []
         let mutable result = None
@@ -80,7 +83,7 @@ type Runtime() =
                     // This runs the task on a separate thread pool.
                     Task.Run(fun () ->
                         task {
-                            let! res = this.InternalRunAsync eff
+                            let! res = this.InterpretAsync eff
                             do! ifiber.Complete res
                         } :> Task
                     )
@@ -127,10 +130,7 @@ type Runtime() =
     override this.Run (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
         let fiber = Fiber<'R, 'E>()
         task {
-            let! res = this.InternalRunAsync <| eff.Upcast()
+            let! res = this.InterpretAsync <| eff.Upcast()
             do! fiber.ToInternal().Complete res
         } |> ignore
         fiber
-
-    override this.Name () =
-        "Native"

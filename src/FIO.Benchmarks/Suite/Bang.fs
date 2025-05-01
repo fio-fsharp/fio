@@ -60,7 +60,7 @@ let rec private createBang recvActor sendActors rounds msg timerChan startChan a
     match sendActors with
     | [] -> return! acc
     | ac :: acs ->
-        let newAcc = createSendActor ac rounds msg timerChan startChan <!> acc
+        let newAcc = createSendActor ac rounds msg timerChan startChan <~> acc
         return! createBang recvActor acs rounds (msg + 1) timerChan startChan newAcc
 }
 
@@ -71,7 +71,7 @@ let private createSendActors recvActorChan actorCount =
         [ 1..actorCount ]
 
 let internal Create config = fio {
-    let (actorCount, rounds) =
+    let actorCount, rounds =
         match config with
         | BangConfig (actors, rounds) -> (actors, rounds)
         | _ -> invalidArg "config" "Bang benchmark requires a BangConfig!"
@@ -91,7 +91,7 @@ let internal Create config = fio {
         | _ -> invalidArg "actorCount" $"createBang failed! (at least 1 sending actor should exist) actorCount = %i{actorCount}"
 
     let acc = createSendActor ac rounds 1 timerChan startChan
-              <!> createRecvActor recvActor (actorCount * rounds) timerChan startChan
+              <~> createRecvActor recvActor (actorCount * rounds) timerChan startChan
     let! timerFiber = !<~ (TimerEff (actorCount + 1) (actorCount + 1) 1 timerChan)
     let! _ = timerChan <-- MsgChannel startChan
     do! createBang recvActor acs rounds 2 timerChan startChan acc

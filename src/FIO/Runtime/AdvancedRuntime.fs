@@ -25,17 +25,17 @@ and private BlockingWorkerConfig =
 and private EvaluationWorker(config: EvaluationWorkerConfig) =
     
     let processWorkItem workItem = task {
-        match! config.Runtime.InternalRunAsync workItem config.EWSteps with
+        match! config.Runtime.InterpretAsync workItem config.EWSteps with
         | Success res, _, Evaluated ->
             do! workItem.CompleteAndReschedule (Ok res) config.WorkItemChan
         | Failure err, _, Evaluated ->
             do! workItem.CompleteAndReschedule (Error err) config.WorkItemChan
         | eff, stack, RescheduleForRunning ->
             do! config.WorkItemChan.AddAsync
-                <| WorkItem.Create eff workItem.IFiber stack RescheduleForRunning
+                <| WorkItem.Create (eff, workItem.IFiber, stack, RescheduleForRunning)
         | eff, stack, RescheduleForBlocking blockingItem ->
             do! config.BlockingWorker.RescheduleForBlocking blockingItem
-                <| WorkItem.Create eff workItem.IFiber stack (RescheduleForBlocking blockingItem)
+                <| WorkItem.Create (eff, workItem.IFiber, stack, RescheduleForBlocking blockingItem)
         | _ ->
             invalidOp "EvaluationWorker: Unexpected state encountered during effect interpretation."
     }
@@ -106,13 +106,13 @@ and Runtime(config: WorkerConfig) as this =
     inherit FIOWorkerRuntime(config)
 
     let workItemChan = InternalChannel<WorkItem>()
-    let blockingItemChan = InternalChannel<BlockingItem>()
+    let blockingItemEventChan = InternalChannel<BlockingItem>()
 
     let createBlockingWorkers count =
         List.init count <| fun _ ->
             new BlockingWorker({
                 WorkItemChan = workItemChan
-                BlockingItemChan = blockingItemChan
+                BlockingItemChan = blockingItemEventChan
             })
 
     let createEvaluationWorkers runtime blockingWorker evalSteps count =
@@ -131,6 +131,9 @@ and Runtime(config: WorkerConfig) as this =
         createEvaluationWorkers this (List.head blockingWorkers) config.EWSteps config.EWCount
         |> ignore
 
+    override this.Name =
+        "Advanced"
+
     new() =
         Runtime
             { EWCount =
@@ -140,7 +143,7 @@ and Runtime(config: WorkerConfig) as this =
               EWSteps = 100 }
 
     [<TailCall>]
-    member internal this.InternalRunAsync (workItem: WorkItem) evalSteps =
+    member internal this.InterpretAsync (workItem: WorkItem) evalSteps =
         let mutable currentEff = workItem.Eff
         let mutable currentContStack = workItem.Stack
         let mutable currentPrevAction = workItem.PrevAction
@@ -200,7 +203,7 @@ and Runtime(config: WorkerConfig) as this =
                             handleError <| onError exn
                     | SendChan (msg, chan) ->
                         do! chan.SendAsync msg
-                        do! blockingItemChan.AddAsync <| BlockingChannel chan
+                        do! blockingItemEventChan.AddAsync <| BlockingChannel chan
                         handleSuccess msg
                     | ReceiveChan chan ->
                         if chan.Count() > 0 then
@@ -212,7 +215,7 @@ and Runtime(config: WorkerConfig) as this =
                             result <- Some (ReceiveChan chan, currentContStack, newPrevAction)
                     | ConcurrentEffect (eff, fiber, ifiber) ->
                         do! workItemChan.AddAsync
-                            <| WorkItem.Create eff ifiber ContStack.Empty currentPrevAction
+                            <| WorkItem.Create (eff, ifiber, ContStack.Empty, currentPrevAction)
                         handleSuccess fiber
                     | ConcurrentTask (task, onError, fiber, ifiber) ->
                         task.ContinueWith((fun (t: Task<obj>) ->
@@ -260,9 +263,6 @@ and Runtime(config: WorkerConfig) as this =
     override this.Run (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
         let fiber = Fiber<'R, 'E>()
         workItemChan.AddAsync
-        <| WorkItem.Create (eff.Upcast()) (fiber.ToInternal()) ContStack.Empty Evaluated
+        <| WorkItem.Create (eff.Upcast(), fiber.ToInternal(), ContStack.Empty, Evaluated)
         |> ignore
         fiber
-
-    override this.Name () =
-        "Advanced"

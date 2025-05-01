@@ -8,7 +8,7 @@
 module FIO.Core.App
 
 open FIO.Runtime
-open FIO.Runtime.Advanced
+open FIO.Runtime.Intermediate
 
 open System
 open System.Threading
@@ -57,18 +57,18 @@ type FIOApp<'R, 'E> (onSuccess: 'R -> Task<unit>, onError: 'E -> Task<unit>, run
 
     static member Run (eff: FIO<'R, 'E>) =
         let fiber = defaultRuntime.Run eff
-        let t = defaultFiberHandler fiber
-        t.Wait()
+        let task = defaultFiberHandler fiber
+        task.Wait()
 
     member this.Run () =
         this.Run runtime
 
     member this.Run runtime =
         let fiber = runtime.Run this.effect
-        let t = fiberHandler fiber
-        t.Wait()
+        let task = fiberHandler fiber
+        task.Wait()
 
     member this.Run (onSuccess: 'R -> 'F, onError: 'E -> 'F) =
         let fiber = runtime.Run this.effect
-        let t = mergeFiber onSuccess onError fiber
-        t.Wait()
+        let task = mergeFiber onSuccess onError fiber
+        task.Wait()
