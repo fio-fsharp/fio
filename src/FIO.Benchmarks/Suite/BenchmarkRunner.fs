@@ -25,6 +25,8 @@ let private writeResultToCsv result savePath =
             .Replace(")", "")
             .Replace(":", "")
             .Replace(" ", "-")
+            .Replace(",", "")
+            .Replace(".", "")
     let folderName = $"%s{benchName}-runs-%s{result.Times.Length.ToString()}"
     let dirPath = savePath + folderName + @"\" + result.RuntimeFileName.ToLower()
 
@@ -36,7 +38,7 @@ let private writeResultToCsv result savePath =
     let fileName = $"""{folderName}-{result.RuntimeFileName.ToLower()}-{DateTime.Now.ToString("dd_MM_yyyy-HH-mm-ss")}.csv"""
     let filePath = dirPath + @"\" + fileName
 
-    File.WriteAllText(filePath, "Time" + "\n" + csvContent result.Times "")
+    File.WriteAllText(filePath, "Execution Time (ms)\n" + csvContent result.Times "")
     printfn $"\nSaved benchmark results to file: '%s{filePath}'"
 
 let private printResult result =
@@ -79,8 +81,10 @@ let private runBenchmark (runtime: FIORuntime) totalRuns (config: BenchmarkConfi
             #if DEBUG
             printfn $"[DEBUG]: Executing benchmark: Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Current run (%i{thisRun}/%i{totalRuns})"
             #endif
-            let res = runtime.Run(eff).AwaitResult()
+            let res = runtime.Run(eff).AwaitAsync()
             let time =
+                res.Wait()
+                let res = res.Result
                 match res with
                 | Ok time -> time
                 | Error err -> invalidOp $"BenchmarkRunner: Failed executing benchmark with error: %A{err}"

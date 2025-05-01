@@ -52,7 +52,7 @@ and private createRecvPings actor rounds recvCount msg timerChan = fio {
                 printfn $"DEBUG: %s{actor.Name} sent pong: %i{pong}"
                 #endif
                 ()
-            | Ping (_, _) -> invalidOp "createRecvPings: Received ping when pong was expected!"
+            | Ping _ -> invalidOp "createRecvPings: Received ping when pong was expected!"
             return! createRecvPings actor rounds (recvCount - 1) ping timerChan
         | _ ->
             invalidOp "createRecvPings: Received pong when ping was expected!"
@@ -118,12 +118,12 @@ let rec private createBig actors rounds msg timerChan startChan acc = fio {
     match actors with
     | [] -> return! acc
     | ac :: acs ->
-        let acc = createActor ac msg rounds timerChan startChan <!> acc
+        let acc = createActor ac msg rounds timerChan startChan <~> acc
         return! createBig acs rounds (msg + 10) timerChan startChan acc
 }
 
 let internal Create config = fio {
-    let (actorCount, rounds) =
+    let actorCount, rounds =
         match config with
         | BigConfig (actors, rounds) -> (actors, rounds)
         | _ -> invalidArg "config" "Big benchmark requires a BigConfig!"
@@ -139,7 +139,7 @@ let internal Create config = fio {
         | _ -> invalidArg "actorCount" $"createBig failed! (at least 2 actors should exist) actorCount = %i{actorCount}"
 
     let acc = createActor firstActor (actorCount - 2) rounds timerChan startChan
-              <!> createActor secondActor (actorCount - 1) rounds timerChan startChan
+              <~> createActor secondActor (actorCount - 1) rounds timerChan startChan
 
     let! timerFiber = !~> (TimerEff actorCount actorCount actorCount timerChan)
     let! _ = timerChan <-- MsgChannel startChan

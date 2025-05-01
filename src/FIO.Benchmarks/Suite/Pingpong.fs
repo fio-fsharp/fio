@@ -86,7 +86,7 @@ let internal Create config = fio {
 
     let! timerFiber = !<~ (TimerEff 1 0 1 timerChan)
     do! createPinger pinger rounds startChan timerChan
-        <!> createPonger ponger rounds startChan
+        <~> createPonger ponger rounds startChan
     let! res = !<~~ timerFiber
     return res
 }

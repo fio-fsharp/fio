@@ -11,6 +11,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FIO.Examples", "FIO.Example
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FIO.Tests", "FIO.Tests\FIO.Tests.fsproj", "{C268093D-D055-4DDF-BD0D-B9499E92CED1}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FIO.Benchmarks.Plots", "FIO.Benchmarks.Plots\FIO.Benchmarks.Plots.fsproj", "{D78AF381-23DA-4394-867D-ACD4EE705B03}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{C268093D-D055-4DDF-BD0D-B9499E92CED1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C268093D-D055-4DDF-BD0D-B9499E92CED1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C268093D-D055-4DDF-BD0D-B9499E92CED1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D78AF381-23DA-4394-867D-ACD4EE705B03}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D78AF381-23DA-4394-867D-ACD4EE705B03}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D78AF381-23DA-4394-867D-ACD4EE705B03}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D78AF381-23DA-4394-867D-ACD4EE705B03}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

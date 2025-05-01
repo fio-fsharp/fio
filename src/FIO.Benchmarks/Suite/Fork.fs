@@ -21,7 +21,7 @@ let rec private createFork actorCount timerChan acc = fio {
     match actorCount with
     | 0 -> return! acc
     | count ->
-        let newAcc = createActor timerChan <!> acc
+        let newAcc = createActor timerChan <~> acc
         return! createFork (count - 1) timerChan newAcc
 }
 

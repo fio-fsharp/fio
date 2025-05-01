@@ -458,3 +458,4 @@ Scripts/
 ### CUSTOM ###
 .ionide
 .config
+/src/FIO.Benchmarks/data

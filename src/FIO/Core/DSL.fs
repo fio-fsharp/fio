@@ -7,8 +7,18 @@
 [<AutoOpen>]
 module FIO.Core.DSL
 
+open System
 open System.Threading
-open System.Collections.Concurrent
+open System.Threading.Tasks
+open System.Threading.Channels
+
+[<AutoOpen>]
+module private Utils =
+    let inline upcastOnError (onError: exn -> 'E) : (exn -> obj) =
+        fun (exn: exn) -> onError exn :> obj
+
+    let inline upcastFunc (func: unit -> 'R) : unit -> obj =
+        fun () -> func () :> obj
 
 type internal Cont =
     obj -> FIO<obj, obj>
@@ -23,13 +33,14 @@ and internal ContStackFrame =
 and internal ContStack =
     ContStackFrame list
 
-and internal BlockingQueue<'T> =
-    BlockingCollection<'T>
-
 and internal RuntimeAction =
     | RescheduleForRunning
     | RescheduleForBlocking of BlockingItem
     | Evaluated
+
+and internal BlockingItem =
+    | BlockingChannel of Channel<obj>
+    | BlockingIFiber of InternalFiber
 
 and internal WorkItem =
     { Eff: FIO<obj, obj>
@@ -37,128 +48,205 @@ and internal WorkItem =
       Stack: ContStack
       PrevAction: RuntimeAction }
 
-    static member internal Create eff ifiber stack prevAction =
+    static member internal Create (eff, ifiber, stack, prevAction) =
         { Eff = eff
           IFiber = ifiber
           Stack = stack
           PrevAction = prevAction }
 
-    member internal this.Complete res =
+    member internal this.Complete res : Task<unit> =
         this.IFiber.Complete res
 
-and internal BlockingItem =
-    | BlockingChannel of Channel<obj>
-    | BlockingIFiber of InternalFiber
+    member internal this.CompleteAndReschedule res workItemChan : Task<unit> =
+        this.IFiber.CompleteAndReschedule res workItemChan
 
-and internal InternalFiber internal (resQueue: BlockingQueue<Result<obj, obj>>, blockingWorkItemQueue: BlockingQueue<WorkItem>) =
+and internal InternalChannel<'R> (id: Guid) =
+    let chan = Channel.CreateUnbounded<'R>()
+    let mutable count = 0
+    
+    new() = InternalChannel (Guid.NewGuid())
 
-    // Use semaphore instead?
-    member internal this.Complete res =
-        if resQueue.Count = 0 then
-            resQueue.Add res
+    member internal this.AddAsync (msg: 'R) : Task<unit> =
+        (chan.Writer.WriteAsync msg)
+            .AsTask()
+            .ContinueWith(fun _ ->
+                Interlocked.Increment &count
+                |> ignore
+                Task.FromResult ())
+            .Unwrap()
+    
+    member internal this.TakeAsync () : Task<'R> =
+        chan.Reader.ReadAsync()
+            .AsTask()
+            .ContinueWith(fun (task: Task<'R>) ->
+                Interlocked.Decrement &count
+                |> ignore
+                task.Result)
+
+    member internal this.WaitToReceiveAsync () : Task<bool> =
+        chan.Reader.WaitToReadAsync().AsTask()
+
+    member internal this.Count : int =
+        Volatile.Read &count
+
+    member internal this.Id : Guid =
+        id
+
+and internal InternalFiber
+    (id: Guid,
+     resChan: InternalChannel<Result<obj, obj>>,
+     blockingWorkItemChan: InternalChannel<WorkItem>) =
+
+    let completeAlreadyCalledFail () =
+        invalidOp $"InternalFiber: Complete was called on an already
+            completed InternalFiber! Result channel count: %i{resChan.Count}"
+
+    member internal this.Complete res : Task<unit> =
+        if resChan.Count = 0 then
+            resChan.AddAsync res
         else
-            invalidOp "InternalFiber: Complete was called on an already completed InternalFiber!"
+            completeAlreadyCalledFail ()
+    
+    member internal this.CompleteAndReschedule res workItemChan : Task<unit> =
+        if resChan.Count = 0 then
+            resChan.AddAsync res |> ignore
+            this.RescheduleBlockingWorkItems workItemChan
+        else
+            completeAlreadyCalledFail ()
 
-    member internal this.AwaitResult () =
-        let res = resQueue.Take ()
-        // Re-add the result to the queue to allow concurrent awaits
-        resQueue.Add res
-        res
+    member internal this.AwaitAsync () : Task<Result<obj, obj>> =
+        task {
+            let! res = resChan.TakeAsync ()
+            // Re-add the result to the channel to allow concurrent awaits
+            // (the channel is never depleted)
+            do! resChan.AddAsync res
+            return res
+        }
+    
+    member internal this.AddBlockingWorkItem workItem : Task<unit> =
+        blockingWorkItemChan.AddAsync workItem
 
-    member internal this.Completed () =
-        resQueue.Count > 0
+    member internal this.Completed () : bool =
+        resChan.Count > 0
 
-    member internal this.AddBlockingWorkItem workItem =
-        blockingWorkItemQueue.Add workItem
+    member internal this.Id : Guid =
+        id
 
-    member internal this.RescheduleBlockingWorkItems (workItemQueue: BlockingQueue<WorkItem>) =
-        while blockingWorkItemQueue.Count > 0 do
-            workItemQueue.Add <| blockingWorkItemQueue.Take ()
+    member private this.RescheduleBlockingWorkItems (activeWorkItemChan: InternalChannel<WorkItem>) : Task<unit> =
+        task {
+            while blockingWorkItemChan.Count > 0 do
+                let! workItem = blockingWorkItemChan.TakeAsync ()
+                do! activeWorkItemChan.AddAsync workItem
+        }
 
-    member internal this.BlockingWorkItemsCount () =
-        blockingWorkItemQueue.Count
-
-/// A Fiber is a construct that represents a lightweight-thread. Fibers are used to interpret multiple effects in parallel and
+/// A Fiber is a construct that represents a lightweight-thread.
+/// Fibers are used to interpret multiple effects in parallel and
 /// can be awaited to retrieve the result of the effect.
-and Fiber<'R, 'E> private (resQueue: BlockingQueue<Result<obj, obj>>, blockingWorkItemQueue: BlockingQueue<WorkItem>) =
+and Fiber<'R, 'E> private
+    (id: Guid,
+     resChan: InternalChannel<Result<obj, obj>>,
+     blockingWorkItemChan: InternalChannel<WorkItem>) =
 
-    new() = Fiber(new BlockingQueue<Result<obj, obj>>(), new BlockingQueue<WorkItem>())
+    let ifiber = InternalFiber (id, resChan, blockingWorkItemChan)
+
+    new() = Fiber(Guid.NewGuid(), InternalChannel<Result<obj, obj>>(), InternalChannel<WorkItem>())
 
     /// Creates an effect that waits for the fiber and succeeds with its result.
     member this.Await () : FIO<'R, 'E> =
-        Await <| this.ToInternal ()
+        AwaitFiber ifiber
 
     /// Waits for the fiber and succeeds with its result.
-    member this.AwaitResult () =
-        let res = resQueue.Take ()
-        // Re-add the result to the queue to allow concurrent awaits
-        resQueue.Add res
-        match res with
-        | Ok res -> Ok (res :?> 'R)
-        | Error err -> Error (err :?> 'E)
+    member this.AwaitAsync () : Task<Result<'R, 'E>> =
+        task {
+            match! ifiber.AwaitAsync() with
+            | Ok res -> return Ok (res :?> 'R)
+            | Error err -> return Error (err :?> 'E)
+        }
 
-    member internal this.ToInternal () =
-        InternalFiber(resQueue, blockingWorkItemQueue)
+    member this.Id : Guid =
+        id
 
-/// A channel represents a communication queue that holds data of the type 'R. Data can be both be sent and
+     member internal this.Internal : InternalFiber =
+        ifiber
+ 
+/// A channel represents a communication queue that holds
+/// data of the type 'R. Data can be both be sent and
 /// received (blocking) on a channel.
-and Channel<'R> private (resQueue: BlockingQueue<obj>, blockingWorkItemQueue: BlockingQueue<WorkItem>, dataCounter: int64 ref) =
+and Channel<'R> private
+    (id: Guid,
+     resChan: InternalChannel<obj>,
+     blockingWorkItemChan: InternalChannel<WorkItem>,
+     count: int64 ref) =
 
-    new() = Channel(new BlockingQueue<obj>(), new BlockingQueue<WorkItem>(), ref 0)
+    new() = Channel(Guid.NewGuid(), InternalChannel<obj>(), InternalChannel<WorkItem>(), ref 0)
 
     /// Send puts the message on the channel and succeeds with the message.
     member this.Send msg : FIO<'R, 'E> =
-        Send (msg, this)
+        SendChan (msg, this)
 
     /// Receive retrieves a message from the channel and succeeds with it.
     member this.Receive () : FIO<'R, 'E> =
-        Receive this
+        ReceiveChan this
 
-    member this.Count () =
-        resQueue.Count
+    member this.Count : int =
+        resChan.Count
+        
+    member this.Id : Guid =
+        id
 
-    member internal this.Add (msg: 'R) =
-        Interlocked.Increment dataCounter |> ignore
-        resQueue.Add msg
+    member internal this.SendAsync (msg: 'R) : Task<unit> =
+        Interlocked.Increment count
+        |> ignore
+        resChan.AddAsync msg
 
-    member internal this.Take () =
-        resQueue.Take() :?> 'R
+    member internal this.ReceiveAsync () : Task<'R> =
+        task {
+            let! res = resChan.TakeAsync()
+            return res :?> 'R
+        }
 
-    member internal this.AddBlockingWorkItem workItem =
-        blockingWorkItemQueue.Add workItem
+    member internal this.AddBlockingWorkItem workItem : Task<unit> =
+        blockingWorkItemChan.AddAsync workItem
 
-    member internal this.RescheduleBlockingWorkItems (workItemQueue: BlockingQueue<WorkItem>) =
-        if blockingWorkItemQueue.Count > 0 then
-            workItemQueue.Add <| blockingWorkItemQueue.Take ()
+    member internal this.RescheduleNextBlockingWorkItem (activeWorkItemChan: InternalChannel<WorkItem>) : Task<unit> =
+        task {
+            if blockingWorkItemChan.Count > 0 then
+                let! workItem = blockingWorkItemChan.TakeAsync()
+                do! activeWorkItemChan.AddAsync workItem
+        }
 
-    member internal this.HasBlockingWorkItems () =
-        blockingWorkItemQueue.Count > 0
+    member internal this.BlockingWorkItemCount : int =
+        blockingWorkItemChan.Count
 
-    member internal this.UseAvailableData () =
-        Interlocked.Decrement dataCounter |> ignore
+    member internal this.UseAvailableData () : unit =
+        Interlocked.Decrement count
+        |> ignore
 
-    member internal this.DataAvailable () =
-        let mutable temp = dataCounter.Value
-        Interlocked.Read &temp > 0
+    member internal this.HasDataAvailable () : bool =
+        let value = count.Value
+        Interlocked.Read &value > 0
 
-    member internal this.Upcast () =
-        Channel<obj>(resQueue, blockingWorkItemQueue, dataCounter)
+    member internal this.Upcast () : Channel<obj> =
+        Channel<obj> (id, resChan, blockingWorkItemChan, count)
 
 and channel<'R> = Channel<'R>
 
 /// Builds a functional effect that can either succeed
-/// with a result or fail with an error when interpreted.
+/// with a result or fail with an error when interpreted
+/// by a runtime.
 and FIO<'R, 'E> =
     internal
     | Success of res: 'R
     | Failure of err: 'E
-    | Action of func: (unit -> Result<'R, 'E>)
-    | Send of msg: 'R * chan: Channel<'R>
-    | Receive of chan: Channel<'R>
-    | Concurrent of eff: FIO<obj, obj> * fiber: obj * ifiber: InternalFiber
-    | Await of ifiber: InternalFiber
+    | Action of func: (unit -> 'R) * onError: (exn -> 'E)
+    | SendChan of msg: 'R * chan: Channel<'R>
+    | ReceiveChan of chan: Channel<'R>
+    | ConcurrentEffect of eff: FIO<obj, obj> * fiber: obj * ifiber: InternalFiber
+    | ConcurrentTask of task: Task<obj> * onError: (exn -> 'E) * fiber: obj * ifiber: InternalFiber
+    | AwaitFiber of ifiber: InternalFiber
+    | AwaitGenericTPLTask of task: Task<obj> * onError: (exn -> 'E)
     | ChainSuccess of eff: FIO<obj, 'E> * cont: (obj -> FIO<'R, 'E>)
-    | ChainError of eff: FIO<obj, obj> * cont: (obj -> FIO<'R, 'E>)
+    | ChainError of eff: FIO<'R, obj> * cont: (obj -> FIO<'R, 'E>)
 
     /// Succeeds immediately with the result.
     static member Succeed res : FIO<'R, 'E> =
@@ -169,20 +257,24 @@ and FIO<'R, 'E> =
         Failure err
 
     /// Converts a function into an effect.
-    static member FromFunc (func: unit -> Result<'R, 'E>) : FIO<'R, 'E> =
-        Action func
+    static member FromFunc<'R, 'E> (func: unit -> 'R, onError: exn -> 'E) : FIO<'R, 'E> =
+        Action (func, onError)
 
-    /// Converts an Option into an effect.
-    static member inline FromOption (opt: Option<'R>) (err: 'E) : FIO<'R, 'E> =
-        match opt with
-        | Some res -> FIO.Succeed res
-        | None -> FIO.Fail err
+    /// Converts a function into an effect with a default onError.
+    static member inline FromFunc<'R, 'E> (func: unit -> 'R) : FIO<'R, exn> =
+        FIO.FromFunc<'R, exn> (func, id)
 
     /// Converts a Result into an effect.
     static member inline FromResult (res: Result<'R, 'E>) : FIO<'R, 'E> =
         match res with
         | Ok res -> FIO.Succeed res
         | Error err -> FIO.Fail err
+    
+    /// Converts an Option into an effect.
+    static member inline FromOption (opt: Option<'R>) (onNone: unit -> 'E) : FIO<'R, 'E> =
+        match opt with
+        | Some res -> FIO.Succeed res
+        | None -> FIO.Fail <| onNone ()
 
     /// Converts a Choice into an effect.
     static member inline FromChoice (choice: Choice<'R, 'E>) : FIO<'R, 'E> =
@@ -190,102 +282,138 @@ and FIO<'R, 'E> =
         | Choice1Of2 res -> FIO.Succeed res
         | Choice2Of2 err -> FIO.Fail err
 
-    /// Converts an Async computation into an effect.
-    static member inline FromAsync (async: Async<'R>) : FIO<'R, exn> =
-        FIO.FromFunc <| fun () ->
-            match async |> Async.Catch |> Async.RunSynchronously with
-            | Choice1Of2 res -> Ok res
-            | Choice2Of2 err -> Error err
+    /// Awaits a Task and turns it into an effect.
+    static member AwaitTask<'R, 'E> (task: Task, onError: exn -> 'E) : FIO<unit, 'E> =
+        AwaitGenericTPLTask (task.ContinueWith(fun _ -> box ()), onError)
+
+    /// Awaits a Task and turns it into an effect with a default onError.
+    static member inline AwaitTask<'R, 'E> (task: Task) : FIO<unit, exn> =
+        FIO.AwaitTask<unit, exn> (task, id)
+
+    /// Awaits a generic Task and turns it into an effect.
+    static member AwaitGenericTask<'R, 'E> (task: Task<'R>, onError: exn -> 'E) : FIO<'R, 'E> =
+        let task = task.ContinueWith(fun (outerTask: Task<'R>) ->
+                    if outerTask.IsFaulted then
+                        Task.FromException<obj> (outerTask.Exception.GetBaseException())
+                    elif outerTask.IsCanceled then
+                        Task.FromCanceled<obj> CancellationToken.None
+                    else 
+                        Task.FromResult (box outerTask.Result)
+                   ).Unwrap()
+        AwaitGenericTPLTask (task, onError)
+
+    /// Awaits a generic Task and turns it into an effect with a default onError.
+    static member inline AwaitGenericTask<'R, 'E> (task: Task<'R>) : FIO<'R, exn> =
+        FIO.AwaitGenericTask<'R, exn> (task, id)
+
+    /// Awaits an Async computation and turns it into an effect.
+    static member inline AwaitAsync<'R, 'E> (async: Async<'R>, onError: exn -> 'E) : FIO<'R, 'E>  =
+        FIO.AwaitGenericTask<'R, 'E> (Async.StartAsTask async, onError)
+
+    /// Awaits an Async computation and turns it into an effect with a default onError.
+    static member inline AwaitAsync<'R, 'E> (async: Async<'R>) : FIO<'R, exn> =
+        FIO.AwaitAsync<'R, exn> (async, id)
+
+    // Converts a Task into a Fiber.
+    static member FromTask<'R, 'E> (task: Task, onError: exn -> 'E) : FIO<Fiber<unit, exn>, 'E> =
+        let fiber = Fiber<unit, exn>()
+        ConcurrentTask (task.ContinueWith(fun _ -> box ()), onError, fiber, fiber.Internal)
+
+    // Converts a Task into a Fiber with a default onError.
+    static member inline FromTask<'R, 'E> (task: Task) : FIO<Fiber<unit, exn>, exn> =
+        FIO.FromTask<Fiber<unit, exn>, exn> (task, id)
+    
+    // Converts a generic Task into a Fiber.
+    static member FromGenericTask<'R, 'E> (task: Task<'R>, onError: exn -> 'E) : FIO<Fiber<'R, exn>, 'E> =
+        let fiber = Fiber<'R, exn>()
+        let task = task.ContinueWith(fun (outerTask: Task<'R>) ->
+                    if outerTask.IsFaulted then
+                        Task.FromException<obj> (outerTask.Exception.GetBaseException())
+                    elif outerTask.IsCanceled then
+                        Task.FromCanceled<obj> CancellationToken.None
+                    else 
+                        Task.FromResult (box outerTask.Result)
+                   ).Unwrap()
+        ConcurrentTask (task, onError, fiber, fiber.Internal)
+
+    // Converts a generic Task into a Fiber with a default onError.        
+    static member inline FromGenericTask<'R, 'E> (task: Task<'R>) : FIO<Fiber<'R, exn>, exn> =
+        FIO.FromGenericTask<Fiber<'R, exn>, exn> (task, id)
+        
+    /// Interprets an effect concurrently and returns the fiber interpreting it.
+    /// The fiber can be awaited for the result of the effect.
+    member this.Fork () : FIO<Fiber<'R, 'E>, 'E1> =
+        let fiber = new Fiber<'R, 'E>()
+        ConcurrentEffect (this.Upcast(), fiber, fiber.Internal)
 
     /// Binds a continuation to the result of an effect.
     /// If the effect fails, the error is immediately returned.
-    member this.FlatMap (cont: 'R -> FIO<'R1, 'E>) : FIO<'R1, 'E> =
+    member this.Bind (cont: 'R -> FIO<'R1, 'E>) : FIO<'R1, 'E> =
         ChainSuccess (this.UpcastResult(), fun res -> cont (res :?> 'R))
 
     /// Binds a continuation to the error of an effect.
-    /// If the effect succeeds, the result is immediately returned.
-    member this.FlapMapError (cont: 'E -> FIO<'R, 'E1>) : FIO<'R, 'E1> =
-        ChainError (this.Upcast(), fun err -> cont (err :?> 'E))
+    /// If the effect succeeds, the result is immediately returned.       
+    member this.BindError (cont: 'E -> FIO<'R, 'E1>) : FIO<'R, 'E1> =
+        ChainError (this.UpcastError(), fun err -> cont (err :?> 'E))
 
     /// Maps a function over the result of an effect.
     member inline this.Map (cont: 'R -> 'R1) : FIO<'R1, 'E> =
-        this.FlatMap <| fun res ->
+        this.Bind <| fun res ->
             FIO.Succeed <| cont res
 
     // Maps a function over the error of an effect.
     member inline this.MapError (cont: 'E -> 'E1) : FIO<'R, 'E1> =
-        this.FlapMapError <| fun err ->
+        this.BindError <| fun err ->
             FIO.Fail <| cont err
 
     /// Sequences two effects, ignoring the result of the first effect.
     /// If the first effect fails, the error is immediately returned.
     member inline this.Then (eff: FIO<'R1, 'E>) : FIO<'R1, 'E> =
-        this.FlatMap <| fun _ -> eff
+        this.Bind <| fun _ -> eff
 
     /// Sequences two effects, ignoring the error of the first effect.
     /// If the first effect succeeds, the result is immediately returned.
     member inline this.ThenError (eff: FIO<'R, 'E1>) : FIO<'R, 'E1> =
-        this.FlapMapError <| fun _ -> eff
+        this.BindError <| fun _ -> eff
 
     /// Combines two effects: one produces a result function and the other produces a result value.
     /// The function is applied to the value, and the result is returned.
     /// Errors are immediately returned if any effect fails.
     member inline this.Apply (eff: FIO<'R -> 'R1, 'E>) : FIO<'R1, 'E> =
-        eff.FlatMap <| fun func ->
-            this.Map func
+        eff.Bind <| this.Map
 
     /// Combines two effects: one produces an error function and the other produces an error value.
     /// The function is applied to the value, and the error is returned.
     member inline this.ApplyError (eff: FIO<'R, 'E -> 'E1>) : FIO<'R, 'E1> =
-        eff.FlapMapError <| fun func ->
-            this.MapError func
+        eff.BindError <| this.MapError
 
     /// Combines two effects and succeeds with a tuple of their results when both complete.
     /// Errors are immediately returned if any effect fails.
     member inline this.Zip (eff: FIO<'R1, 'E>) : FIO<'R * 'R1, 'E> =
-        this.FlatMap <| fun res ->
-            eff.FlatMap <| fun res' ->
+        this.Bind <| fun res ->
+            eff.Bind <| fun res' ->
                 FIO.Succeed (res, res')
 
     /// Combines two effects and succeeds with a tuple of their errors when both complete.
     member inline this.ZipError (eff: FIO<'R, 'E1>) : FIO<'R, 'E * 'E1> =
-        this.FlapMapError <| fun err ->
-            eff.FlapMapError <| fun err' ->
+        this.BindError <| fun err ->
+            eff.BindError <| fun err' ->
                 FIO.Fail (err, err')
-
-    /// Interprets an effect concurrently and returns the fiber that is interpreting it.
-    /// The fiber can be awaited for the result of the effect.
-    member this.Fork () : FIO<Fiber<'R, 'E>, 'E1> =
-        let fiber = new Fiber<'R, 'E>()
-        Concurrent (this.Upcast(), fiber, fiber.ToInternal())
 
     /// Interprets two effects concurrently and succeeds with a tuple of their results when both complete.
     /// If either effect fails, the error is immediately returned.
     member inline this.Parallel (eff: FIO<'R1, 'E>) : FIO<'R * 'R1, 'E> =
-        eff.Fork().FlatMap <| fun fiber ->
-            this.FlatMap <| fun res ->
-                fiber.Await().FlatMap <| fun res' ->
+        eff.Fork().Bind <| fun fiber ->
+            this.Bind <| fun res ->
+                fiber.Await().Bind <| fun res' ->
                      FIO.Succeed (res, res')
 
     /// Interprets two effects concurrently and succeeds with a tuple of their errors when both complete.
     member inline this.ParallelError (eff: FIO<'R, 'E1>) : FIO<'R, 'E * 'E1> =
-        eff.Fork().FlatMap <| fun fiber ->
-            this.FlapMapError <| fun err ->
-                fiber.Await().FlapMapError <| fun err' ->
+        eff.Fork().Bind <| fun fiber ->
+            this.BindError <| fun err ->
+                fiber.Await().BindError <| fun err' ->
                     FIO.Fail (err, err')
-
-    /// Interprets two effects concurrently and succeeds with the result of the first effect that completes.
-    /// If both effects fail, the first error is returned.
-    member this.Race (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
-        let chan = new Channel<Result<'R, 'E>>()
-        let interpret (eff: FIO<'R, 'E>) (chan: Channel<Result<'R, 'E>>) =
-            eff.Fork().FlatMap <| fun fiber ->
-                chan.Add <| fiber.AwaitResult()
-                FIO.Succeed ()
-        (interpret this chan).Parallel (interpret eff chan) |> _.Then <|
-        match chan.Take() with
-        | Ok res -> FIO.Succeed res
-        | Error err -> FIO.Fail err
 
     member internal this.UpcastResult () : FIO<obj, 'E> =
         match this with
@@ -293,23 +421,24 @@ and FIO<'R, 'E> =
             Success (res :> obj)
         | Failure err ->
             Failure err
-        | Action func ->
-            Action <| fun () ->
-            match func () with
-            | Ok res -> Ok (res :> obj)
-            | Error err -> Error err
-        | Send (msg, chan) ->
-            Send (msg :> obj, chan.Upcast())
-        | Receive chan ->
-            Receive <| chan.Upcast()
-        | Concurrent (eff, fiber, ifiber) ->
-            Concurrent (eff, fiber, ifiber)
-        | Await ifiber ->
-            Await ifiber
+        | Action (func, onError) ->
+            Action (upcastFunc func, onError)
+        | SendChan (msg, chan) ->
+            SendChan (msg :> obj, chan.Upcast())
+        | ReceiveChan chan ->
+            ReceiveChan <| chan.Upcast()
+        | ConcurrentEffect (eff, fiber, ifiber) ->
+            ConcurrentEffect (eff, fiber, ifiber)
+        | ConcurrentTask (task, onError, fiber, ifiber) ->
+            ConcurrentTask (task, onError, fiber, ifiber)
+        | AwaitFiber ifiber ->
+            AwaitFiber ifiber
+        | AwaitGenericTPLTask (task, onError) ->
+            AwaitGenericTPLTask (task, onError)
         | ChainSuccess (eff, cont) ->
             ChainSuccess (eff, fun res -> (cont res).UpcastResult())
         | ChainError (eff, cont) ->
-            ChainError (eff, fun err -> (cont err).UpcastResult())
+            ChainError (eff.UpcastResult(), fun err -> (cont err).UpcastResult())
 
     member internal this.UpcastError () : FIO<'R, obj> =
         match this with
@@ -317,23 +446,24 @@ and FIO<'R, 'E> =
             Success res
         | Failure err ->
             Failure (err :> obj)
-        | Action func ->
-            Action <| fun () ->
-            match func () with
-            | Ok res -> Ok res
-            | Error err -> Error (err :> obj)
-        | Send (msg, chan) ->
-            Send (msg, chan)
-        | Receive chan ->
-            Receive chan
-        | Concurrent (eff, fiber, ifiber) ->
-            Concurrent (eff, fiber, ifiber)
-        | Await ifiber ->
-            Await ifiber
+        | Action (func, onError) ->
+            Action (func, upcastOnError onError)
+        | SendChan (msg, chan) ->
+            SendChan (msg, chan)
+        | ReceiveChan chan ->
+            ReceiveChan chan
+        | ConcurrentEffect (eff, fiber, ifiber) ->
+            ConcurrentEffect (eff, fiber, ifiber)
+        | ConcurrentTask (task, onError, fiber, ifiber) ->
+            ConcurrentTask (task, upcastOnError onError, fiber, ifiber)
+        | AwaitFiber ifiber ->
+            AwaitFiber ifiber
+        | AwaitGenericTPLTask (task, onError) ->
+            AwaitGenericTPLTask (task, upcastOnError onError)
         | ChainSuccess (eff, cont) ->
             ChainSuccess (eff.UpcastError(), fun res -> (cont res).UpcastError())
         | ChainError (eff, cont) ->
-            ChainError (eff.UpcastError(), fun err -> (cont err).UpcastError())
+            ChainError (eff, fun err -> (cont err).UpcastError())
 
     member internal this.Upcast () : FIO<obj, obj> =
         this.UpcastResult().UpcastError()

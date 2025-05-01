@@ -29,7 +29,7 @@ type internal BenchmarkConfig =
         let ci = CultureInfo("en-US")
         match this with
         | PingpongConfig rounds ->
-            $"""Rounds: %s{rounds.ToString("N0", ci)}"""
+            $"""Actors: 2 Rounds: %s{rounds.ToString("N0", ci)}"""
         | ThreadringConfig (actors, rounds) ->
             $"""Actors: %s{actors.ToString("N0", ci)} Rounds: %s{rounds.ToString("N0", ci)}"""
         | BigConfig (actors, rounds) ->
@@ -37,7 +37,7 @@ type internal BenchmarkConfig =
         | BangConfig (actors, rounds) ->
             $"""Actors: %s{actors.ToString("N0", ci)} Rounds: %s{rounds.ToString("N0", ci)}"""
         | ForkConfig actors ->
-            $"""Actors: %s{actors.ToString("N0", ci)}"""
+            $"""Actors: %s{actors.ToString("N0", ci)} Rounds: 1"""
 
     override this.ToString() =
         $"{this.Name()} ({this.ConfigString()})"

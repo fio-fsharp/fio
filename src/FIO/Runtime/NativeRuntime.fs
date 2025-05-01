@@ -8,65 +8,129 @@ module FIO.Runtime.Native
 
 open FIO.Core
 
+open System
+open System.Threading
+open System.Threading.Tasks
+
 type Runtime() =
     inherit FIORuntime()
 
-    member private this.InternalRun eff stack =
+    override this.Name =
+        "Native"
 
-        let rec handleSuccess res stack =
-            match stack with
-            | [] -> Ok res
-            | (SuccessCont, cont) :: ss -> interpret (cont res) ss
-            | (FailureCont, _) :: ss -> handleSuccess res ss
+    [<TailCall>]
+    member private this.InterpretAsync eff =
+        let mutable currentEff = eff
+        let mutable contStack = []
+        let mutable result = None
 
-        and handleError err stack =
-            match stack with
-            | [] -> Error err
-            | (SuccessCont, _) :: ss -> handleError err ss
-            | (FailureCont, cont) :: ss -> interpret (cont err) ss
+        let handleSuccess res =
+            let mutable loop = true
+            while loop do
+                match contStack with
+                | [] ->
+                    result <- Some <| Ok res
+                    loop <- false
+                | (SuccessCont, cont) :: ss ->
+                    currentEff <- cont res
+                    contStack <- ss
+                    loop <- false
+                | (FailureCont, _) :: ss ->
+                    contStack <- ss
 
-        and handleResult res stack =
+        let handleError err =
+            let mutable loop = true
+            while loop do
+                match contStack with
+                | [] ->
+                    result <- Some <| Error err
+                    loop <- false
+                | (SuccessCont, _) :: ss ->
+                    contStack <- ss
+                | (FailureCont, cont) :: ss ->
+                    currentEff <- cont err
+                    contStack <- ss
+                    loop <- false
+
+        let handleResult res =
             match res with
-            | Ok res -> handleSuccess res stack
-            | Error err -> handleError err stack
+            | Ok res ->
+                handleSuccess res
+            | Error err ->
+                handleError err
 
-        and interpret eff stack =
-            match eff with
-            | Success res ->
-                handleSuccess res stack
-            | Failure err ->
-                handleError err stack
-            | Action func ->
-                handleResult (func ()) stack
-            | Send (msg, chan) ->
-                chan.Add msg
-                handleSuccess msg stack
-            | Receive chan ->
-                handleSuccess (chan.Take()) stack
-            | Concurrent (eff, fiber, ifiber) ->
-                async {
-                    ifiber.Complete
-                    <| interpret eff ContStack.Empty
-                }
-                |> Async.Start
-                handleSuccess fiber stack
-            | Await ifiber ->
-                handleResult (ifiber.AwaitResult()) stack
-            | ChainSuccess (eff, cont) ->
-                interpret eff ((SuccessCont, cont) :: stack)
-            | ChainError (eff, cont) ->
-                interpret eff ((FailureCont, cont) :: stack)
+        task {
+            while result.IsNone do
+                match currentEff with
+                | Success res ->
+                    handleSuccess res
+                | Failure err ->
+                    handleError err
+                | Action (func, onError) ->
+                    try 
+                        let res = func ()
+                        handleSuccess res
+                    with exn ->
+                        handleError
+                        <| onError exn
+                | SendChan (msg, chan) ->
+                    do! chan.SendAsync msg
+                    handleSuccess msg
+                | ReceiveChan chan ->
+                    let! res = chan.ReceiveAsync()
+                    handleSuccess res
+                | ConcurrentEffect (eff, fiber, ifiber) ->
+                    // This runs the task on a separate thread pool.
+                    Task.Run(fun () ->
+                        task {
+                            let! res = this.InterpretAsync eff
+                            do! ifiber.Complete res
+                        } :> Task
+                    )
+                    |> ignore
+                    handleSuccess fiber
+                | ConcurrentTask (task, onError, fiber, ifiber) ->
+                    task.ContinueWith((fun (t: Task<obj>) ->
+                        if t.IsFaulted then
+                            ifiber.Complete
+                            <| Error (onError t.Exception.InnerException)
+                        elif t.IsCanceled then
+                            ifiber.Complete
+                            <| Error (onError <| TaskCanceledException "Task has been cancelled.")
+                        elif t.IsCompleted then
+                            ifiber.Complete
+                            <| Ok t.Result
+                        else
+                            ifiber.Complete
+                            <| Error (onError <| InvalidOperationException "Task not completed.")),
+                        CancellationToken.None,
+                        TaskContinuationOptions.RunContinuationsAsynchronously,
+                        TaskScheduler.Default)
+                    |> ignore
+                    handleSuccess fiber
+                | AwaitFiber ifiber ->
+                    let! res = ifiber.AwaitAsync()
+                    handleResult res
+                | AwaitGenericTPLTask (task, onError) ->
+                    try
+                        let! res = task
+                        handleSuccess res
+                    with exn ->
+                        handleError <| onError exn
+                | ChainSuccess (eff, cont) ->
+                    currentEff <- eff
+                    contStack <- (SuccessCont, cont) :: contStack
+                | ChainError (eff, cont) ->
+                    currentEff <- eff
+                    contStack <- (FailureCont, cont) :: contStack
 
-        interpret eff stack
+            return result.Value
+        }
 
     override this.Run (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
-        let fiber = new Fiber<'R, 'E>()
-        async {
-            fiber.ToInternal().Complete
-            <| this.InternalRun (eff.Upcast()) ContStack.Empty
-        }
-        |> Async.Start
+        let fiber = Fiber<'R, 'E>()
+        task {
+            let! res = this.InterpretAsync <| eff.Upcast()
+            do! fiber.Internal.Complete res
+        } |> ignore
         fiber
-
-    override this.Name () =
-        "Native"
