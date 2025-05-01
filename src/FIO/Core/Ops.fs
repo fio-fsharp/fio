@@ -105,16 +105,20 @@ let inline ( !!<~~ ) (fiber: Fiber<'R, 'E>) : FIO<unit, 'E> =
 let inline ( !!~~> ) (fiber: Fiber<'R, 'E>) : FIO<unit, 'E> =
     fiber.Await().Then <| FIO.Succeed ()
 
-let inline ( !<<~ ) (task: Task) (onError: exn -> 'E) =
+// TODO: Add documentation.
+let inline ( !<<~ ) (task: Task) (onError: exn -> 'E) : FIO<unit, 'E> =
     FIO.AwaitTask<unit, 'E> (task, onError)
 
-let inline ( !!<<~ ) (task: Task)=
+// TODO: Add documentation.
+let inline ( !!<<~ ) (task: Task) : FIO<unit, exn> =
     FIO.AwaitTask<unit, exn> task
 
-let inline ( !<<~~ ) (task: Task<'R>) (onError: exn -> 'E) =
+// TODO: Add documentation.
+let inline ( !<<~~ ) (task: Task<'R>) (onError: exn -> 'E) : FIO<'R, 'E> =
     FIO.AwaitGenericTask<'R, 'E> (task, onError)
 
-let inline ( !!<<~~ ) (task: Task<'R>) =
+// TODO: Add documentation.
+let inline ( !!<<~~ ) (task: Task<'R>) : FIO<'R, exn> =
     FIO.AwaitGenericTask<'R, exn> task
 
 /// An alias for `FlatMap`, which chains the success result of the effect to the continuation function.
@@ -165,7 +169,6 @@ let inline ( >>? ) (eff: FIO<'R, 'E>) (eff': FIO<'R, 'E1>) : FIO<'R, 'E1> =
 let inline ( ?<< ) (eff: FIO<'R, 'E1>) (eff': FIO<'R, 'E>) : FIO<'R, 'E1> =
     eff'.ThenError eff
 
-// TODO: What is the Haskell symbol for this?
 /// An alias for `Apply`, which combines two effects: one producing a function and the other a value, 
 /// and applies the function to the value.
 let inline ( <*> ) (eff: FIO<'R, 'E>) (eff': FIO<'R -> 'R1, 'E>) : FIO<'R1, 'E> =

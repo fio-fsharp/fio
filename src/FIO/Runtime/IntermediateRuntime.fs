@@ -63,7 +63,7 @@ and private EvaluationWorker(config: EvaluationWorkerConfig) =
 and private BlockingWorker(config: BlockingWorkerConfig) =
     
     let processBlockingChannel blockingItem (workItem: WorkItem) (chan: Channel<obj>)  =
-        if chan.DataAvailable() then
+        if chan.HasDataAvailable() then
             chan.UseAvailableData()
             config.WorkItemChan.AddAsync workItem
         else
@@ -181,6 +181,7 @@ and Runtime(config: WorkerConfig) as this =
                     currentEff <- cont err
                     currentContStack <- ss
                     currentPrevAction <- Evaluated
+                    loop <- false
 
         let handleResult res =
             match res with
@@ -210,7 +211,7 @@ and Runtime(config: WorkerConfig) as this =
                         do! chan.SendAsync msg
                         handleSuccess msg
                     | ReceiveChan chan ->
-                        if chan.Count() > 0 then
+                        if chan.Count > 0 then
                             let! res = chan.ReceiveAsync()
                             handleSuccess res
                         else
@@ -267,6 +268,6 @@ and Runtime(config: WorkerConfig) as this =
     override this.Run (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
         let fiber = Fiber<'R, 'E>()
         workItemChan.AddAsync
-        <| WorkItem.Create (eff.Upcast(), fiber.ToInternal(), ContStack.Empty, Evaluated)
+        <| WorkItem.Create (eff.Upcast(), fiber.Internal, ContStack.Empty, Evaluated)
         |> ignore
         fiber

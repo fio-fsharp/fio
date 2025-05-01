@@ -62,7 +62,7 @@ and private EvaluationWorker(config: EvaluationWorkerConfig) =
 and private BlockingWorker(config: BlockingWorkerConfig) =
 
     let processBlockingChannel (blockingChan: Channel<obj>) = task {
-        if blockingChan.HasBlockingWorkItems() then
+        if blockingChan.BlockingWorkItemCount > 0 then
             do! blockingChan.RescheduleNextBlockingWorkItem config.WorkItemChan
         else
             do! config.BlockingItemChan.AddAsync <| BlockingChannel blockingChan
@@ -169,7 +169,7 @@ and Runtime(config: WorkerConfig) as this =
             let mutable loop = true
             while loop do
                 match currentContStack with
-                | [] -> 
+                | [] ->
                     result <- Some (Failure err, ContStack.Empty, Evaluated)
                     loop <- false
                 | (SuccessCont, _) :: ss -> 
@@ -178,11 +178,14 @@ and Runtime(config: WorkerConfig) as this =
                     currentEff <- cont err
                     currentContStack <- ss
                     currentPrevAction <- Evaluated
+                    loop <- false
 
         let handleResult res =
             match res with
-            | Ok res -> handleSuccess res
-            | Error err -> handleError err
+            | Ok res ->
+                handleSuccess res
+            | Error err ->
+                handleError err
 
         task {
             while result.IsNone do
@@ -206,7 +209,7 @@ and Runtime(config: WorkerConfig) as this =
                         do! blockingItemEventChan.AddAsync <| BlockingChannel chan
                         handleSuccess msg
                     | ReceiveChan chan ->
-                        if chan.Count() > 0 then
+                        if chan.Count > 0 then
                             let! res = chan.ReceiveAsync()
                             handleSuccess res
                         else
@@ -263,6 +266,6 @@ and Runtime(config: WorkerConfig) as this =
     override this.Run (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
         let fiber = Fiber<'R, 'E>()
         workItemChan.AddAsync
-        <| WorkItem.Create (eff.Upcast(), fiber.ToInternal(), ContStack.Empty, Evaluated)
+        <| WorkItem.Create (eff.Upcast(), fiber.Internal, ContStack.Empty, Evaluated)
         |> ignore
         fiber

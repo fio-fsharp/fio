@@ -22,7 +22,7 @@ type FIORuntime internal () =
 
     abstract member Run : FIO<'R, 'E> -> Fiber<'R, 'E>
 
-    override this.ToString () = 
+    override this.ToString () =
         this.ConfigString
 
 type WorkerConfig =
@@ -33,7 +33,6 @@ type WorkerConfig =
 [<AbstractClass>]
 type FIOWorkerRuntime internal (config: WorkerConfig) =
     inherit FIORuntime()
-    let ci = CultureInfo "en-US"
 
     let validateWorkerConfiguration () =
         if config.EWCount <= 0 ||
@@ -47,6 +46,7 @@ type FIOWorkerRuntime internal (config: WorkerConfig) =
         config
 
     override this.ConfigString  =
+        let ci = CultureInfo "en-US"
         $"""EWC: %s{config.EWCount.ToString("N0", ci)} EWS: %s{config.EWSteps.ToString("N0", ci)} BWC: %s{config.BWCount.ToString("N0", ci)}"""
 
     override this.ToString () =

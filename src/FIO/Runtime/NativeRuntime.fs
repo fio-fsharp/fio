@@ -131,6 +131,6 @@ type Runtime() =
         let fiber = Fiber<'R, 'E>()
         task {
             let! res = this.InterpretAsync <| eff.Upcast()
-            do! fiber.ToInternal().Complete res
+            do! fiber.Internal.Complete res
         } |> ignore
         fiber

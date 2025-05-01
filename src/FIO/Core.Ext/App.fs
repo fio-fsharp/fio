@@ -8,7 +8,7 @@
 module FIO.Core.App
 
 open FIO.Runtime
-open FIO.Runtime.Intermediate
+open FIO.Runtime.Advanced
 
 open System
 open System.Threading
