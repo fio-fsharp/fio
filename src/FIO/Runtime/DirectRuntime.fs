@@ -4,7 +4,7 @@
 (* All rights reserved                                                                                       *)
 (*************************************************************************************************************)
 
-module FIO.Runtime.Native
+module FIO.Runtime.Direct
 
 open FIO.Core
 
@@ -16,7 +16,7 @@ type Runtime() =
     inherit FIORuntime()
 
     override this.Name =
-        "Native"
+        "Direct"
 
     [<TailCall>]
     member private this.InterpretAsync eff =
@@ -90,23 +90,24 @@ type Runtime() =
                     |> ignore
                     handleSuccess fiber
                 | ConcurrentTask (task, onError, fiber, ifiber) ->
-                    task.ContinueWith((fun (t: Task<obj>) ->
-                        if t.IsFaulted then
-                            ifiber.Complete
-                            <| Error (onError t.Exception.InnerException)
-                        elif t.IsCanceled then
-                            ifiber.Complete
-                            <| Error (onError <| TaskCanceledException "Task has been cancelled.")
-                        elif t.IsCompleted then
-                            ifiber.Complete
-                            <| Ok t.Result
-                        else
-                            ifiber.Complete
-                            <| Error (onError <| InvalidOperationException "Task not completed.")),
-                        CancellationToken.None,
-                        TaskContinuationOptions.RunContinuationsAsynchronously,
-                        TaskScheduler.Default)
-                    |> ignore
+                    Task.Run(fun () ->
+                        (task ()).ContinueWith((fun (t: Task<obj>) ->
+                            if t.IsFaulted then
+                                ifiber.Complete
+                                <| Error (onError t.Exception.InnerException)
+                            elif t.IsCanceled then
+                                ifiber.Complete
+                                <| Error (onError <| TaskCanceledException "Task has been cancelled.")
+                            elif t.IsCompleted then
+                                ifiber.Complete
+                                <| Ok t.Result
+                            else
+                                ifiber.Complete
+                                <| Error (onError <| InvalidOperationException "Task not completed.")),
+                            CancellationToken.None,
+                            TaskContinuationOptions.RunContinuationsAsynchronously,
+                            TaskScheduler.Default) :> Task
+                    ) |> ignore
                     handleSuccess fiber
                 | AwaitFiber ifiber ->
                     let! res = ifiber.AwaitAsync()

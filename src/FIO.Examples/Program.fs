@@ -7,7 +7,8 @@
 module private FIO.Examples
 
 open FIO.Core
-open FIO.Runtime.Advanced
+open FIO.Runtime.Concurrent
+
 open FIO.Lib.IO
 open FIO.Lib.Net.Sockets
 open FIO.Lib.Net.WebSockets
@@ -23,6 +24,7 @@ open System.Net.WebSockets
 let helloWorld1 () =
     let hello = FIO.Succeed "Hello world! 🪻"
     let fiber = Runtime().Run hello
+    
     task {
         let! result = fiber.AwaitAsync()
         match result with
@@ -33,6 +35,7 @@ let helloWorld1 () =
 let helloWorld2 () : unit =
     let hello: FIO<string, obj> = FIO.Succeed "Hello world! 🪻"
     let fiber: Fiber<string, obj> = Runtime().Run hello
+    
     task {
         let! (result: Result<string, obj>) = fiber.AwaitAsync()
         match result with
@@ -43,6 +46,7 @@ let helloWorld2 () : unit =
 let helloWorld3 () : unit =
     let hello: FIO<obj, string> = FIO.Fail "Hello world! 🪻"
     let fiber: Fiber<obj, string> = Runtime().Run hello
+    
     task {
         let! (result: Result<obj, string>) = fiber.AwaitAsync()
         match result with
@@ -53,6 +57,7 @@ let helloWorld3 () : unit =
 let helloWorld4 () =
     let hello = FIO.Succeed "Hello world! 🪻"
     let fiber = Runtime().Run hello
+    
     task {
         let! result = fiber.AwaitAsync()
         printfn $"%A{result}"
@@ -61,6 +66,7 @@ let helloWorld4 () =
 let helloWorld5 () =
     let hello = !+ "Hello world! 🪻"
     let fiber = Runtime().Run hello
+    
     task {
         let! result = fiber.AwaitAsync()
         printfn $"%A{result}"
@@ -69,6 +75,7 @@ let helloWorld5 () =
 let helloWorld6 () =
     let hello = !- "Hello world! 🪻"
     let fiber = Runtime().Run hello
+    
     task {
         let! result = fiber.AwaitAsync()
         printfn $"%A{result}"
@@ -77,6 +84,7 @@ let helloWorld6 () =
 let concurrency1 () =
     let concurrent = (FIO.Succeed 42).Fork().Bind(_.Await())
     let fiber = Runtime().Run concurrent
+    
     task {
         let! result = fiber.AwaitAsync()
         printfn $"%A{result}"
@@ -85,6 +93,7 @@ let concurrency1 () =
 let concurrency2 () =
     let concurrent = !~> !+ 42 >>= fun fiber -> !~~> fiber
     let fiber = Runtime().Run concurrent
+    
     task {
         let! result = fiber.AwaitAsync()
         printfn $"%A{result}"
@@ -95,6 +104,7 @@ let concurrency3 () =
     let taskB = !+ (200, "Task B OK")
     let concurrent = taskA <!> taskB
     let fiber = Runtime().Run concurrent
+    
     task {
         let! result = fiber.AwaitAsync()
         printfn $"%A{result}"
@@ -105,7 +115,9 @@ let computationExpression1 () =
         fio {
             return "Hello world! 🪻"
         }
+
     let fiber = Runtime().Run hello
+    
     task {
         let! result = fiber.AwaitAsync()
         printfn $"%A{result}"
@@ -116,7 +128,9 @@ let computationExpression2 () =
         fio {
             return! !- "Hello world! 🪻"
         }
+
     let fiber = Runtime().Run hello
+    
     task {
         let! result = fiber.AwaitAsync()
         printfn $"%A{result}"
@@ -129,7 +143,9 @@ let computationExpression3 () =
             let! name = FConsole.ReadLine ()
             do! FConsole.PrintLine $"Hello, %s{name}! Welcome to FIO! 🪻💜"
         }
+
     let fiber = Runtime().Run welcome
+    
     task {
         let! result = fiber.AwaitAsync()
         printfn $"%A{result}"
@@ -152,6 +168,7 @@ type EnterNumberApp() =
         fio {
             do! FConsole.Print "Enter a number: "
             let! input = FConsole.ReadLine ()
+
             match! !<< (fun () -> Int32.TryParse input) with
             | true, number ->
                 return $"You entered the number: %i{number}."
@@ -412,6 +429,38 @@ type HighlyConcurrentApp() =
             return! create chan (fiberCount - 1) acc rand
         }
 
+type FiberFromTaskApp() =
+    inherit FIOApp<unit, exn>()
+
+    let fibonacci n =
+        FIO.FromGenericTask<Fiber<string, exn>, exn> <| fun () ->
+            task {
+                let rec fib (n: int64) =
+                    if n <= 1 then n
+                    else fib (n - 1L) + fib (n - 2L)
+                
+                printfn $"Task computing Fibonacci of %i{n}..."
+                let res = fib n
+                return $"Fibonacci of %i{n} is %i{res}"
+           }
+
+    override this.effect : FIO<unit, exn> =
+        let awaitAndPrint (fiber: Fiber<string, exn>) =
+            fio {
+                 let! res = !<~~ fiber
+                 do! FConsole.PrintLine $"%s{res}"
+            }
+            
+        fio {
+            let! fiber35 = fibonacci 35L
+            and! fiber40 = fibonacci 40L
+            and! fiber45 = fibonacci 45L
+
+            do! awaitAndPrint fiber35 <~>
+                awaitAndPrint fiber40 <~>
+                awaitAndPrint fiber45
+        }
+
 type SocketApp(ip: string, port: int) =
     inherit FIOApp<unit, exn>()
 
@@ -422,6 +471,7 @@ type SocketApp(ip: string, port: int) =
                 while true do
                     let! msg = socket.Receive()
                     do! FConsole.PrintLine $"Server received message: %s{msg}"
+                    
                     let! ascii =
                         if msg.Length > 0 then
                             !<< (fun () -> msg.Chars 0) >>= fun c ->
@@ -445,6 +495,7 @@ type SocketApp(ip: string, port: int) =
                 new TcpListener(IPAddress.Parse ip, port))
             do! !<< (fun () -> listener.Start())
             do! FConsole.PrintLine $"Server listening on %s{ip}:%i{port}..."
+            
             while true do
                 let! internalSocket = !<< (fun () -> listener.AcceptSocket())
                 let! clientSocket = FSocket.Create<int, string, exn> internalSocket
@@ -494,6 +545,7 @@ type WebSocketApp(serverUrl, clientUrl) =
                 while state = WebSocketState.Open do
                     let! msg = clientSocket.Receive()
                     do! FConsole.PrintLine $"Server received message: %s{msg}"
+                    
                     let! ascii =
                         if msg.Length > 0 then
                             !<< (fun () -> msg.Chars 0) >>= fun c ->
@@ -550,11 +602,6 @@ type WebSocketApp(serverUrl, clientUrl) =
         fio {
             do! server serverUrl <~> client clientUrl
         }
-        
-WebSocketApp("http://localhost:8080/", "ws://localhost:8080/").Run()
-Console.ReadLine() |> ignore
-
-// TODO: Create more examples with the FromTask functions.
 
 helloWorld1 ()
 Console.ReadLine() |> ignore
@@ -623,6 +670,9 @@ AsyncErrorHandlingApp().Run()
 Console.ReadLine() |> ignore
 
 HighlyConcurrentApp().Run()
+Console.ReadLine() |> ignore
+
+FiberFromTaskApp().Run()
 Console.ReadLine() |> ignore
 
 SocketApp("127.0.0.1", 5000).Run()

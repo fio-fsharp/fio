@@ -105,21 +105,33 @@ let inline ( !!<~~ ) (fiber: Fiber<'R, 'E>) : FIO<unit, 'E> =
 let inline ( !!~~> ) (fiber: Fiber<'R, 'E>) : FIO<unit, 'E> =
     fiber.Await().Then <| FIO.Succeed ()
 
-// TODO: Add documentation.
+// An alias for 'AwaitTask', which awaits a Task and turns it into an effect.
+// Applies error handling if necessary.
 let inline ( !<<~ ) (task: Task) (onError: exn -> 'E) : FIO<unit, 'E> =
     FIO.AwaitTask<unit, 'E> (task, onError)
 
-// TODO: Add documentation.
+// An alias for 'AwaitTask', which awaits a Task and turns it into an effect.
 let inline ( !!<<~ ) (task: Task) : FIO<unit, exn> =
     FIO.AwaitTask<unit, exn> task
 
-// TODO: Add documentation.
+// An alias for 'AwaitGenericTask', which awaits a generic Task and turns it into an effect.
+// Applies error handling if necessary.
 let inline ( !<<~~ ) (task: Task<'R>) (onError: exn -> 'E) : FIO<'R, 'E> =
     FIO.AwaitGenericTask<'R, 'E> (task, onError)
 
-// TODO: Add documentation.
+// An alias for 'AwaitGenericTask', which awaits a generic Task and turns it into an effect.
 let inline ( !!<<~~ ) (task: Task<'R>) : FIO<'R, exn> =
     FIO.AwaitGenericTask<'R, exn> task
+
+// An alias for 'AwaitAsync', which awaits an Async computation and turns it into an effect
+// with a default onError.
+let inline ( !<<<~ ) (async: Async<'R>) : FIO<'R, exn> =
+    FIO.AwaitAsync<'R, exn> async
+
+// An alias for 'AwaitAsync', which awaits an Async computation and turns it into an effect.
+// Applies error handling if necessary.
+let inline ( !!<<<~ ) (async: Async<'R>) (onError: exn -> 'E) : FIO<'R, 'E> =
+    FIO.AwaitAsync<'R, 'E> (async, onError)
 
 /// An alias for `FlatMap`, which chains the success result of the effect to the continuation function.
 let inline ( >>= ) (eff: FIO<'R, 'E>) (cont: 'R -> FIO<'R1, 'E>) : FIO<'R1, 'E> =

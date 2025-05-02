@@ -14,9 +14,9 @@ open FIO.Runtime
 open FIO.Benchmarks.Suite
 
 type internal Arguments =
-    | Native_Runtime
-    | Intermediate_Runtime of ewc: int * ews: int * bwc: int
-    | Advanced_Runtime of ewc: int * ews: int * bwc: int
+    | Direct_Runtime
+    | Cooperative_Runtime of ewc: int * ews: int * bwc: int
+    | Concurrent_Runtime of ewc: int * ews: int * bwc: int
     | Runs of runs: int
     | Actor_Increment of actorInc: int * times: int
     | Round_Increment of roundInc: int * times: int
@@ -31,12 +31,12 @@ type internal Arguments =
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Native_Runtime -> 
-                "specify Native runtime"
-            | Intermediate_Runtime _ -> 
-                "specify Intermediate runtime with ewc, ews and bwc"
-            | Advanced_Runtime _ -> 
-                "specify Advanced runtime with ewc, ews and bwc"
+            | Direct_Runtime -> 
+                "specify Direct runtime"
+            | Cooperative_Runtime _ -> 
+                "specify Cooperative runtime with ewc, ews and bwc"
+            | Concurrent_Runtime _ -> 
+                "specify Concurrent runtime with ewc, ews and bwc"
             | Runs _ -> 
                 "specify number of runs for each benchmark"
             | Actor_Increment _ -> 
@@ -72,14 +72,14 @@ type internal Parser() =
         let results = parser.Parse args
 
         let runtime: FIORuntime =
-            if results.Contains Native_Runtime then
-                Native.Runtime()
-            elif results.Contains Intermediate_Runtime then
-                let (ewc, ews, bwc) = results.GetResult Intermediate_Runtime
-                Intermediate.Runtime({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
-            elif results.Contains Advanced_Runtime then
-                let (ewc, ews, bwc) = results.GetResult Advanced_Runtime
-                Advanced.Runtime({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
+            if results.Contains Direct_Runtime then
+                Direct.Runtime()
+            elif results.Contains Cooperative_Runtime then
+                let (ewc, ews, bwc) = results.GetResult Cooperative_Runtime
+                Cooperative.Runtime({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
+            elif results.Contains Concurrent_Runtime then
+                let (ewc, ews, bwc) = results.GetResult Concurrent_Runtime
+                Concurrent.Runtime({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
             else
                 invalidArg "args" "Runtime should be specified!"
 

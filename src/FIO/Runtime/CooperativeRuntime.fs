@@ -4,7 +4,7 @@
 (* All rights reserved                                                                                       *)
 (*************************************************************************************************************)
 
-module FIO.Runtime.Intermediate
+module FIO.Runtime.Cooperative
 
 open FIO.Core
 
@@ -26,7 +26,6 @@ and private EvaluationWorker(config: EvaluationWorkerConfig) =
 
     let processWorkItem workItem = task {
         match! config.Runtime.InterpretAsync workItem config.EWSteps with
-        // TODO: Can we make this matching more concise? Make a type for it, for example.
         | Success res, _, Evaluated ->
             do! workItem.Complete <| Ok res
         | Failure err, _, Evaluated ->
@@ -135,7 +134,7 @@ and Runtime(config: WorkerConfig) as this =
         |> ignore
 
     override this.Name =
-        "Intermediate"
+        "Cooperative"
 
     new() =
         Runtime
@@ -223,23 +222,24 @@ and Runtime(config: WorkerConfig) as this =
                             <| WorkItem.Create (eff, ifiber, ContStack.Empty, currentPrevAction)
                         handleSuccess fiber
                     | ConcurrentTask (task, onError, fiber, ifiber) ->
-                        task.ContinueWith((fun (t: Task<obj>) ->
-                            if t.IsFaulted then
-                                ifiber.Complete
-                                <| Error (onError t.Exception.InnerException)
-                            elif t.IsCanceled then
-                                ifiber.Complete
-                                <| Error (onError <| TaskCanceledException "Task has been cancelled.")
-                            elif t.IsCompleted then
-                                ifiber.Complete
-                                <| Ok t.Result
-                            else
-                                ifiber.Complete
-                                <| Error (onError <| InvalidOperationException "Task not completed.")),
-                            CancellationToken.None,
-                            TaskContinuationOptions.RunContinuationsAsynchronously,
-                            TaskScheduler.Default)
-                        |> ignore
+                        Task.Run(fun () -> 
+                            (task ()).ContinueWith((fun (t: Task<obj>) ->
+                                if t.IsFaulted then
+                                    ifiber.Complete
+                                    <| Error (onError t.Exception.InnerException)
+                                elif t.IsCanceled then
+                                    ifiber.Complete
+                                    <| Error (onError <| TaskCanceledException "Task has been cancelled.")
+                                elif t.IsCompleted then
+                                    ifiber.Complete
+                                    <| Ok t.Result
+                                else
+                                    ifiber.Complete
+                                    <| Error (onError <| InvalidOperationException "Task not completed.")),
+                                CancellationToken.None,
+                                TaskContinuationOptions.RunContinuationsAsynchronously,
+                                TaskScheduler.Default) :> Task
+                        ) |> ignore
                         handleSuccess fiber
                     | AwaitFiber ifiber ->
                         if ifiber.Completed() then

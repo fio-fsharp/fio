@@ -4,7 +4,7 @@
 (* All rights reserved                                                                                       *)
 (*************************************************************************************************************)
 
-module FIO.Runtime.Advanced
+module FIO.Runtime.Concurrent
 
 open FIO.Core
 
@@ -132,7 +132,7 @@ and Runtime(config: WorkerConfig) as this =
         |> ignore
 
     override this.Name =
-        "Advanced"
+        "Concurrent"
 
     new() =
         Runtime
@@ -221,23 +221,24 @@ and Runtime(config: WorkerConfig) as this =
                             <| WorkItem.Create (eff, ifiber, ContStack.Empty, currentPrevAction)
                         handleSuccess fiber
                     | ConcurrentTask (task, onError, fiber, ifiber) ->
-                        task.ContinueWith((fun (t: Task<obj>) ->
-                            if t.IsFaulted then
-                                ifiber.CompleteAndReschedule
-                                    (Error <| onError t.Exception.InnerException) workItemChan
-                            elif t.IsCanceled then
-                                ifiber.CompleteAndReschedule
-                                    (Error (onError <| TaskCanceledException "Task has been cancelled.")) workItemChan
-                            elif t.IsCompleted then
-                                ifiber.CompleteAndReschedule
-                                    (Ok t.Result) workItemChan
-                            else
-                                ifiber.CompleteAndReschedule
-                                    (Error (onError <| InvalidOperationException "Task not completed.")) workItemChan),
-                            CancellationToken.None,
-                            TaskContinuationOptions.RunContinuationsAsynchronously,
-                            TaskScheduler.Default)
-                        |> ignore
+                        Task.Run(fun () ->
+                            (task ()).ContinueWith((fun (t: Task<obj>) ->
+                                if t.IsFaulted then
+                                    ifiber.CompleteAndReschedule
+                                        (Error <| onError t.Exception.InnerException) workItemChan
+                                elif t.IsCanceled then
+                                    ifiber.CompleteAndReschedule
+                                        (Error (onError <| TaskCanceledException "Task has been cancelled.")) workItemChan
+                                elif t.IsCompleted then
+                                    ifiber.CompleteAndReschedule
+                                        (Ok t.Result) workItemChan
+                                else
+                                    ifiber.CompleteAndReschedule
+                                        (Error (onError <| InvalidOperationException "Task not completed.")) workItemChan),
+                                CancellationToken.None,
+                                TaskContinuationOptions.RunContinuationsAsynchronously,
+                                TaskScheduler.Default) :> Task
+                        ) |> ignore
                         handleSuccess fiber
                     | AwaitFiber ifiber ->
                         if ifiber.Completed() then
