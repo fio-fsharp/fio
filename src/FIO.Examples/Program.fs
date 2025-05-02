@@ -1,4 +1,4 @@
-﻿(*************************************************************************************************************)
+(*************************************************************************************************************)
 (* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
 (* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
 (* All rights reserved                                                                                       *)
@@ -115,7 +115,7 @@ let computationExpression1 () =
         fio {
             return "Hello world! 🪻"
         }
-    
+
     let fiber = Runtime().Run hello
     
     task {
@@ -168,7 +168,7 @@ type EnterNumberApp() =
         fio {
             do! FConsole.Print "Enter a number: "
             let! input = FConsole.ReadLine ()
-            
+
             match! !<< (fun () -> Int32.TryParse input) with
             | true, number ->
                 return $"You entered the number: %i{number}."

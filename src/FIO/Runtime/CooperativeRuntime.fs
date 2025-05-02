@@ -26,7 +26,6 @@ and private EvaluationWorker(config: EvaluationWorkerConfig) =
 
     let processWorkItem workItem = task {
         match! config.Runtime.InterpretAsync workItem config.EWSteps with
-        // TODO: Can we make this matching more concise? Make a type for it, for example.
         | Success res, _, Evaluated ->
             do! workItem.Complete <| Ok res
         | Failure err, _, Evaluated ->
