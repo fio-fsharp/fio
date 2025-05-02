@@ -46,15 +46,15 @@ let private parseBenchmarkData (path: string) =
 
 let private parseFileMetadata (path: string) =
     let fileName = path.ToLowerInvariant().Split Path.DirectorySeparatorChar |> Array.last
-    let split = fileName.Split('_').[0].Split('-') |> fun s -> s.[..s.Length - 2]
+    let split = fileName.Split('_').[0].Split('-') |> fun s -> s[..s.Length - 2]
 
     let bench = split[0].Trim()
     let runtime = split[7].Trim()
 
     let isWorkerRuntime =
         match runtime with
-        | "native" -> false
-        | "advanced" | "intermediate" -> true
+        | "direct" -> false
+        | "cooperative" | "concurrent" -> true
         | _ -> invalidOp "Unknown runtime!"
 
     let capitalizeFirst s =

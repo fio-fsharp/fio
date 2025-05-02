@@ -242,7 +242,7 @@ and FIO<'R, 'E> =
     | SendChan of msg: 'R * chan: Channel<'R>
     | ReceiveChan of chan: Channel<'R>
     | ConcurrentEffect of eff: FIO<obj, obj> * fiber: obj * ifiber: InternalFiber
-    | ConcurrentTask of task: Task<obj> * onError: (exn -> 'E) * fiber: obj * ifiber: InternalFiber
+    | ConcurrentTask of task: (unit -> Task<obj>) * onError: (exn -> 'E) * fiber: obj * ifiber: InternalFiber
     | AwaitFiber of ifiber: InternalFiber
     | AwaitGenericTPLTask of task: Task<obj> * onError: (exn -> 'E)
     | ChainSuccess of eff: FIO<obj, 'E> * cont: (obj -> FIO<'R, 'E>)
@@ -315,18 +315,19 @@ and FIO<'R, 'E> =
         FIO.AwaitAsync<'R, exn> (async, id)
 
     // Converts a Task into a Fiber.
-    static member FromTask<'R, 'E> (task: Task, onError: exn -> 'E) : FIO<Fiber<unit, exn>, 'E> =
+    static member FromTask<'R, 'E> (task: unit -> Task, onError: exn -> 'E) : FIO<Fiber<unit, exn>, 'E> =
         let fiber = Fiber<unit, exn>()
-        ConcurrentTask (task.ContinueWith(fun _ -> box ()), onError, fiber, fiber.Internal)
+        ConcurrentTask ((fun () -> (task ()).ContinueWith(fun _ -> box ())), onError, fiber, fiber.Internal)
 
     // Converts a Task into a Fiber with a default onError.
-    static member inline FromTask<'R, 'E> (task: Task) : FIO<Fiber<unit, exn>, exn> =
+    static member inline FromTask<'R, 'E> (task: unit -> Task) : FIO<Fiber<unit, exn>, exn> =
         FIO.FromTask<Fiber<unit, exn>, exn> (task, id)
     
     // Converts a generic Task into a Fiber.
-    static member FromGenericTask<'R, 'E> (task: Task<'R>, onError: exn -> 'E) : FIO<Fiber<'R, exn>, 'E> =
+    static member FromGenericTask<'R, 'E> (task: unit -> Task<'R>, onError: exn -> 'E) : FIO<Fiber<'R, exn>, 'E> =
         let fiber = Fiber<'R, exn>()
-        let task = task.ContinueWith(fun (outerTask: Task<'R>) ->
+        let task = fun () ->
+                (task ()).ContinueWith(fun (outerTask: Task<'R>) ->
                     if outerTask.IsFaulted then
                         Task.FromException<obj> (outerTask.Exception.GetBaseException())
                     elif outerTask.IsCanceled then
@@ -336,8 +337,8 @@ and FIO<'R, 'E> =
                    ).Unwrap()
         ConcurrentTask (task, onError, fiber, fiber.Internal)
 
-    // Converts a generic Task into a Fiber with a default onError.        
-    static member inline FromGenericTask<'R, 'E> (task: Task<'R>) : FIO<Fiber<'R, exn>, exn> =
+    // Converts a generic Task into a Fiber with a default onError.       
+    static member inline FromGenericTask<'R, 'E> (task: unit -> Task<'R>) : FIO<Fiber<'R, exn>, exn> =
         FIO.FromGenericTask<Fiber<'R, exn>, exn> (task, id)
         
     /// Interprets an effect concurrently and returns the fiber interpreting it.

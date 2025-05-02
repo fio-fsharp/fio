@@ -21,9 +21,9 @@
 		<Compile Include="Runtime.Ext\Monitor.fs" />
 		<Compile Include="Runtime.Ext\DeadlockDetector.fs" />
 		<Compile Include="Runtime\Runtime.fs" />
-		<Compile Include="Runtime\NativeRuntime.fs" />
-		<Compile Include="Runtime\IntermediateRuntime.fs" />
-		<Compile Include="Runtime\AdvancedRuntime.fs" />
+		<Compile Include="Runtime\DirectRuntime.fs" />
+		<Compile Include="Runtime\CooperativeRuntime.fs" />
+		<Compile Include="Runtime\ConcurrentRuntime.fs" />
 		
 		<Compile Include="Lib\IO.fs" />
 		<Compile Include="Lib\Net.fs" />
