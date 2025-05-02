@@ -1,4 +1,4 @@
-﻿(*************************************************************************************************************)
+(*************************************************************************************************************)
 (* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
 (* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
 (* All rights reserved                                                                                       *)
@@ -130,7 +130,7 @@ let computationExpression2 () =
         }
 
     let fiber = Runtime().Run hello
-    
+
     task {
         let! result = fiber.AwaitAsync()
         printfn $"%A{result}"
@@ -145,7 +145,7 @@ let computationExpression3 () =
         }
 
     let fiber = Runtime().Run welcome
-    
+
     task {
         let! result = fiber.AwaitAsync()
         printfn $"%A{result}"
@@ -428,7 +428,7 @@ type HighlyConcurrentApp() =
                       <~> receiver chan fiberCount fiberCount
             return! create chan (fiberCount - 1) acc rand
         }
-
+        
 type FiberFromTaskApp() =
     inherit FIOApp<unit, exn>()
 
