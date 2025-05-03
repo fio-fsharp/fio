@@ -10,39 +10,39 @@ module FIO.Core.CE
 open System
 open System.Collections.Generic
 
-type FIOBuilder() =
+type FIOBuilder internal () =
 
-    member inline this.Bind (eff: FIO<'R1, 'E>, cont: 'R1 -> FIO<'R, 'E>) : FIO<'R, 'E> =
+    member inline this.Bind<'R, 'R1, 'E> (eff: FIO<'R, 'E>, cont: 'R -> FIO<'R1, 'E>) : FIO<'R1, 'E> =
         eff.Bind cont
         
-    member inline this.BindReturn (eff: FIO<'R1, 'E>, cont: 'R1 -> 'R) : FIO<'R, 'E> =
+    member inline this.BindReturn<'R, 'R1, 'E> (eff: FIO<'R, 'E>, cont: 'R -> 'R1) : FIO<'R1, 'E> =
         eff.Map cont
 
-    member inline this.Combine (eff: FIO<'R, 'E>, eff': FIO<'R1, 'E>) : FIO<'R1, 'E> =
+    member inline this.Combine<'R, 'R1, 'E> (eff: FIO<'R, 'E>, eff': FIO<'R1, 'E>) : FIO<'R1, 'E> =
         eff.Then eff'
 
-    member inline this.Run (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
+    member inline this.Run<'R, 'E> (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
         eff
 
-    member inline this.Zero () : FIO<unit, 'E> =
+    member inline this.Zero<'E> () : FIO<unit, 'E> =
         FIO.Succeed ()
 
-    member inline this.Return (res: 'R) : FIO<'R, 'E> =
+    member inline this.Return<'R, 'E> (res: 'R) : FIO<'R, 'E> =
         FIO.Succeed res
 
-    member inline this.ReturnFrom (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
+    member inline this.ReturnFrom<'R, 'E> (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
         eff
 
-    member inline this.Yield (res: 'R) : FIO<'R, 'E> =
+    member inline this.Yield<'R, 'E> (res: 'R) : FIO<'R, 'E> =
         this.Return res
 
-    member inline this.YieldFrom (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
+    member inline this.YieldFrom<'R, 'E> (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
         this.ReturnFrom eff
 
-    member inline this.TryWith (eff: FIO<'R, 'E>, cont: 'E -> FIO<'R, 'E>) : FIO<'R, 'E> =
+    member inline this.TryWith<'R, 'E, 'E1> (eff: FIO<'R, 'E>, cont: 'E -> FIO<'R, 'E1>) : FIO<'R, 'E1> =
         eff.BindError cont
 
-    member inline this.TryFinally (eff: FIO<'R, 'E>, finalizer: unit -> unit) : FIO<'R, 'E> =
+    member inline this.TryFinally<'R, 'E when 'E :> exn> (eff: FIO<'R, 'E>, finalizer: unit -> unit) : FIO<'R, 'E> =
         eff.Bind <| fun res ->
             try
                 finalizer ()
@@ -50,39 +50,39 @@ type FIOBuilder() =
             with exn ->
                 FIO.Fail (exn :?> 'E)
 
-    member inline this.Delay (cont: unit -> FIO<'R, 'E>) : FIO<'R, 'E> =
+    member inline this.Delay<'R1, 'E> (cont: unit -> FIO<'R1, 'E>) : FIO<'R1, 'E> =
        this.Zero().Bind cont
 
-    member inline this.For (sequence: seq<'T>, body: 'T -> FIO<unit, 'E>) : FIO<unit, 'E> =
+    member inline this.For<'T, 'E when 'E :> exn> (sequence: seq<'T>, body: 'T -> FIO<unit, 'E>) : FIO<unit, 'E> =
         let rec loop (enumerator: IEnumerator<'T>) =
-            if enumerator.MoveNext() then
+            if enumerator.MoveNext () then
                 this.Delay <| fun () -> 
                     body(enumerator.Current).Then(loop enumerator)
             else
                 try
-                    enumerator.Dispose()
-                    this.Zero()
+                    enumerator.Dispose ()
+                    this.Zero ()
                 with exn ->
                     FIO.Fail (exn :?> 'E)
                 
         sequence.GetEnumerator()
         |> loop
 
-    member inline this.While (guard: unit -> bool, body: FIO<'R, 'E>) : FIO<unit, 'E> =
+    member inline this.While<'R, 'E> (guard: unit -> bool, body: FIO<'R, 'E>) : FIO<unit, 'E> =
         let rec loop () =
             if guard () then
                 this.Delay <| fun () -> body.Bind <| fun _ -> loop ()
             else
-                this.Zero()
+                this.Zero ()
         loop ()
 
     member inline this.Using (resource: #IDisposable, body: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
         this.TryFinally (body resource, fun () -> resource.Dispose())
 
-    member inline this.Match (value: 'T, cases: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
+    member inline this.Match<'R, 'E, 'T> (value: 'T, cases: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
         cases value
 
-    member inline this.MergeSources (eff: FIO<'R, 'E>, eff': FIO<'R1, 'E>) : FIO<'R * 'R1, 'E> =
+    member inline this.MergeSources<'R, 'R1, 'E> (eff: FIO<'R, 'E>, eff': FIO<'R1, 'E>) : FIO<'R * 'R1, 'E> =
         eff.Zip eff'
 
 /// The FIO computation expression builder.

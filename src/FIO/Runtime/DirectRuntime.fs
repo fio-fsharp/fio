@@ -12,8 +12,8 @@ open System
 open System.Threading
 open System.Threading.Tasks
 
-type Runtime() =
-    inherit FIORuntime()
+type Runtime () =
+    inherit FIORuntime ()
 
     override this.Name =
         "Direct"
@@ -22,14 +22,14 @@ type Runtime() =
     member private this.InterpretAsync eff =
         let mutable currentEff = eff
         let mutable contStack = []
-        let mutable result = None
+        let mutable resultOpt = None
 
         let handleSuccess res =
             let mutable loop = true
             while loop do
                 match contStack with
                 | [] ->
-                    result <- Some <| Ok res
+                    resultOpt <- Some <| Ok res
                     loop <- false
                 | (SuccessCont, cont) :: ss ->
                     currentEff <- cont res
@@ -43,7 +43,7 @@ type Runtime() =
             while loop do
                 match contStack with
                 | [] ->
-                    result <- Some <| Error err
+                    resultOpt <- Some <| Error err
                     loop <- false
                 | (SuccessCont, _) :: ss ->
                     contStack <- ss
@@ -60,7 +60,7 @@ type Runtime() =
                 handleError err
 
         task {
-            while result.IsNone do
+            while resultOpt.IsNone do
                 match currentEff with
                 | Success res ->
                     handleSuccess res
@@ -89,7 +89,7 @@ type Runtime() =
                     )
                     |> ignore
                     handleSuccess fiber
-                | ConcurrentTask (task, onError, fiber, ifiber) ->
+                | ConcurrentTPLTask (task, onError, fiber, ifiber) ->
                     Task.Run(fun () ->
                         (task ()).ContinueWith((fun (t: Task<obj>) ->
                             if t.IsFaulted then
@@ -125,10 +125,10 @@ type Runtime() =
                     currentEff <- eff
                     contStack <- (FailureCont, cont) :: contStack
 
-            return result.Value
+            return resultOpt.Value
         }
 
-    override this.Run (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
+    override this.Run<'R, 'E> (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
         let fiber = Fiber<'R, 'E>()
         task {
             let! res = this.InterpretAsync <| eff.Upcast()

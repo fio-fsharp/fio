@@ -52,23 +52,23 @@ type FIOApp<'R, 'E> (onSuccess: 'R -> Task<unit>, onError: 'E -> Task<unit>, run
 
     abstract member effect: FIO<'R, 'E>
 
-    static member Run (app: FIOApp<'R, 'E>) =
+    static member Run<'R, 'E> (app: FIOApp<'R, 'E>) =
         app.Run()
 
-    static member Run (eff: FIO<'R, 'E>) =
+    static member Run<'R, 'E> (eff: FIO<'R, 'E>) =
         let fiber = defaultRuntime.Run eff
         let task = defaultFiberHandler fiber
         task.Wait()
 
-    member this.Run () =
+    member this.Run<'R, 'E> () =
         this.Run runtime
 
-    member this.Run runtime =
+    member this.Run<'R, 'E> runtime =
         let fiber = runtime.Run this.effect
         let task = fiberHandler fiber
         task.Wait()
 
-    member this.Run (onSuccess: 'R -> 'F, onError: 'E -> 'F) =
+    member this.Run<'R, 'E, 'F> (onSuccess: 'R -> Task<'F>, onError: 'E -> Task<'F>) =
         let fiber = runtime.Run this.effect
         let task = mergeFiber onSuccess onError fiber
         task.Wait()

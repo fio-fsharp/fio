@@ -18,11 +18,11 @@ let inline ( !- ) (err: 'E) : FIO<'R, 'E> =
     FIO.Fail err
 
 /// An alias for 'FromFunc' which succeeds with the result of a function and applies error handling if necessary.
-let inline ( !<<< ) (func: unit -> 'R) (onError: exn -> 'E) =
+let inline ( !<<< ) (func: unit -> 'R) (onError: exn -> 'E) : FIO<'R, 'E> =
     FIO.FromFunc<'R, 'E> (func, onError)
     
 /// An alias for 'FromFunc' which succeeds with the result of a function and fails with Exception.
-let inline ( !<< ) (func: unit -> 'R) =
+let inline ( !<< ) (func: unit -> 'R) : FIO<'R, exn> =
     FIO.FromFunc<'R, exn> func
 
 /// An alias for `Send`, which puts the message on the channel and succeeds with the message.

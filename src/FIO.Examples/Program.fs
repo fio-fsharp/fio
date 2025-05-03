@@ -435,14 +435,23 @@ type FiberFromTaskApp() =
     let fibonacci n =
         FIO.FromGenericTask<Fiber<string, exn>, exn> <| fun () ->
             task {
-                let rec fib (n: int64) =
-                    if n <= 1 then n
-                    else fib (n - 1L) + fib (n - 2L)
-                
+                let fib (n: int64) =
+                    let mutable a = 0L
+                    let mutable b = 1L
+                    let mutable i = 0L
+
+                    while i < n do
+                        let temp = a + b
+                        a <- b
+                        b <- temp
+                        i <- i + 1L
+                        
+                    a
+
                 printfn $"Task computing Fibonacci of %i{n}..."
                 let res = fib n
                 return $"Fibonacci of %i{n} is %i{res}"
-           }
+            }
 
     override this.effect : FIO<unit, exn> =
         let awaitAndPrint (fiber: Fiber<string, exn>) =
@@ -669,6 +678,7 @@ Console.ReadLine() |> ignore
 AsyncErrorHandlingApp().Run()
 Console.ReadLine() |> ignore
 
+// TODO: Seems to be waiting forever after finishing. Investigate!
 HighlyConcurrentApp().Run()
 Console.ReadLine() |> ignore
 

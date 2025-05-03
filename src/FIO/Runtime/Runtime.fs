@@ -20,7 +20,7 @@ type FIORuntime internal () =
     override this.ConfigString =
         this.Name
 
-    abstract member Run : FIO<'R, 'E> -> Fiber<'R, 'E>
+    abstract member Run<'R, 'E> : FIO<'R, 'E> -> Fiber<'R, 'E>
 
     override this.ToString () =
         this.ConfigString
@@ -31,21 +31,21 @@ type WorkerConfig =
       BWCount: int }
 
 [<AbstractClass>]
-type FIOWorkerRuntime internal (config: WorkerConfig) =
-    inherit FIORuntime()
+type FIOWorkerRuntime internal (config: WorkerConfig) as this =
+    inherit FIORuntime ()
 
     let validateWorkerConfiguration () =
         if config.EWCount <= 0 ||
            config.EWSteps <= 0 ||
            config.BWCount <= 0 then
-            invalidArg "config" "Invalid worker configuration!"
+            invalidArg "config" $"Invalid worker configuration! %s{this.ToString()}"
 
     do validateWorkerConfiguration ()
 
     member this.GetWorkerConfiguration () =
         config
 
-    override this.ConfigString  =
+    override this.ConfigString =
         let ci = CultureInfo "en-US"
         $"""EWC: %s{config.EWCount.ToString("N0", ci)} EWS: %s{config.EWSteps.ToString("N0", ci)} BWC: %s{config.BWCount.ToString("N0", ci)}"""
 
