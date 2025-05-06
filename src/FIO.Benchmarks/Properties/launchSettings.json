@@ -2,7 +2,7 @@
   "profiles": {
     "Benchmarks": {
       "commandName": "Project",
-      "commandLineArgs": "--advanced-runtime 13 15 1 --runs 50 --big 500 1 --actor-increment 500 4 --save true"
+      "commandLineArgs": "--concurrent-runtime 15 100 1 --runs 25 --threadring 100 10"
     }
   }
 }

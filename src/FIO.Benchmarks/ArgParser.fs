@@ -6,12 +6,12 @@
 
 module internal ArgParser
 
+open FIO.Runtime
+open FIO.Benchmarks.Suite
+
 open Argu
 
 open System.IO
-
-open FIO.Runtime
-open FIO.Benchmarks.Suite
 
 type internal Arguments =
     | Direct_Runtime
@@ -20,11 +20,11 @@ type internal Arguments =
     | Runs of runs: int
     | Actor_Increment of actorInc: int * times: int
     | Round_Increment of roundInc: int * times: int
-    | Pingpong of rounds: int
-    | Threadring of actors: int * rounds: int
-    | Big of actors: int * rounds: int
-    | Bang of actors: int * rounds: int
-    | Fork of actors: int
+    | Pingpong of roundCount: int
+    | Threadring of actorCount: int * roundCount: int
+    | Big of actorCount: int * roundCount: int
+    | Bang of actorCount: int * roundCount: int
+    | Fork of actorCount: int
     | Save of saveToCsv: bool
     | SavePath of absolutePath: string
 
@@ -66,7 +66,7 @@ type internal Parser() =
         printfn $"benchmark arguments: %s{argsStr}"
 
     member internal this.PrintUsage() =
-        printfn "%s" (parser.PrintUsage())
+        printfn $"%s{parser.PrintUsage()}"
 
     member internal this.ParseArgs args =
         let results = parser.Parse args
@@ -75,10 +75,10 @@ type internal Parser() =
             if results.Contains Direct_Runtime then
                 Direct.Runtime()
             elif results.Contains Cooperative_Runtime then
-                let (ewc, ews, bwc) = results.GetResult Cooperative_Runtime
+                let ewc, ews, bwc = results.GetResult Cooperative_Runtime
                 Cooperative.Runtime({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
             elif results.Contains Concurrent_Runtime then
-                let (ewc, ews, bwc) = results.GetResult Concurrent_Runtime
+                let ewc, ews, bwc = results.GetResult Concurrent_Runtime
                 Concurrent.Runtime({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
             else
                 invalidArg "args" "Runtime should be specified!"
@@ -90,27 +90,31 @@ type internal Parser() =
         let roundInc = results.TryGetResult Round_Increment |> Option.defaultValue (0, 0)
 
         let configs =
-            [ results.TryGetResult Pingpong |> Option.map (fun rounds -> PingpongConfig rounds)
-              results.TryGetResult Threadring |> Option.map (fun (actors, rounds) -> ThreadringConfig (actors, rounds))
-              results.TryGetResult Big |> Option.map (fun (actors, rounds) -> BigConfig (actors, rounds))
-              results.TryGetResult Bang |> Option.map (fun (actors, rounds) -> BangConfig (actors, rounds))
-              results.TryGetResult Fork |> Option.map  (fun actors -> ForkConfig actors) ]
+            [ results.TryGetResult Pingpong |> Option.map PingpongConfig
+              results.TryGetResult Threadring |> Option.map ThreadringConfig
+              results.TryGetResult Big |> Option.map BigConfig
+              results.TryGetResult Bang |> Option.map BangConfig
+              results.TryGetResult Fork |> Option.map  ForkConfig ]
             |> List.choose id
 
         if configs.IsEmpty then
             invalidArg "args" "At least one benchmark should be specified!"
 
-        let saveToCsv = results.TryGetResult Save |> Option.defaultValue false
+        let saveToCsv =
+            results.TryGetResult Save
+            |> Option.defaultValue false
 
         let projectDirPath =
             Directory.GetCurrentDirectory()
             |> Directory.GetParent
-            |> (fun di -> di.Parent)
-            |> (fun di -> di.Parent)
+            |> _.Parent
+            |> _.Parent
             |> function
                 | null -> failwith "Unexpected directory structure!"
                 | di -> di.FullName
-        let savePath = results.TryGetResult SavePath |> Option.defaultValue (projectDirPath + @"\data\")
+        let savePath =
+           results.TryGetResult SavePath
+           |> Option.defaultValue (projectDirPath + @"\data\")
 
         { Runtime = runtime
           Runs = runs

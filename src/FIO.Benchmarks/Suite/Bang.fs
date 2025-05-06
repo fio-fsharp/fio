@@ -12,89 +12,87 @@
 module internal FIO.Benchmarks.Suite.Bang
 
 open FIO.Core
+#if DEBUG
+open FIO.Lib.IO
+#endif
+
 open FIO.Benchmarks.Tools.Timer
+
+open System
 
 type private Actor = 
     { Name: string; 
       Chan: int channel }
 
-[<TailCall>]
-let rec private createSendActorHelper actor rounds msg = fio {
-    if rounds <= 0 then
-        return ()
-    else
-        let! _ = actor.Chan <-- msg
-        #if DEBUG
-        printfn $"DEBUG: %s{actor.Name} sent: %i{msg}"
-        #endif
-        return! createSendActorHelper actor (rounds - 1) msg
-}
+let private createSendingActor actor roundCount msg timerChan startChan =
+    fio {
+        do! timerChan <!-- Start
+        do! !<!-- startChan
+        
+        for _ in 1..roundCount do
+            do! actor.Chan <!-- msg
+            #if DEBUG
+            do! FConsole.PrintLine $"[DEBUG]: %s{actor.Name} sent: %i{msg}"
+            #endif
+    }
 
-let rec private createSendActor actor rounds msg timerChan startChan = fio {
-    let! _ = timerChan <-- Start
-    let! _ = !<-- startChan
-    return! createSendActorHelper actor rounds msg
-}
+let private createReceiveActor actor roundCount timerChan startChan =
+    fio {
+        do! timerChan <!-- Start
+        do! !<!-- startChan
+        
+        for _ in 1..roundCount do
+            let! msg = !<-- actor.Chan
+            #if DEBUG
+            do! FConsole.PrintLine $"[DEBUG]: %s{actor.Name} received: %i{msg}"
+            #endif
+            
+        do! timerChan <!-- Stop
+    }
 
-[<TailCall>]
-let rec private createRecvActorHelper actor rounds timerChan = fio {
-    if rounds <= 0 then
-        let! _ = timerChan <-- Stop
-        return ()
-    else
-        let! msg = !<-- actor.Chan
-        #if DEBUG
-        printfn $"DEBUG: %s{actor.Name} received: %i{msg}"
-        #endif
-        return! createRecvActorHelper actor (rounds - 1) timerChan
-}
+let private createBang receivingActor (sendingActors: Actor list) actorCount roundCount msg timerChan startChan =
+    fio {
+        let mutable currentMsg = msg
+        let mutable currentEff = createReceiveActor receivingActor (actorCount * roundCount) timerChan startChan
+        
+        for sendingActor in sendingActors do
+            currentEff <- createSendingActor sendingActor roundCount currentMsg timerChan startChan
+                          <~> currentEff
+            currentMsg <- currentMsg + 1
+        
+        return! currentEff
+    }
 
-let rec private createRecvActor actor rounds timerChan startChan = fio {
-    let! _ = timerChan <-- Start
-    let! _ = !<-- startChan
-    return! createRecvActorHelper actor rounds timerChan
-}
-
-[<TailCall>]
-let rec private createBang recvActor sendActors rounds msg timerChan startChan acc = fio {
-    match sendActors with
-    | [] -> return! acc
-    | ac :: acs ->
-        let newAcc = createSendActor ac rounds msg timerChan startChan <~> acc
-        return! createBang recvActor acs rounds (msg + 1) timerChan startChan newAcc
-}
-
-let private createSendActors recvActorChan actorCount =
+let private createSendingActors receiveActorChan actorCount =
     List.map (fun index ->
             { Name = $"Actor-{index}"
-              Chan = recvActorChan })
+              Chan = receiveActorChan })
         [ 1..actorCount ]
 
-let internal Create config = fio {
-    let actorCount, rounds =
-        match config with
-        | BangConfig (actors, rounds) -> (actors, rounds)
-        | _ -> invalidArg "config" "Bang benchmark requires a BangConfig!"
+let internal Create config : FIO<int64, exn> =
+    fio {
+        let! actorCount, roundCount =
+            match config with
+            | BangConfig (actorCount, roundCount) -> !+ (actorCount, roundCount)
+            | _ -> !- ArgumentException("Bang benchmark requires a BangConfig!", nameof(config))
+        
+        if actorCount < 1 then
+            return! !- ArgumentException($"Bang failed: At least 1 actor should be specified. actorCount = %i{actorCount}", nameof(actorCount))
+        
+        if roundCount < 1 then
+            return! !- ArgumentException($"Bang failed: At least 1 round should be specified. roundCount = %i{roundCount}", nameof(roundCount))
+        
+        let timerChan = Channel<TimerMessage<int>>()
+        let startChan = Channel<int>()
 
-    let timerChan = Channel<TimerMessage<int>>()
-    let startChan = Channel<int>()
+        let receivingActor =
+            { Name = "Actor-0"
+              Chan = Channel<int>() }
 
-    let recvActor =
-        { Name = "Actor-0"
-          Chan = Channel<int>() }
-
-    let sendActors = createSendActors recvActor.Chan actorCount
-
-    let ac, acs =
-        match List.rev sendActors with
-        | ac :: acs -> (ac, acs)
-        | _ -> invalidArg "actorCount" $"createBang failed! (at least 1 sending actor should exist) actorCount = %i{actorCount}"
-
-    let acc = createSendActor ac rounds 1 timerChan startChan
-              <~> createRecvActor recvActor (actorCount * rounds) timerChan startChan
-    let! timerFiber = !<~ (TimerEff (actorCount + 1) (actorCount + 1) 1 timerChan)
-    let! _ = timerChan <-- MsgChannel startChan
-    do! createBang recvActor acs rounds 2 timerChan startChan acc
-    let! res = !<~~ timerFiber
-    return res
-}
+        let sendingActors = createSendingActors receivingActor.Chan actorCount
+        let! timerFiber = !<~ (TimerEff (actorCount + 1) (actorCount + 1) 1 timerChan)
+        do! timerChan <!-- MsgChannel startChan
+        do! createBang receivingActor sendingActors actorCount roundCount 1 timerChan startChan
+        let! res = !<~~ timerFiber
+        return res
+    }

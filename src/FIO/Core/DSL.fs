@@ -121,8 +121,11 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
     
     member internal this.AddBlockingWorkItem blockingWorkItem =
         blockingWorkItemChan.AddAsync blockingWorkItem
+        
+    member internal this.BlockingWorkItemCount =
+        blockingWorkItemChan.Count
 
-    member internal this.Completed () =
+    member internal this.Completed =
         resChan.Count > 0
 
     member internal this.Id =
