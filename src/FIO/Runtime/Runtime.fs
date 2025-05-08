@@ -6,7 +6,7 @@
 
 namespace FIO.Runtime
 
-open FIO.Core
+open FIO.DSL
 
 open System.Globalization
 
@@ -22,6 +22,14 @@ type FIORuntime internal () =
 
     abstract member Run<'R, 'E> : FIO<'R, 'E> -> Fiber<'R, 'E>
 
+    member this.ToFileString () =
+        this.ToString()
+            .ToLowerInvariant()
+            .Replace("(", "")
+            .Replace(")", "")
+            .Replace(":", "")
+            .Replace(' ', '-')
+    
     override this.ToString () =
         this.ConfigString
 

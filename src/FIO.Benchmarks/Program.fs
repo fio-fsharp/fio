@@ -6,10 +6,11 @@
 
 module private Program
 
-open System.Threading
-
 open FIO.Benchmarks.Suite
 
+open System.Threading
+
+// TODO: Is this necessary?
 let maxThreads = 32767
 ThreadPool.SetMaxThreads(maxThreads, maxThreads) |> ignore
 ThreadPool.SetMinThreads(maxThreads, maxThreads) |> ignore
@@ -18,5 +19,8 @@ ThreadPool.SetMinThreads(maxThreads, maxThreads) |> ignore
 let main args =
     let parser = ArgParser.Parser()
     parser.PrintArgs args
-    BenchmarkRunner.Run <| parser.ParseArgs args
+    let task =
+        BenchmarkRunner.Run
+        <| parser.ParseArgs args
+    task.Wait()
     0

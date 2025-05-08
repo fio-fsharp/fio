@@ -6,7 +6,7 @@
 
 module FIO.Runtime.Concurrent
 
-open FIO.Core
+open FIO.DSL
 
 open System
 open System.Threading
@@ -20,7 +20,7 @@ type private EvaluationWorkerConfig =
 
 and private BlockingWorkerConfig =
     { ActiveWorkItemChan: InternalChannel<WorkItem>
-      ActiveBlockingItemEventChan: InternalChannel<BlockingItem> }
+      ActiveBlockingEventChan: InternalChannel<Channel<obj>> }
 
 and private EvaluationWorker (config: EvaluationWorkerConfig) =
     
@@ -34,24 +34,26 @@ and private EvaluationWorker (config: EvaluationWorkerConfig) =
             | eff, stack, RescheduleForRunning ->
                 do! config.ActiveWorkItemChan.AddAsync
                     <| WorkItem.Create (eff, workItem.IFiber, stack, RescheduleForRunning)
-            | eff, stack, RescheduleForBlocking blockingItem ->
-                do! config.BlockingWorker.RescheduleForBlocking blockingItem
-                    <| WorkItem.Create (eff, workItem.IFiber, stack, RescheduleForBlocking blockingItem)
+            | _, _, Skipped ->
+                ()
             | _ ->
+                printfn "ERROR: EvaluationWorker: Unexpected state encountered during effect interpretation!"
                 invalidOp "EvaluationWorker: Unexpected state encountered during effect interpretation!"
         }
 
     let startWorker () =
-        task {
-            let mutable loop = true
-            while loop do
-                let! hasWorkItem = config.ActiveWorkItemChan.WaitToTakeAsync()
-                if not hasWorkItem then
-                    loop <- false
-                else
-                    let! workItem = config.ActiveWorkItemChan.TakeAsync()
-                    do! processWorkItem workItem
-        } |> ignore
+        (new Task((fun () ->
+            task {
+                let mutable loop = true
+                while loop do
+                    let! hasWorkItem = config.ActiveWorkItemChan.WaitToTakeAsync()
+                    if not hasWorkItem then
+                        loop <- false
+                    else
+                        let! workItem = config.ActiveWorkItemChan.TakeAsync()
+                        do! processWorkItem workItem
+            } |> ignore), TaskCreationOptions.LongRunning))
+            .Start TaskScheduler.Default
 
     let cancellationTokenSource = new CancellationTokenSource()
     do startWorker ()
@@ -68,30 +70,24 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
                 do! blockingChan.RescheduleNextBlockingWorkItem
                     <| config.ActiveWorkItemChan
             else
-                do! config.ActiveBlockingItemEventChan.AddAsync
-                    <| BlockingChannel blockingChan
-        }
-
-    let processBlockingItem blockingItem =
-        task {
-            match blockingItem with
-            | BlockingChannel blockingChan ->
-                do! processBlockingChannel blockingChan
-            | _ ->
-                return ()
+                do! config.ActiveBlockingEventChan.AddAsync blockingChan
         }
 
     let startWorker () =
-        task {
-            let mutable loop = true
-            while loop do
-                let! hasBlockingItem = config.ActiveBlockingItemEventChan.WaitToTakeAsync()
-                if not hasBlockingItem then
-                    loop <- false 
-                else
-                    let! blockingItem = config.ActiveBlockingItemEventChan.TakeAsync()
-                    do! processBlockingItem blockingItem
-        } |> ignore
+        (new Task((fun () ->
+            task {
+                let mutable loop = true
+                while loop do
+                    // When the BlockingWorker receives a channel, it is an "event" that the
+                    // the given channel now has received one element, that the next blocking effect can retrieve.
+                    let! hasBlockingItem = config.ActiveBlockingEventChan.WaitToTakeAsync()
+                    if not hasBlockingItem then
+                        loop <- false 
+                    else
+                        let! blockingChanEvent = config.ActiveBlockingEventChan.TakeAsync()
+                        do! processBlockingChannel blockingChanEvent
+            } |> ignore), TaskCreationOptions.LongRunning))
+            .Start TaskScheduler.Default
 
     let cancellationTokenSource = new CancellationTokenSource()
     do startWorker ()
@@ -100,24 +96,17 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
         member this.Dispose () =
             cancellationTokenSource.Cancel()
 
-    member internal this.RescheduleForBlocking blockingItem blockingWorkItem =
-        match blockingItem with
-        | BlockingChannel chan ->
-            chan.AddBlockingWorkItem blockingWorkItem
-        | BlockingIFiber ifiber ->
-            ifiber.AddBlockingWorkItem blockingWorkItem
-
 and Runtime(config: WorkerConfig) as this =
     inherit FIOWorkerRuntime(config)
 
     let activeWorkItemChan = InternalChannel<WorkItem>()
-    let activeBlockingItemEventChan = InternalChannel<BlockingItem>()
+    let activeBlockingEventChan = InternalChannel<Channel<obj>>()
 
     let createBlockingWorkers count =
         List.init count <| fun _ ->
             new BlockingWorker({
                 ActiveWorkItemChan = activeWorkItemChan
-                ActiveBlockingItemEventChan = activeBlockingItemEventChan
+                ActiveBlockingEventChan = activeBlockingEventChan
             })
 
     let createEvaluationWorkers runtime blockingWorker evalSteps count =
@@ -211,16 +200,19 @@ and Runtime(config: WorkerConfig) as this =
                             handleError <| onError exn
                     | SendChan (msg, chan) ->
                         do! chan.SendAsync msg
-                        do! activeBlockingItemEventChan.AddAsync <| BlockingChannel chan
+                        do! activeBlockingEventChan.AddAsync chan
                         handleSuccess msg
                     | ReceiveChan chan ->
                         if chan.Count > 0 then
                             let! res = chan.ReceiveAsync()
                             handleSuccess res
                         else
-                            let newPrevAction = RescheduleForBlocking <| BlockingChannel chan
+                            let newPrevAction = Skipped
                             currentPrevAction <- newPrevAction
-                            resultOpt <- Some (ReceiveChan chan, currentContStack, newPrevAction)
+                            chan.AddBlockingWorkItem
+                            <| WorkItem.Create (ReceiveChan chan, workItem.IFiber, currentContStack, newPrevAction)
+                            |> ignore
+                            resultOpt <- Some (Success (), ContStack.Empty, newPrevAction)
                     | ConcurrentEffect (eff, fiber, ifiber) ->
                         do! activeWorkItemChan.AddAsync
                             <| WorkItem.Create (eff, ifiber, ContStack.Empty, currentPrevAction)
@@ -246,13 +238,16 @@ and Runtime(config: WorkerConfig) as this =
                         ) |> ignore
                         handleSuccess fiber
                     | AwaitFiber ifiber ->
-                        if ifiber.Completed() then
+                        if ifiber.Completed then
                             let! res = ifiber.AwaitAsync()
                             handleResult res
                         else
-                            let newPrevAction = RescheduleForBlocking <| BlockingIFiber ifiber
+                            let newPrevAction = Skipped
                             currentPrevAction <- newPrevAction
-                            resultOpt <- Some (AwaitFiber ifiber, currentContStack, newPrevAction)
+                            ifiber.AddBlockingWorkItem
+                            <| WorkItem.Create (AwaitFiber ifiber, workItem.IFiber, currentContStack, newPrevAction)
+                            |> ignore
+                            resultOpt <- Some (Success (), ContStack.Empty, newPrevAction)
                     | AwaitGenericTPLTask (task, onError) ->
                         try
                             let! res = task

@@ -1,4 +1,4 @@
-(*************************************************************************************************************)
+﻿(*************************************************************************************************************)
 (* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
 (* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
 (* All rights reserved                                                                                       *)
@@ -6,7 +6,7 @@
 
 module private FIO.Examples
 
-open FIO.Core
+open FIO.DSL
 open FIO.Runtime.Concurrent
 
 open FIO.Lib.IO
@@ -611,6 +611,26 @@ type WebSocketApp(serverUrl, clientUrl) =
         fio {
             do! server serverUrl <~> client clientUrl
         }
+
+let test number =
+    fio {
+        
+        if number = 0 then
+            return! !- (ArgumentException("Number was 0!", "number"))
+        else
+            return number
+    }
+    
+task {
+    let fiber = Runtime().Run (test 0)
+    let! result = fiber.AwaitAsync()
+    match result with
+    | Ok result -> printfn $"Success: %i{result}"
+    | Error error -> printfn $"Error: %A{error}"
+} |> ignore
+Console.ReadLine() |> ignore
+Console.ReadLine() |> ignore
+Console.ReadLine() |> ignore
 
 helloWorld1 ()
 Console.ReadLine() |> ignore

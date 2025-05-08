@@ -5,7 +5,7 @@
 (*************************************************************************************************************)
 
 [<AutoOpen>]
-module FIO.Core.Ops
+module FIO.DSL.Ops
 
 open System.Threading.Tasks
 

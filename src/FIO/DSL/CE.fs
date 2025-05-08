@@ -5,7 +5,7 @@
 (*************************************************************************************************************)
 
 [<AutoOpen>]
-module FIO.Core.CE
+module FIO.DSL.CE
 
 open System
 open System.Collections.Generic

@@ -5,7 +5,7 @@
 (*************************************************************************************************************)
 
 [<AutoOpen>]
-module FIO.Core.App
+module FIO.DSL.App
 
 open FIO.Runtime
 open FIO.Runtime.Concurrent

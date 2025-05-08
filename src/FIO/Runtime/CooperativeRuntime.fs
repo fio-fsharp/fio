@@ -6,7 +6,7 @@
 
 module FIO.Runtime.Cooperative
 
-open FIO.Core
+open FIO.DSL
 
 open System
 open System.Threading
@@ -47,20 +47,23 @@ and private EvaluationWorker (config: EvaluationWorkerConfig) =
                     <| BlockingData.Create (blockingItem,
                         WorkItem.Create (eff, workItem.IFiber, stack, RescheduleForBlocking blockingItem))
             | _ ->
-                invalidOp "EvaluationWorker: Unexpected state encountered during effect evaluation!"
+                printfn "ERROR: EvaluationWorker: Unexpected state encountered during effect interpretation!"
+                invalidOp "EvaluationWorker: Unexpected state encountered during effect interpretation!"
         }
 
     let startWorker () =
-        task {
-            let mutable loop = true
-            while loop do
-                let! hasWorkItem = config.ActiveWorkItemChan.WaitToTakeAsync()
-                if not hasWorkItem then
-                    loop <- false
-                else
-                    let! workItem = config.ActiveWorkItemChan.TakeAsync()
-                    do! processWorkItem workItem
-        } |> ignore
+        (new Task((fun () ->
+            task {
+                let mutable loop = true
+                while loop do
+                    let! hasWorkItem = config.ActiveWorkItemChan.WaitToTakeAsync()
+                    if not hasWorkItem then
+                        loop <- false
+                    else
+                        let! workItem = config.ActiveWorkItemChan.TakeAsync()
+                        do! processWorkItem workItem
+            } |> ignore), TaskCreationOptions.LongRunning))
+            .Start TaskScheduler.Default
 
     let cancellationTokenSource = new CancellationTokenSource()
     do startWorker ()
@@ -78,7 +81,7 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
             config.ActiveBlockingDataChan.AddAsync blockingData
             
     let processBlockingIFiber blockingData (ifiber: InternalFiber) =
-        if ifiber.Completed() then
+        if ifiber.Completed then
             config.ActiveWorkItemChan.AddAsync blockingData.WaitingWorkItem
         else
             config.ActiveBlockingDataChan.AddAsync blockingData
@@ -93,16 +96,18 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
         }
     
     let startWorker () =
-        task {
-            let mutable loop = true
-            while loop do
-                let! hasBlockingItem = config.ActiveBlockingDataChan.WaitToTakeAsync()
-                if not hasBlockingItem then
-                    loop <- false 
-                else
-                    let! blockingData = config.ActiveBlockingDataChan.TakeAsync()
-                    do! processBlockingData blockingData
-        } |> ignore
+        (new Task((fun () ->
+            task {
+                let mutable loop = true
+                while loop do
+                    let! hasBlockingItem = config.ActiveBlockingDataChan.WaitToTakeAsync()
+                    if not hasBlockingItem then
+                        loop <- false 
+                    else
+                        let! blockingData = config.ActiveBlockingDataChan.TakeAsync()
+                        do! processBlockingData blockingData
+            } |> ignore), TaskCreationOptions.LongRunning))
+            .Start TaskScheduler.Default
 
     let cancellationTokenSource = new CancellationTokenSource()
     do startWorker ()
@@ -252,7 +257,7 @@ and Runtime (config: WorkerConfig) as this =
                         ) |> ignore
                         handleSuccess fiber
                     | AwaitFiber ifiber ->
-                        if ifiber.Completed() then
+                        if ifiber.Completed then
                             let! res = ifiber.AwaitAsync()
                             handleResult res
                         else

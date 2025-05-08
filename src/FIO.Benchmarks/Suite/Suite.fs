@@ -6,18 +6,18 @@
 
 namespace FIO.Benchmarks.Suite
 
-open System.Globalization
-
 open FIO.Runtime
 
-type internal BenchmarkConfig =
-    | PingpongConfig of rounds: int
-    | ThreadringConfig of actors: int * rounds: int
-    | BigConfig of actors: int * rounds: int
-    | BangConfig of actors: int * rounds: int
-    | ForkConfig of actors: int
+open System.Globalization
 
-    member internal this.Name() =
+type internal BenchmarkConfig =
+    | PingpongConfig of roundCount: int
+    | ThreadringConfig of actorCount: int * roundCount: int
+    | BigConfig of actorCount: int * roundCount: int
+    | BangConfig of actorCount: int * roundCount: int
+    | ForkConfig of actorCount: int
+
+    member internal this.Name =
         match this with
         | PingpongConfig _ -> "Pingpong"
         | ThreadringConfig _ -> "Threadring"
@@ -25,7 +25,7 @@ type internal BenchmarkConfig =
         | BangConfig _ -> "Bang"
         | ForkConfig _ -> "Fork"
 
-    member internal this.ConfigString() =
+    member internal this.ConfigString =
         let ci = CultureInfo("en-US")
         match this with
         | PingpongConfig rounds ->
@@ -39,9 +39,19 @@ type internal BenchmarkConfig =
         | ForkConfig actors ->
             $"""Actors: %s{actors.ToString("N0", ci)} Rounds: 1"""
 
-    override this.ToString() =
-        $"{this.Name()} ({this.ConfigString()})"
-
+    member internal this.ToFileString () =
+        this.ToString()
+            .ToLowerInvariant()
+            .Replace("(", "") 
+            .Replace(")", "")
+            .Replace(":", "")
+            .Replace(" ", "-")
+            .Replace(",", "")
+            .Replace(".", "")
+    
+    override this.ToString () =
+        $"{this.Name} ({this.ConfigString})"
+        
 type internal BenchmarkResult = 
     { Config: BenchmarkConfig
       RuntimeName: string

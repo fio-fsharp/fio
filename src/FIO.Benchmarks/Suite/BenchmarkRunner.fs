@@ -6,10 +6,11 @@
 
 module internal FIO.Benchmarks.Suite.BenchmarkRunner
 
+open FIO.DSL
+open FIO.Runtime
+
 open System
 open System.IO
-
-open FIO.Runtime
 
 let private writeResultToCsv result savePath =
 
@@ -18,22 +19,12 @@ let private writeResultToCsv result savePath =
         | [] -> acc
         | (_, time) :: ts -> csvContent ts (acc + $"%i{time}\n")
 
-    let benchName = 
-        result.Config.ToString()
-            .ToLowerInvariant()
-            .Replace("(", "") 
-            .Replace(")", "")
-            .Replace(":", "")
-            .Replace(" ", "-")
-            .Replace(",", "")
-            .Replace(".", "")
+    let benchName = result.Config.ToFileString()
     let folderName = $"%s{benchName}-runs-%s{result.Times.Length.ToString()}"
     let dirPath = savePath + folderName + @"\" + result.RuntimeFileName.ToLower()
 
     if not <| Directory.Exists dirPath then
         Directory.CreateDirectory dirPath |> ignore
-    else
-        ()
 
     let fileName = $"""{folderName}-{result.RuntimeFileName.ToLower()}-{DateTime.Now.ToString("dd_MM_yyyy-HH-mm-ss")}.csv"""
     let filePath = dirPath + @"\" + fileName
@@ -72,80 +63,90 @@ let private printResult result =
     printfn $"%s{header + timeRows}"
 
 let private runBenchmark (runtime: FIORuntime) totalRuns (config: BenchmarkConfig) =
+    
+    let rec executeBenchmark (eff: FIO<int64, exn>) =
+            task {
+                let mutable results = []
+                
+                for currentRun in 1..totalRuns do
+                    #if DEBUG
+                    printfn $"[DEBUG]: Executing benchmark: Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Current run (%i{currentRun}/%i{totalRuns})"
+                    #endif
+                    let! res = runtime.Run(eff).AwaitAsync()
+                    let time =
+                        match res with
+                        | Ok time -> time
+                        | Error err -> invalidOp $"BenchmarkRunner: Failed executing benchmark with error: %A{err}"
+                            
+                    #if DEBUG
+                    printfn $"[DEBUG]: Executing benchmark completed: Time: %i{time}ms, Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Current run (%i{currentRun}/%i{totalRuns})"
+                    #endif
+                    results <- List.append results [(currentRun, time)]
+                    
+                return results
+            }
+    
+    task {
+        #if DEBUG
+        printfn $"[DEBUG]: Starting benchmark session: Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Total runs: %i{totalRuns}"
+        #endif
+        
+        let eff =
+            match config with
+            | PingpongConfig rounds ->
+                Pingpong.Create <| PingpongConfig rounds
+            | ThreadringConfig (actors, rounds) ->
+                Threadring.Create <| ThreadringConfig (actors, rounds)
+            | BigConfig (actors, rounds) ->
+                Big.Create <| BigConfig (actors, rounds)
+            | BangConfig (actors, rounds) ->
+                Bang.Create <| BangConfig (actors, rounds)
+            | ForkConfig actors ->
+                Fork.Create <| ForkConfig actors
 
-    let rec executeBenchmark eff run acc =
-        match run with
-        | run when run = totalRuns -> acc
-        | run ->
-            let thisRun = run + 1
-            #if DEBUG
-            printfn $"[DEBUG]: Executing benchmark: Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Current run (%i{thisRun}/%i{totalRuns})"
-            #endif
-            let res = runtime.Run(eff).AwaitAsync()
-            let time =
-                res.Wait()
-                let res = res.Result
-                match res with
-                | Ok time -> time
-                | Error err -> invalidOp $"BenchmarkRunner: Failed executing benchmark with error: %A{err}"
-            #if DEBUG
-            printfn $"[DEBUG]: Executing benchmark completed: Time: %i{time}ms, Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Current run (%i{thisRun}/%i{totalRuns})"
-            #endif
-            let result = (thisRun, time)
-            executeBenchmark eff thisRun (acc @ [result])
-
-    #if DEBUG
-    printfn $"[DEBUG]: Starting benchmark session: Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Total runs: %i{totalRuns}"
-    #endif
-    let eff =
-        match config with
-        | PingpongConfig rounds ->
-            Pingpong.Create <| PingpongConfig rounds
-        | ThreadringConfig (actors, rounds) ->
-            Threadring.Create <| ThreadringConfig (actors, rounds)
-        | BigConfig (actors, rounds) ->
-            Big.Create <| BigConfig (actors, rounds)
-        | BangConfig (actors, rounds) ->
-            Bang.Create <| BangConfig (actors, rounds)
-        | ForkConfig actors ->
-            Fork.Create <| ForkConfig actors
-    let times = executeBenchmark eff 0 []
-    #if DEBUG
-    printfn $"[DEBUG]: Completed benchmark session: Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Total runs: %i{totalRuns}"
-    #endif
-    { Config = config
-      RuntimeName = runtime.ToString()
-      RuntimeFileName = 
-        runtime.ToString()
-            .ToLowerInvariant()
-            .Replace("(", "")
-            .Replace(")", "")
-            .Replace(":", "")
-            .Replace(' ', '-')
-      Times = times  }
+        let! times = executeBenchmark eff
+        
+        #if DEBUG
+        printfn $"[DEBUG]: Completed benchmark session: Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Total runs: %i{totalRuns}"
+        #endif
+        
+        return
+            { Config = config
+              RuntimeName = runtime.ToString()
+              RuntimeFileName = runtime.ToFileString()
+              Times = times }
+    }
 
 let internal Run args =
-    let (actorInc, actorIncTimes) = args.ActorIncrement
-    let (roundInc, roundIncTimes) = args.RoundIncrement
-
-    let configs =
-        args.BenchmarkConfigs
-        |> List.collect (fun config ->
-            [ for actorIncTime in 0..actorIncTimes do
-                for roundIncTime in 0..roundIncTimes do
-                    match config with
-                    | PingpongConfig rounds -> 
-                        yield PingpongConfig (rounds + (roundInc * roundIncTime))
-                    | ThreadringConfig (actors, rounds) -> 
-                        yield ThreadringConfig (actors + (actorInc * actorIncTime), rounds + (roundInc * roundIncTime))
-                    | BigConfig (actors, rounds) -> 
-                        yield BigConfig (actors + (actorInc * actorIncTime), rounds + (roundInc * roundIncTime))
-                    | BangConfig (actors, rounds) -> 
-                        yield BangConfig (actors + (actorInc * actorIncTime), rounds + (roundInc * roundIncTime))
-                    | ForkConfig actors -> 
-                        yield ForkConfig (actors + (actorInc * actorIncTime)) ])
-           
-    let results = List.map (fun config -> runBenchmark args.Runtime args.Runs config) configs
-    results |> List.iter (fun result ->
-        printResult result
-        if args.SaveToCsv then writeResultToCsv result args.SavePath)
+    task {
+        let actorInc, actorIncTimes = args.ActorIncrement
+        let roundInc, roundIncTimes = args.RoundIncrement
+        
+        if args.Runs < 1 then
+            invalidArg (nameof(args.Runs)) $"BenchmarkRunner: Runs argument must at least be 1. Runs = %i{args.Runs}"
+        
+        let configs =
+            args.BenchmarkConfigs
+            |> List.collect (fun config ->
+                [ for actorIncTime in 0..actorIncTimes do
+                    for roundIncTime in 0..roundIncTimes do
+                        match config with
+                        | PingpongConfig rounds -> 
+                            yield PingpongConfig (rounds + (roundInc * roundIncTime))
+                        | ThreadringConfig (actors, rounds) -> 
+                            yield ThreadringConfig (actors + (actorInc * actorIncTime), rounds + (roundInc * roundIncTime))
+                        | BigConfig (actors, rounds) -> 
+                            yield BigConfig (actors + (actorInc * actorIncTime), rounds + (roundInc * roundIncTime))
+                        | BangConfig (actors, rounds) -> 
+                            yield BangConfig (actors + (actorInc * actorIncTime), rounds + (roundInc * roundIncTime))
+                        | ForkConfig actors -> 
+                            yield ForkConfig (actors + (actorInc * actorIncTime)) ])
+        
+        let results = List.map (runBenchmark args.Runtime args.Runs) configs
+        
+        for task in results do
+            let! result = task
+            printResult result
+            if args.SaveToCsv then
+                writeResultToCsv result args.SavePath
+    }

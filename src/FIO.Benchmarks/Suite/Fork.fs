@@ -8,34 +8,41 @@
 
 module internal FIO.Benchmarks.Suite.Fork
 
-open FIO.Core
+open FIO.DSL
+
 open FIO.Benchmarks.Tools.Timer
 
-let private createActor timerChan = fio {
-    let! _ = timerChan <-- Stop
-    return ()
-}
+open System
 
-[<TailCall>]
-let rec private createFork actorCount timerChan acc = fio {
-    match actorCount with
-    | 0 -> return! acc
-    | count ->
-        let newAcc = createActor timerChan <~> acc
-        return! createFork (count - 1) timerChan newAcc
-}
+let private createActor timerChan =
+    fio {
+        do! timerChan <!-- Stop
+    }
 
-let internal Create config = fio {
-    let actorCount =
-        match config with
-        | ForkConfig actors -> actors
-        | _ -> invalidArg "config" "Fork benchmark requires a ForkConfig!"
+let private createFork actorCount timerChan =
+    fio {
+        let mutable currentEff = createActor timerChan
+        
+        for _ in 1..actorCount do
+            currentEff <- createActor timerChan <~> currentEff
+            
+        return! currentEff
+    }
 
-    let timerChan = Channel<TimerMessage<int>>()
-    let! timerFiber = !<~ (TimerEff 1 0 actorCount timerChan)
-    let! _ = timerChan <-- Start
-    let acc = createActor timerChan
-    do! createFork (actorCount - 1) timerChan acc
-    let! res = !<~~ timerFiber
-    return res
-}
+let internal Create config : FIO<int64, exn> =
+    fio {
+        let! actorCount =
+            match config with
+            | ForkConfig actorCount -> !+ actorCount
+            | _ -> !- ArgumentException("Fork benchmark requires a ForkConfig!", nameof(config))
+            
+        if actorCount < 1 then
+            return! !- ArgumentException($"Fork failed: At least 1 actor should be specified. actorCount = %i{actorCount}", nameof(actorCount))
+            
+        let! timerChan = !+ Channel<TimerMessage<int>>()
+        let! timerFiber = !<~ (TimerEff 1 0 actorCount timerChan)
+        do! timerChan <!-- Start
+        do! createFork actorCount timerChan
+        let! res = !<~~ timerFiber
+        return res
+    }

@@ -5,7 +5,7 @@
 (*************************************************************************************************************)
 
 [<AutoOpen>]
-module FIO.Core.DSL
+module FIO.DSL.Core
 
 open System
 open System.Threading
@@ -34,6 +34,7 @@ and internal ContStack =
     ContStackFrame list
 
 and internal RuntimeAction =
+    | Skipped
     | Evaluated
     | RescheduleForRunning
     | RescheduleForBlocking of BlockingItem
@@ -94,21 +95,27 @@ and internal InternalChannel<'R> (id: Guid) =
 
 and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>, blockingWorkItemChan: InternalChannel<WorkItem>) =
     let completeAlreadyCalledFail () =
+        // TODO: This will not throw an exception. How can we make sure it does?
+        printfn "WARNING: InternalFiber: Complete was called on an already completed InternalFiber! Exception will be raised."
         invalidOp $"InternalFiber: Complete was called on an already
             completed InternalFiber! Result channel count: %i{resChan.Count}"
 
     member internal this.Complete res =
-        if resChan.Count = 0 then
-            resChan.AddAsync res
-        else
-            completeAlreadyCalledFail ()
+        task {
+            if resChan.Count = 0 then
+                do! resChan.AddAsync res
+            else
+                completeAlreadyCalledFail ()
+        }
     
     member internal this.CompleteAndReschedule res activeWorkItemChan =
-        if resChan.Count = 0 then
-            resChan.AddAsync res |> ignore
-            this.RescheduleBlockingWorkItems activeWorkItemChan
-        else
-            completeAlreadyCalledFail ()
+        task {
+            if resChan.Count = 0 then
+                do! resChan.AddAsync res
+                do! this.RescheduleBlockingWorkItems activeWorkItemChan
+            else
+                completeAlreadyCalledFail ()
+        }
 
     member internal this.AwaitAsync () =
         task {
@@ -120,9 +127,16 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
         }
     
     member internal this.AddBlockingWorkItem blockingWorkItem =
-        blockingWorkItemChan.AddAsync blockingWorkItem
+        task {
+            if resChan.Count > 0 then
+                printfn "WARNING: InternalFiber: Adding a blocking item on a fiber that is already completed!"
+            do! blockingWorkItemChan.AddAsync blockingWorkItem
+        }
+        
+    member internal this.BlockingWorkItemCount =
+        blockingWorkItemChan.Count
 
-    member internal this.Completed () =
+    member internal this.Completed =
         resChan.Count > 0
 
     member internal this.Id =
@@ -130,6 +144,8 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
 
     member private this.RescheduleBlockingWorkItems (activeWorkItemChan: InternalChannel<WorkItem>) =
         task {
+            if resChan.Count = 0 then
+                printfn "WARNING: InternalFiber: Rescheduling blocking work items on a fiber that has not yet been completed!"
             while blockingWorkItemChan.Count > 0 do
                 let! unblockedWorkItem = blockingWorkItemChan.TakeAsync ()
                 do! activeWorkItemChan.AddAsync unblockedWorkItem

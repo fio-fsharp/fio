@@ -6,84 +6,94 @@
 
 module internal FIO.Benchmarks.Tools.Timer
 
-open System.Diagnostics
+open FIO.DSL
+open FIO.Lib.IO
 
-open FIO.Core
+open System.Diagnostics
 
 type internal TimerMessage<'R> =
     | Start
     | Stop
     | MsgChannel of 'R channel
 
-[<TailCall>]
-let rec private startLoop count startCount timerChan (stopwatch: Stopwatch) = fio {
-    match count with
-    | 0 ->
-        stopwatch.Start()
+let private startLoop startCount timerChan (stopwatch: Stopwatch) =
+    fio {
+        if startCount < 0 then
+            return! !- (invalidArg "startCount" $"Timer: startCount must be non-negative! startCount = %i{startCount}")
+        
+        let mutable currentCount = startCount
+        
+        while currentCount > 0 do
+            match! !<-- timerChan with
+            | Start ->
+                #if DEBUG
+                do! FConsole.PrintLine $"[DEBUG]: Timer received Start message (%i{startCount - currentCount + 1}/%i{startCount})"
+                #endif
+                currentCount <- currentCount - 1
+            | _ -> ()
+        
+        do! !<< (fun () -> stopwatch.Start())
         #if DEBUG
-        printfn "[DEBUG]: Timer started"
+        do! FConsole.PrintLine "[DEBUG]: Timer started"
         #endif
-    | count when count < 0 ->
-        invalidArg "startCount" "Timer: startCount must be non-negative!"
-    | count ->
-        let! msg = !<-- timerChan
-        match msg with
-        | Start ->
+    }
+
+let private msgLoop msgCount msg msgChan =
+    fio {
+        if msgCount < 0 then
+            return! !- (invalidArg "msgCount" $"Timer: msgCount must be non-negative! msgCount = %i{msgCount}")
+        
+        let mutable currentCount = msgCount
+        let mutable currentMsg = msg
+        
+        while currentCount > 0 do
+            let! _ = msgChan <-- msg
             #if DEBUG
-            printfn $"[DEBUG]: Timer received Start message (%i{startCount - count + 1}/%i{startCount})"
+            do! FConsole.PrintLine $"[DEBUG]: Timer sent %i{msg} to MsgChannel (%i{msgCount - currentCount + 1}/%i{msgCount})"
             #endif
-            return! startLoop (count - 1) startCount timerChan stopwatch
-        | _ -> return! startLoop count startCount timerChan stopwatch
-}
+            currentCount <- currentCount - 1
+            currentMsg <- currentMsg + 1
+    }
 
-[<TailCall>]
-let rec private msgLoop count msgCount msg msgChan = fio {
-    match count with
-    | 0 -> return ()
-    | count when count < 0 ->
-        invalidArg "msgCount" "Timer: msgCount must be non-negative!"
-    | count ->
-        let! _ = msgChan <-- msg
+let private stopLoop stopCount timerChan (stopwatch: Stopwatch) =
+    fio {
+        if stopCount < 0 then
+            return! !- (invalidArg "stopCount" $"Timer: stopCount must be non-negative! stopCount = %i{stopCount}")
+               
+        let mutable currentCount = stopCount
+        
+        while currentCount > 0 do
+            match! !<-- timerChan with
+            | Stop ->
+                #if DEBUG
+                do! FConsole.PrintLine $"[DEBUG]: Timer received Stop message (%i{stopCount - currentCount + 1}/%i{stopCount})"
+                #endif
+                currentCount <- currentCount - 1
+            | _ -> ()
+            
+        do! !<< (fun () -> stopwatch.Stop())
         #if DEBUG
-        printfn $"[DEBUG]: Timer sent %i{msg} to MsgChannel (%i{msgCount - count + 1}/%i{msgCount})"
-        #endif
-        return! msgLoop (count - 1) msgCount (msg + 1) msgChan
-}
-
-[<TailCall>]
-let rec private stopLoop count stopCount timerChan (stopwatch: Stopwatch) = fio {
-    match count with
-    | 0 ->
-        stopwatch.Stop()
-        #if DEBUG
-        printfn "[DEBUG]: Timer stopped"
+        do! FConsole.PrintLine "[DEBUG]: Timer stopped"
         #endif
         return ()
-    | count when count < 0 ->
-        invalidArg "stopCount" "Timer: stopCount must be non-negative!"
-    | count ->
-        let! msg = !<-- timerChan
-        match msg with
-        | Stop ->
-            #if DEBUG
-            printfn $"[DEBUG]: Timer received Stop message (%i{stopCount - count + 1}/%i{stopCount})"
-            #endif
-            return! stopLoop (count - 1) stopCount timerChan stopwatch
-        | _ -> return! stopLoop count stopCount timerChan stopwatch
-}
+    }
 
-let internal TimerEff startCount msgCount stopCount timerChan = fio {
-    let mutable msgChan = Channel<int>()
-    let stopwatch = Stopwatch()
-    if msgCount > 0 then
-        let! msg = !<-- timerChan
-        match msg with
-        | MsgChannel chan -> msgChan <- chan
-        | _ -> invalidOp "Timer: Did not receive MsgChannel as first message when msgCount > 0!"
-    else
-        ()
-    do! startLoop startCount startCount timerChan stopwatch
-    do! msgLoop msgCount msgCount 0 msgChan
-    do! stopLoop stopCount stopCount timerChan stopwatch
-    return stopwatch.ElapsedMilliseconds
-}
+let internal TimerEff startCount msgCount stopCount timerChan =
+    fio {
+        let mutable msgChan = Channel<int>()
+        let! stopwatch = !<< (fun () -> Stopwatch())
+        
+        if msgCount > 0 then
+            match! !<-- timerChan with
+            | MsgChannel chan ->
+                msgChan <- chan
+            | _ ->
+                return! !- (invalidOp "Timer: Did not receive MsgChannel as first message when msgCount > 0!")
+        else
+            ()
+
+        do! startLoop startCount timerChan stopwatch
+        do! msgLoop msgCount 0 msgChan
+        do! stopLoop stopCount timerChan stopwatch
+        return stopwatch.ElapsedMilliseconds
+    }
