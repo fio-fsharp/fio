@@ -6,7 +6,7 @@
 
 module FIO.Runtime.Cooperative
 
-open FIO.Core
+open FIO.DSL
 
 open System
 open System.Threading

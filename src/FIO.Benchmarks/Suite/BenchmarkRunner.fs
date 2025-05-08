@@ -6,7 +6,7 @@
 
 module internal FIO.Benchmarks.Suite.BenchmarkRunner
 
-open FIO.Core
+open FIO.DSL
 open FIO.Runtime
 
 open System

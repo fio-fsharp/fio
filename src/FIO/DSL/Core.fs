@@ -5,7 +5,7 @@
 (*************************************************************************************************************)
 
 [<AutoOpen>]
-module FIO.Core.DSL
+module FIO.DSL.Core
 
 open System
 open System.Threading

@@ -11,7 +11,7 @@
 
 module internal FIO.Benchmarks.Suite.Big
 
-open FIO.Core
+open FIO.DSL
 #if DEBUG
 open FIO.Lib.IO
 #endif

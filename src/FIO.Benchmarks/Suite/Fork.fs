@@ -8,7 +8,7 @@
 
 module internal FIO.Benchmarks.Suite.Fork
 
-open FIO.Core
+open FIO.DSL
 
 open FIO.Benchmarks.Tools.Timer
 

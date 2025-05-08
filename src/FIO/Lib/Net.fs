@@ -6,7 +6,7 @@
 
 namespace FIO.Lib.Net
 
-open FIO.Core
+open FIO.DSL
 
 open System
 open System.IO

@@ -6,7 +6,7 @@
 
 module FIO.Runtime.Concurrent
 
-open FIO.Core
+open FIO.DSL
 
 open System
 open System.Threading

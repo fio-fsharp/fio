@@ -6,7 +6,7 @@
 
 namespace FIO.Runtime
 
-open FIO.Core
+open FIO.DSL
 
 open System.Globalization
 

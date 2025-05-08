@@ -6,7 +6,7 @@
 
 module internal FIO.Runtime.Tools
 
-open FIO.Core
+open FIO.DSL
 
 open System.Threading
 

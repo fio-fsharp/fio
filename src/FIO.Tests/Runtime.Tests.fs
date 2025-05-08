@@ -11,7 +11,7 @@ module private FIO.Tests
 open System.Threading
 open NUnit.Framework
 
-open FIO.Core
+open FIO.DSL
 open FIO.Runtime
 (*
 [<TestFixture>]

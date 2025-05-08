@@ -1,6 +1,6 @@
 ﻿module DeadlockDetector
 
-open FIO.Core
+open FIO.DSL
 
 open System.Threading
 open System.Collections.Concurrent

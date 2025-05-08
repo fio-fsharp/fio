@@ -6,7 +6,7 @@
 
 module FIO.Lib.IO
 
-open FIO.Core
+open FIO.DSL
 
 /// Functional Console
 type FConsole private =

@@ -6,7 +6,7 @@
 
 module internal FIO.Benchmarks.Tools.Timer
 
-open FIO.Core
+open FIO.DSL
 open FIO.Lib.IO
 
 open System.Diagnostics
