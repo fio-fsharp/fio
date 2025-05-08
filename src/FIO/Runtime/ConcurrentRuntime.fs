@@ -20,7 +20,7 @@ type private EvaluationWorkerConfig =
 
 and private BlockingWorkerConfig =
     { ActiveWorkItemChan: InternalChannel<WorkItem>
-      ActiveBlockingItemEventChan: InternalChannel<BlockingItem> }
+      ActiveBlockingEventChan: InternalChannel<Channel<obj>> }
 
 and private EvaluationWorker (config: EvaluationWorkerConfig) =
     
@@ -70,17 +70,7 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
                 do! blockingChan.RescheduleNextBlockingWorkItem
                     <| config.ActiveWorkItemChan
             else
-                do! config.ActiveBlockingItemEventChan.AddAsync
-                    <| BlockingChannel blockingChan
-        }
-
-    let processBlockingItem blockingItem =
-        task {
-            match blockingItem with
-            | BlockingChannel blockingChan ->
-                do! processBlockingChannel blockingChan
-            | _ ->
-                return ()
+                do! config.ActiveBlockingEventChan.AddAsync blockingChan
         }
 
     let startWorker () =
@@ -88,12 +78,12 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
             task {
                 let mutable loop = true
                 while loop do
-                    let! hasBlockingItem = config.ActiveBlockingItemEventChan.WaitToTakeAsync()
+                    let! hasBlockingItem = config.ActiveBlockingEventChan.WaitToTakeAsync()
                     if not hasBlockingItem then
                         loop <- false 
                     else
-                        let! blockingItem = config.ActiveBlockingItemEventChan.TakeAsync()
-                        do! processBlockingItem blockingItem
+                        let! blockingChan = config.ActiveBlockingEventChan.TakeAsync()
+                        do! processBlockingChannel blockingChan
             } |> ignore), TaskCreationOptions.LongRunning))
             .Start TaskScheduler.Default
 
@@ -115,13 +105,13 @@ and Runtime(config: WorkerConfig) as this =
     inherit FIOWorkerRuntime(config)
 
     let activeWorkItemChan = InternalChannel<WorkItem>()
-    let activeBlockingItemEventChan = InternalChannel<BlockingItem>()
+    let activeBlockingEventChan = InternalChannel<Channel<obj>>()
 
     let createBlockingWorkers count =
         List.init count <| fun _ ->
             new BlockingWorker({
                 ActiveWorkItemChan = activeWorkItemChan
-                ActiveBlockingItemEventChan = activeBlockingItemEventChan
+                ActiveBlockingEventChan = activeBlockingEventChan
             })
 
     let createEvaluationWorkers runtime blockingWorker evalSteps count =
@@ -215,7 +205,7 @@ and Runtime(config: WorkerConfig) as this =
                             handleError <| onError exn
                     | SendChan (msg, chan) ->
                         do! chan.SendAsync msg
-                        do! activeBlockingItemEventChan.AddAsync <| BlockingChannel chan
+                        do! activeBlockingEventChan.AddAsync chan
                         handleSuccess msg
                     | ReceiveChan chan ->
                         if chan.Count > 0 then
