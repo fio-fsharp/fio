@@ -34,10 +34,10 @@ and private EvaluationWorker (config: EvaluationWorkerConfig) =
             | eff, stack, RescheduleForRunning ->
                 do! config.ActiveWorkItemChan.AddAsync
                     <| WorkItem.Create (eff, workItem.IFiber, stack, RescheduleForRunning)
-            | eff, stack, RescheduleForBlocking blockingItem ->
-                do! config.BlockingWorker.RescheduleForBlocking blockingItem
-                    <| WorkItem.Create (eff, workItem.IFiber, stack, RescheduleForBlocking blockingItem)
+            | _, _, Skipped ->
+                ()
             | _ ->
+                printfn "ERROR: EvaluationWorker: Unexpected state encountered during effect interpretation!"
                 invalidOp "EvaluationWorker: Unexpected state encountered during effect interpretation!"
         }
 
@@ -78,12 +78,14 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
             task {
                 let mutable loop = true
                 while loop do
+                    // When the BlockingWorker receives a channel, it is an "event" that the
+                    // the given channel now has received one element, that the next blocking effect can retrieve.
                     let! hasBlockingItem = config.ActiveBlockingEventChan.WaitToTakeAsync()
                     if not hasBlockingItem then
                         loop <- false 
                     else
-                        let! blockingChan = config.ActiveBlockingEventChan.TakeAsync()
-                        do! processBlockingChannel blockingChan
+                        let! blockingChanEvent = config.ActiveBlockingEventChan.TakeAsync()
+                        do! processBlockingChannel blockingChanEvent
             } |> ignore), TaskCreationOptions.LongRunning))
             .Start TaskScheduler.Default
 
@@ -93,13 +95,6 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
     interface IDisposable with
         member this.Dispose () =
             cancellationTokenSource.Cancel()
-
-    member internal this.RescheduleForBlocking blockingItem blockingWorkItem =
-        match blockingItem with
-        | BlockingChannel chan ->
-            chan.AddBlockingWorkItem blockingWorkItem
-        | BlockingIFiber ifiber ->
-            ifiber.AddBlockingWorkItem blockingWorkItem
 
 and Runtime(config: WorkerConfig) as this =
     inherit FIOWorkerRuntime(config)
@@ -212,9 +207,12 @@ and Runtime(config: WorkerConfig) as this =
                             let! res = chan.ReceiveAsync()
                             handleSuccess res
                         else
-                            let newPrevAction = RescheduleForBlocking <| BlockingChannel chan
+                            let newPrevAction = Skipped
                             currentPrevAction <- newPrevAction
-                            resultOpt <- Some (ReceiveChan chan, currentContStack, newPrevAction)
+                            chan.AddBlockingWorkItem
+                            <| WorkItem.Create (ReceiveChan chan, workItem.IFiber, currentContStack, newPrevAction)
+                            |> ignore
+                            resultOpt <- Some (Success (), ContStack.Empty, newPrevAction)
                     | ConcurrentEffect (eff, fiber, ifiber) ->
                         do! activeWorkItemChan.AddAsync
                             <| WorkItem.Create (eff, ifiber, ContStack.Empty, currentPrevAction)
@@ -244,9 +242,12 @@ and Runtime(config: WorkerConfig) as this =
                             let! res = ifiber.AwaitAsync()
                             handleResult res
                         else
-                            let newPrevAction = RescheduleForBlocking <| BlockingIFiber ifiber
+                            let newPrevAction = Skipped
                             currentPrevAction <- newPrevAction
-                            resultOpt <- Some (AwaitFiber ifiber, currentContStack, newPrevAction)
+                            ifiber.AddBlockingWorkItem
+                            <| WorkItem.Create (AwaitFiber ifiber, workItem.IFiber, currentContStack, newPrevAction)
+                            |> ignore
+                            resultOpt <- Some (Success (), ContStack.Empty, newPrevAction)
                     | AwaitGenericTPLTask (task, onError) ->
                         try
                             let! res = task

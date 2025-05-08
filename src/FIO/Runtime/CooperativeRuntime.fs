@@ -47,7 +47,8 @@ and private EvaluationWorker (config: EvaluationWorkerConfig) =
                     <| BlockingData.Create (blockingItem,
                         WorkItem.Create (eff, workItem.IFiber, stack, RescheduleForBlocking blockingItem))
             | _ ->
-                invalidOp "EvaluationWorker: Unexpected state encountered during effect evaluation!"
+                printfn "ERROR: EvaluationWorker: Unexpected state encountered during effect interpretation!"
+                invalidOp "EvaluationWorker: Unexpected state encountered during effect interpretation!"
         }
 
     let startWorker () =
