@@ -229,7 +229,7 @@ and Runtime (config: WorkerConfig) as this =
                             <| WorkItem.Create (eff, ifiber, ContStack.Empty, currentPrevAction)
                         handleSuccess fiber
                     | ConcurrentTPLTask (task, onError, fiber, ifiber) ->
-                        Task.Run(fun () -> 
+                        do! Task.Run(fun () -> 
                             (task ()).ContinueWith((fun (t: Task<obj>) ->
                                 if t.IsFaulted then
                                     ifiber.Complete
@@ -245,8 +245,7 @@ and Runtime (config: WorkerConfig) as this =
                                     <| Error (onError <| InvalidOperationException "Task not completed.")),
                                 CancellationToken.None,
                                 TaskContinuationOptions.RunContinuationsAsynchronously,
-                                TaskScheduler.Default) :> Task
-                        ) |> ignore
+                                TaskScheduler.Default) :> Task)
                         handleSuccess fiber
                     | AwaitFiber ifiber ->
                         if ifiber.Completed then

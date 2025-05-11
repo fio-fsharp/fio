@@ -110,7 +110,7 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
 
     member internal this.Complete res =
         task {
-            if resChan.Count = 0 then
+            if not this.Completed then
                 do! resChan.AddAsync res
             else
                 completeAlreadyCalledFail ()
@@ -118,7 +118,7 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
     
     member internal this.CompleteAndReschedule res activeWorkItemChan =
         task {
-            if resChan.Count = 0 then
+            if not this.Completed then
                 do! resChan.AddAsync res
                 do! this.RescheduleBlockingWorkItems activeWorkItemChan
             else
@@ -136,7 +136,7 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
     
     member internal this.AddBlockingWorkItem blockingWorkItem =
         task {
-            if resChan.Count > 0 then
+            if this.Completed then
                 printfn "WARNING: InternalFiber: Adding a blocking item on a fiber that is already completed!"
             do! blockingWorkItemChan.AddAsync blockingWorkItem
         }
@@ -153,12 +153,12 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
     member internal this.Id =
         id
 
-    member private this.RescheduleBlockingWorkItems (activeWorkItemChan: InternalChannel<WorkItem>) =
+    member private this.RescheduleBlockingWorkItems (activeWorkItemChan: InternalChannel<WorkItem>) res =
         task {
             // TODO: This has been commented out as it was spamming the test suite.
             // TODO: Figure out why this was spamming the test suite. I don't see scenarios where a fiber should not be completed.
-            //if resChan.Count = 0 then
-            //    printfn "WARNING: InternalFiber: Rescheduling blocking work items on a fiber that has not yet been completed!"
+            if resChan.Count = 0 then
+                printfn "WARNING: InternalFiber: Rescheduling blocking work items on a fiber that has not yet been completed!"
             while blockingWorkItemChan.Count > 0 do
                 let! unblockedWorkItem = blockingWorkItemChan.TakeAsync ()
                 do! activeWorkItemChan.AddAsync unblockedWorkItem

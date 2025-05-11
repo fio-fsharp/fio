@@ -58,6 +58,7 @@ let private createPonger ponger roundCount startChan =
             #if DEBUG
             do! FConsole.PrintLine $"[DEBUG]: %s{ponger.Name} sent pong: %i{pong}"
             #endif
+            return ()
     }
 
 let internal Create config : FIO<int64, exn> =

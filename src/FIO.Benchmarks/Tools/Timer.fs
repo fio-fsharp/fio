@@ -7,7 +7,9 @@
 module internal FIO.Benchmarks.Tools.Timer
 
 open FIO.DSL
+#if DEBUG
 open FIO.Lib.IO
+#endif
 
 open System.Diagnostics
 
@@ -75,7 +77,6 @@ let private stopLoop stopCount timerChan (stopwatch: Stopwatch) =
         #if DEBUG
         do! FConsole.PrintLine "[DEBUG]: Timer stopped"
         #endif
-        return ()
     }
 
 let internal TimerEff startCount msgCount stopCount timerChan =
@@ -90,7 +91,7 @@ let internal TimerEff startCount msgCount stopCount timerChan =
             | _ ->
                 return! !- (invalidOp "Timer: Did not receive MsgChannel as first message when msgCount > 0!")
         else
-            ()
+            return ()
 
         do! startLoop startCount timerChan stopwatch
         do! msgLoop msgCount 0 msgChan

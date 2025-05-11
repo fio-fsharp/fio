@@ -209,16 +209,15 @@ and Runtime (config: WorkerConfig) as this =
                         else
                             let newPrevAction = Skipped
                             currentPrevAction <- newPrevAction
-                            chan.AddBlockingWorkItem
-                            <| WorkItem.Create (ReceiveChan chan, workItem.IFiber, currentContStack, newPrevAction)
-                            |> ignore
+                            do! chan.AddBlockingWorkItem
+                                <| WorkItem.Create (ReceiveChan chan, workItem.IFiber, currentContStack, newPrevAction)
                             resultOpt <- Some (Success (), ContStack.Empty, newPrevAction)
                     | ConcurrentEffect (eff, fiber, ifiber) ->
                         do! activeWorkItemChan.AddAsync
                             <| WorkItem.Create (eff, ifiber, ContStack.Empty, currentPrevAction)
                         handleSuccess fiber
                     | ConcurrentTPLTask (task, onError, fiber, ifiber) ->
-                        Task.Run(fun () ->
+                        do! Task.Run(fun () ->
                             (task ()).ContinueWith((fun (t: Task<obj>) ->
                                 if t.IsFaulted then
                                     ifiber.CompleteAndReschedule
@@ -234,8 +233,7 @@ and Runtime (config: WorkerConfig) as this =
                                         (Error (onError <| InvalidOperationException "Task not completed.")) activeWorkItemChan),
                                 CancellationToken.None,
                                 TaskContinuationOptions.RunContinuationsAsynchronously,
-                                TaskScheduler.Default) :> Task
-                        ) |> ignore
+                                TaskScheduler.Default) :> Task)
                         handleSuccess fiber
                     | AwaitFiber ifiber ->
                         if ifiber.Completed then
@@ -244,9 +242,8 @@ and Runtime (config: WorkerConfig) as this =
                         else
                             let newPrevAction = Skipped
                             currentPrevAction <- newPrevAction
-                            ifiber.AddBlockingWorkItem
-                            <| WorkItem.Create (AwaitFiber ifiber, workItem.IFiber, currentContStack, newPrevAction)
-                            |> ignore
+                            do! ifiber.AddBlockingWorkItem
+                                <| WorkItem.Create (AwaitFiber ifiber, workItem.IFiber, currentContStack, newPrevAction)
                             resultOpt <- Some (Success (), ContStack.Empty, newPrevAction)
                     | AwaitGenericTPLTask (task, onError) ->
                         try

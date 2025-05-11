@@ -46,6 +46,7 @@ let private createReceiveActor actor roundCount timerChan startChan =
             #if DEBUG
             do! FConsole.PrintLine $"[DEBUG]: %s{actor.Name} received: %i{msg}"
             #endif
+            return ()
             
         do! timerChan <!-- Stop
     }
