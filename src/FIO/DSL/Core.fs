@@ -153,7 +153,7 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
     member internal this.Id =
         id
 
-    member private this.RescheduleBlockingWorkItems (activeWorkItemChan: InternalChannel<WorkItem>) res =
+    member private this.RescheduleBlockingWorkItems (activeWorkItemChan: InternalChannel<WorkItem>) =
         task {
             // TODO: This has been commented out as it was spamming the test suite.
             // TODO: Figure out why this was spamming the test suite. I don't see scenarios where a fiber should not be completed.
