@@ -62,7 +62,7 @@ let private printResult result =
 
     printfn $"%s{header + timeRows}"
 
-let private runBenchmark (runtime: FIORuntime) totalRuns (config: BenchmarkConfig) =
+let private runBenchmark (runtime: FRuntime) totalRuns (config: BenchmarkConfig) =
     
     let rec executeBenchmark (eff: FIO<int64, exn>) =
             task {

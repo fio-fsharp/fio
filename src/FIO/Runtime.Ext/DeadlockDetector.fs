@@ -8,7 +8,10 @@ open System.Collections.Concurrent
 [<AbstractClass>]
 type internal Worker () =
     abstract Working: unit -> bool
-    
+
+// TODO: This implementation is currently wrong. It currently takes data from the channels, which is not correct.
+// Rather, it should take a copy of the current contents of the channels, without removing anything.
+// Perhaps the channel could hold a buffer when compilation directives are present.
 type internal DeadlockDetector<'B, 'E when 'B :> Worker and 'E :> Worker>(activeWorkItemChan: InternalChannel<WorkItem>, intervalMs: int) as this =
     let blockingItems = ConcurrentDictionary<BlockingItem, unit>()
     let mutable blockingWorkers: List<'B> = []

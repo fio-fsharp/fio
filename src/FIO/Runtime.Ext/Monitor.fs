@@ -10,18 +10,30 @@ open FIO.DSL
 
 open System.Threading
 
-type internal Monitor (activeWorkItemChan: InternalChannel<WorkItem>, activeBlockingItemChanOpt: Option<InternalChannel<BlockingItem>>) as this =
+// TODO: This implementation is currently wrong. It currently takes data from the channels, which is not correct.
+// Rather, it should take a copy of the current contents of the channels, without removing anything.
+// Perhaps the channel could hold a buffer when compilation directives are present.
+type internal Monitor (
+    activeWorkItemChan: InternalChannel<WorkItem>,
+    activeBlockingDataChanOpt: InternalChannel<BlockingData> option,
+    activeBlockingEventChan: InternalChannel<Channel<obj>> option) as this =
     
     let startMonitor () =
         task {
             while true do
                 printfn "\n\n"
-                do! this.PrintWorkItemChanInfo activeWorkItemChan
+                do! this.PrintActiveWorkItemChanInfo activeWorkItemChan
                 printfn "\n"
                 
-                match activeBlockingItemChanOpt with
+                match activeBlockingDataChanOpt with
                 | Some chan ->
-                    do! this.PrintBlockingItemChanInfo chan
+                    do! this.PrintActiveBlockingDataChanInfo chan
+                    printfn "\n"
+                | _ -> ()
+                
+                match activeBlockingEventChan with
+                | Some chan ->
+                    do! this.PrintBlockingEventChanInfo chan
                     printfn "\n"
                 | _ -> ()
 
@@ -30,10 +42,10 @@ type internal Monitor (activeWorkItemChan: InternalChannel<WorkItem>, activeBloc
 
     do startMonitor ()
 
-    member private this.PrintWorkItemChanInfo chan =
+    member private this.PrintActiveWorkItemChanInfo chan =
         task {
-            printfn $"MONITOR: workItemQueue count: %i{chan.Count}"
-            printfn "MONITOR: ------------ workItemQueue information start ------------"
+            printfn "MONITOR: ------------ activeWorkItemChan monitoring information start ------------"
+            printfn $"MONITOR: activeWorkItemChan count: %i{chan.Count}"
 
             let mutable loop = true
             while loop do
@@ -42,22 +54,22 @@ type internal Monitor (activeWorkItemChan: InternalChannel<WorkItem>, activeBloc
                     loop <- false
                 else
                     let! workItem = chan.TakeAsync()
-                    let ifiber = workItem.IFiber
                     printfn $"MONITOR:    ------------ workItem start ------------"
-                    printfn $"MONITOR:      WorkItem IFiber completed: %b{ifiber.Completed}"
-                    printfn $"MONITOR:      WorkItem IFiber blocking items count: %i{ifiber.BlockingWorkItemCount}"
+                    printfn $"MONITOR:      WorkItem IFiber Id: %A{workItem.IFiber.Id}"
+                    printfn $"MONITOR:      WorkItem IFiber count: %i{workItem.IFiber.Count}"
+                    printfn $"MONITOR:      WorkItem IFiber completed: %b{workItem.IFiber.Completed}"
+                    printfn $"MONITOR:      WorkItem IFiber blocking items count: %i{workItem.IFiber.BlockingWorkItemCount}"
                     printfn $"MONITOR:      WorkItem PrevAction: %A{workItem.PrevAction}"
                     printfn $"MONITOR:      WorkItem Eff: %A{workItem.Eff}"
                     printfn $"MONITOR:    ------------ workItem end ------------"
 
-            printfn "MONITOR: ------------ workItemQueue information end ------------"
+            printfn "MONITOR: ------------ activeWorkItemChan monitoring information end ------------"
         }
-
-
-    member private this.PrintBlockingItemChanInfo chan =
+        
+    member private this.PrintActiveBlockingDataChanInfo chan =
         task {
-            printfn $"MONITOR: ------------ blockingItemQueue debugging information start ------------"
-            printfn $"MONITOR: blockingItemQueue count: %i{chan.Count}"
+            printfn "MONITOR: ------------ activeBlockingDataChan monitoring information start ------------"
+            printfn $"MONITOR: activeBlockingDataChan count: %i{chan.Count}"
 
             let mutable loop = true
             while loop do
@@ -65,17 +77,53 @@ type internal Monitor (activeWorkItemChan: InternalChannel<WorkItem>, activeBloc
                 if not hasWorkItem then
                     loop <- false
                 else
-                    let! blockingItem = chan.TakeAsync()
-                    match blockingItem with
+                    // BlockingItem
+                    // and WaitingWorkItem
+                    let! blockingData = chan.TakeAsync()
+                    printfn $"MONITOR:    ------------ waitingWorkItem start ------------"
+                    printfn $"MONITOR:      WorkItem IFiber Id: %A{blockingData.WaitingWorkItem.IFiber.Id}"
+                    printfn $"MONITOR:      WorkItem IFiber count: %i{blockingData.WaitingWorkItem.IFiber.Count}"
+                    printfn $"MONITOR:      WorkItem IFiber completed: %b{blockingData.WaitingWorkItem.IFiber.Completed}"
+                    printfn $"MONITOR:      WorkItem IFiber blocking items count: %i{blockingData.WaitingWorkItem.IFiber.BlockingWorkItemCount}"
+                    printfn $"MONITOR:      WorkItem PrevAction: %A{blockingData.WaitingWorkItem.PrevAction}"
+                    printfn $"MONITOR:      WorkItem Eff: %A{blockingData.WaitingWorkItem.Eff}"
+                    printfn $"MONITOR:    ------------ waitingWorkItem end ------------"
+                    
+                    match blockingData.BlockingItem with
+                    | BlockingChannel chan ->
+                        printfn $"MONITOR:    ------------ blockingChan start ------------"
+                        printfn $"MONITOR:      Id: %%{chan.Id}"
+                        printfn $"MONITOR:      Count: %i{chan.Count}"
+                        printfn $"MONITOR:      BlockingWorkItemCount: %i{chan.BlockingWorkItemCount}"
+                        printfn $"MONITOR:    ------------ blockingChan end ------------"
                     | BlockingIFiber ifiber ->
                         printfn $"MONITOR:    ------------ blockingIFiber start ------------"
+                        printfn $"MONITOR:      IFiber Id: %A{ifiber.Id}"
+                        printfn $"MONITOR:      IFiber count: %i{ifiber.Count}"
                         printfn $"MONITOR:      IFiber completed: %b{ifiber.Completed}"
                         printfn $"MONITOR:      IFiber blocking items count: %i{ifiber.BlockingWorkItemCount}"
                         printfn $"MONITOR:    ------------ blockingIFiber end ------------"
-                    | BlockingChannel blockingChan ->
-                        printfn $"MONITOR:    ------------ blockingChan start ------------"
-                        printfn $"MONITOR:      Count: %i{blockingChan.Count}"
-                        printfn $"MONITOR:    ------------ blockingChan end ------------"
+
+            printfn "MONITOR: ------------ activeBlockingDataChan monitoring information end ------------"
+        }
+
+    member private this.PrintBlockingEventChanInfo chan =
+        task {
+            printfn $"MONITOR: ------------ activeBlockingEventChan monitoring information start ------------"
+            printfn $"MONITOR: activeBlockingEventChan count: %i{chan.Count}"
+
+            let mutable loop = true
+            while loop do
+                let! hasWorkItem = chan.WaitToTakeAsync()
+                if not hasWorkItem then
+                    loop <- false
+                else
+                    let! eventChan = chan.TakeAsync()
+                    printfn $"MONITOR:    ------------ eventChan start ------------"
+                    printfn $"MONITOR:      Id: %%{eventChan.Id}"
+                    printfn $"MONITOR:      Count: %i{eventChan.Count}"
+                    printfn $"MONITOR:      BlockingWorkItemCount: %i{eventChan.BlockingWorkItemCount}"
+                    printfn $"MONITOR:    ------------ eventChan end ------------"
                         
-            printfn "MONITOR: ------------ blockingEventQueue debugging information end ------------"
+            printfn "MONITOR: ------------ activeBlockingEventChan monitoring information end ------------"
         }

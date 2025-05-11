@@ -96,8 +96,8 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
         member this.Dispose () =
             cancellationTokenSource.Cancel()
 
-and Runtime(config: WorkerConfig) as this =
-    inherit FIOWorkerRuntime(config)
+and Runtime (config: WorkerConfig) as this =
+    inherit FWorkerRuntime(config)
 
     let activeWorkItemChan = InternalChannel<WorkItem>()
     let activeBlockingEventChan = InternalChannel<Channel<obj>>()

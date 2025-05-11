@@ -59,7 +59,7 @@ type internal BenchmarkResult =
       Times: (int * int64) list }
 
 type internal BenchmarkArgs = 
-    { Runtime: FIORuntime
+    { Runtime: FRuntime
       Runs: int
       ActorIncrement: int * int
       RoundIncrement: int * int

@@ -13,7 +13,7 @@ open System.Threading
 open System.Threading.Tasks
 
 type Runtime () =
-    inherit FIORuntime ()
+    inherit FRuntime ()
 
     override this.Name =
         "Direct"

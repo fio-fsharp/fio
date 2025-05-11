@@ -17,14 +17,6 @@ type private EvaluationWorkerConfig =
       ActiveWorkItemChan: InternalChannel<WorkItem>
       BlockingWorker: BlockingWorker
       EWSteps: int }
-    
-and private BlockingData =
-    { BlockingItem: BlockingItem
-      WaitingWorkItem: WorkItem }
-    
-    static member internal Create (blockingItem, waitingWorkItem) : BlockingData =
-        { BlockingItem = blockingItem
-          WaitingWorkItem = waitingWorkItem }
 
 and private BlockingWorkerConfig =
     { ActiveWorkItemChan: InternalChannel<WorkItem>
@@ -120,7 +112,7 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
         config.ActiveBlockingDataChan.AddAsync blockingData
 
 and Runtime (config: WorkerConfig) as this =
-    inherit FIOWorkerRuntime(config)
+    inherit FWorkerRuntime(config)
     
     let activeWorkItemChan = InternalChannel<WorkItem>()
     let activeBlockingDataChan = InternalChannel<BlockingData>()

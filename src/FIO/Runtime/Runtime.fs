@@ -10,8 +10,9 @@ open FIO.DSL
 
 open System.Globalization
 
+/// Functional runtime
 [<AbstractClass>]
-type FIORuntime internal () =
+type FRuntime internal () =
 
     abstract member Name : string
 
@@ -38,9 +39,10 @@ type WorkerConfig =
       EWSteps: int
       BWCount: int }
 
+/// Functional worker runtime
 [<AbstractClass>]
-type FIOWorkerRuntime internal (config: WorkerConfig) as this =
-    inherit FIORuntime ()
+type FWorkerRuntime internal (config: WorkerConfig) as this =
+    inherit FRuntime ()
 
     let validateWorkerConfiguration () =
         if config.EWCount <= 0 ||

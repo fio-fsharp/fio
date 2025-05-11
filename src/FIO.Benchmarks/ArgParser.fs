@@ -71,7 +71,7 @@ type internal Parser() =
     member internal this.ParseArgs args =
         let results = parser.Parse args
 
-        let runtime: FIORuntime =
+        let runtime: FRuntime =
             if results.Contains Direct_Runtime then
                 Direct.Runtime()
             elif results.Contains Cooperative_Runtime then

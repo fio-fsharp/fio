@@ -4,9 +4,9 @@
 (* All rights reserved                                                                                       *)
 (*************************************************************************************************************)
 
-[<AutoOpen>]
-module FIO.DSL.App
+module FIO.App
 
+open FIO.DSL
 open FIO.Runtime
 open FIO.Runtime.Concurrent
 
@@ -45,7 +45,7 @@ let private defaultOnError err = task {
 let private defaultFiberHandler fiber = mergeFiber defaultOnSuccess defaultOnError fiber
 
 [<AbstractClass>]
-type FIOApp<'R, 'E> (onSuccess: 'R -> Task<unit>, onError: 'E -> Task<unit>, runtime: FIORuntime) =
+type FIOApp<'R, 'E> (onSuccess: 'R -> Task<unit>, onError: 'E -> Task<unit>, runtime: FRuntime) =
     let fiberHandler = mergeFiber onSuccess onError
 
     new() = FIOApp(defaultOnSuccess, defaultOnError, defaultRuntime)

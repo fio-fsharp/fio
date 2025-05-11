@@ -7,6 +7,7 @@
 module private FIO.Examples
 
 open FIO.DSL
+open FIO.App
 open FIO.Runtime.Concurrent
 
 open FIO.Lib.IO

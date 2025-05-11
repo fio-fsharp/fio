@@ -42,6 +42,14 @@ and internal RuntimeAction =
 and internal BlockingItem =
     | BlockingChannel of Channel<obj>
     | BlockingIFiber of InternalFiber
+    
+and internal BlockingData =
+    { BlockingItem: BlockingItem
+      WaitingWorkItem: WorkItem }
+    
+    static member internal Create (blockingItem, waitingWorkItem) =
+        { BlockingItem = blockingItem
+          WaitingWorkItem = waitingWorkItem }
 
 and internal WorkItem =
     { Eff: FIO<obj, obj>
@@ -132,6 +140,9 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
                 printfn "WARNING: InternalFiber: Adding a blocking item on a fiber that is already completed!"
             do! blockingWorkItemChan.AddAsync blockingWorkItem
         }
+    
+    member internal this.Count =
+        resChan.Count
         
     member internal this.BlockingWorkItemCount =
         blockingWorkItemChan.Count
@@ -144,8 +155,10 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
 
     member private this.RescheduleBlockingWorkItems (activeWorkItemChan: InternalChannel<WorkItem>) =
         task {
-            if resChan.Count = 0 then
-                printfn "WARNING: InternalFiber: Rescheduling blocking work items on a fiber that has not yet been completed!"
+            // TODO: This has been commented out as it was spamming the test suite.
+            // TODO: Figure out why this was spamming the test suite. I don't see scenarios where a fiber should not be completed.
+            //if resChan.Count = 0 then
+            //    printfn "WARNING: InternalFiber: Rescheduling blocking work items on a fiber that has not yet been completed!"
             while blockingWorkItemChan.Count > 0 do
                 let! unblockedWorkItem = blockingWorkItemChan.TakeAsync ()
                 do! activeWorkItemChan.AddAsync unblockedWorkItem

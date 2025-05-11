@@ -27,7 +27,7 @@
 		
 		<Compile Include="Lib\IO.fs" />
 		<Compile Include="Lib\Net.fs" />
-		<Compile Include="DSL.Ext\App.fs" />
+		<Compile Include="Ext\App.fs" />
 	</ItemGroup>
 
 	<PropertyGroup>
