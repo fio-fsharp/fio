@@ -140,7 +140,6 @@ and Runtime (config: WorkerConfig) as this =
     member internal this.InterpretAsync workItem evalSteps =
         let mutable currentEff = workItem.Eff
         let mutable currentContStack = workItem.Stack
-        let mutable currentPrevAction = workItem.PrevAction
         let mutable currentEWSteps = evalSteps
         let mutable resultOpt = None
 
@@ -153,7 +152,6 @@ and Runtime (config: WorkerConfig) as this =
                     loop <- false
                 | (SuccessCont, cont) :: ss -> 
                     currentEff <- cont res
-                    currentPrevAction <- Evaluated
                     currentContStack <- ss
                     loop <- false
                 | (FailureCont, _) :: ss -> 
@@ -171,7 +169,6 @@ and Runtime (config: WorkerConfig) as this =
                 | (FailureCont, cont) :: ss ->
                     currentEff <- cont err
                     currentContStack <- ss
-                    currentPrevAction <- Evaluated
                     loop <- false
 
         let handleResult res =
@@ -207,14 +204,12 @@ and Runtime (config: WorkerConfig) as this =
                             let! res = chan.ReceiveAsync()
                             handleSuccess res
                         else
-                            let newPrevAction = Skipped
-                            currentPrevAction <- newPrevAction
                             do! chan.AddBlockingWorkItem
-                                <| WorkItem.Create (ReceiveChan chan, workItem.IFiber, currentContStack, newPrevAction)
-                            resultOpt <- Some (Success (), ContStack.Empty, newPrevAction)
+                                <| WorkItem.Create (ReceiveChan chan, workItem.IFiber, currentContStack, Skipped)
+                            resultOpt <- Some (Success (), ContStack.Empty, Skipped)
                     | ConcurrentEffect (eff, fiber, ifiber) ->
                         do! activeWorkItemChan.AddAsync
-                            <| WorkItem.Create (eff, ifiber, ContStack.Empty, currentPrevAction)
+                            <| WorkItem.Create (eff, ifiber, ContStack.Empty, workItem.PrevAction)
                         handleSuccess fiber
                     | ConcurrentTPLTask (task, onError, fiber, ifiber) ->
                         do! Task.Run(fun () ->
@@ -240,11 +235,8 @@ and Runtime (config: WorkerConfig) as this =
                             let! res = ifiber.AwaitAsync()
                             handleResult res
                         else
-                            let newPrevAction = Skipped
-                            currentPrevAction <- newPrevAction
-                            do! ifiber.AddBlockingWorkItem
-                                <| WorkItem.Create (AwaitFiber ifiber, workItem.IFiber, currentContStack, newPrevAction)
-                            resultOpt <- Some (Success (), ContStack.Empty, newPrevAction)
+                            do! ifiber.AddBlockingWorkItem (WorkItem.Create (AwaitFiber ifiber, workItem.IFiber, currentContStack, Skipped))
+                            resultOpt <- Some (Success (), ContStack.Empty, Skipped)
                     | AwaitGenericTPLTask (task, onError) ->
                         try
                             let! res = task

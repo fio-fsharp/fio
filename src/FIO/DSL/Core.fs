@@ -71,7 +71,7 @@ and internal WorkItem =
 
 and internal InternalChannel<'R> (id: Guid) =
     let chan = Channel.CreateUnbounded<'R>()
-    let mutable count = 0
+    let mutable count = 0L
     
     new() = InternalChannel (Guid.NewGuid())
 
@@ -134,10 +134,13 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
             return res
         }
     
-    member internal this.AddBlockingWorkItem blockingWorkItem =
+    member internal this.AddBlockingWorkItem (blockingWorkItem: WorkItem) =
         task {
             if this.Completed then
                 printfn "WARNING: InternalFiber: Adding a blocking item on a fiber that is already completed!"
+                // Current issue: So, 'this' fiber is returning null, but the blocking fiber is expecting a int64.
+                // This has something to do with the timer fiber. Why is that being weird?
+                // do! blockingWorkItem.CompleteAndReschedule res activeWorkItemChan
             do! blockingWorkItemChan.AddAsync blockingWorkItem
         }
     
