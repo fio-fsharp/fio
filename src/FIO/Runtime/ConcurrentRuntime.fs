@@ -236,6 +236,10 @@ and Runtime (config: WorkerConfig) as this =
                             handleResult res
                         else
                             do! ifiber.AddBlockingWorkItem (WorkItem.Create (AwaitFiber ifiber, workItem.IFiber, currentContStack, Skipped))
+                            // TODO: This double check here fixes a race condition, but is not optimal.
+                            // Channels are bad at synconizing, so we need to check if the fiber is completed again. Should we try again?
+                            if ifiber.Completed then
+                                do! ifiber.RescheduleBlockingWorkItems activeWorkItemChan
                             resultOpt <- Some (Success (), ContStack.Empty, Skipped)
                     | AwaitGenericTPLTask (task, onError) ->
                         try

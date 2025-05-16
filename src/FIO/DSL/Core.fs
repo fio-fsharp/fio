@@ -102,6 +102,8 @@ and internal InternalChannel<'R> (id: Guid) =
         id
 
 and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>, blockingWorkItemChan: InternalChannel<WorkItem>) =
+    let mutable completed = false
+
     let completeAlreadyCalledFail () =
         // TODO: This will not throw an exception. How can we make sure it does?
         printfn "WARNING: InternalFiber: Complete was called on an already completed InternalFiber! Exception will be raised."
@@ -110,7 +112,7 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
 
     member internal this.Complete res =
         task {
-            if not this.Completed then
+            if Interlocked.Exchange (&completed, true) = false then
                 do! resChan.AddAsync res
             else
                 completeAlreadyCalledFail ()
@@ -118,7 +120,7 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
     
     member internal this.CompleteAndReschedule res activeWorkItemChan =
         task {
-            if not this.Completed then
+            if Interlocked.Exchange (&completed, true) = false then
                 do! resChan.AddAsync res
                 do! this.RescheduleBlockingWorkItems activeWorkItemChan
             else
@@ -140,7 +142,6 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
                 printfn "WARNING: InternalFiber: Adding a blocking item on a fiber that is already completed!"
                 // Current issue: So, 'this' fiber is returning null, but the blocking fiber is expecting a int64.
                 // This has something to do with the timer fiber. Why is that being weird?
-                // do! blockingWorkItem.CompleteAndReschedule res activeWorkItemChan
             do! blockingWorkItemChan.AddAsync blockingWorkItem
         }
     
@@ -151,16 +152,16 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
         blockingWorkItemChan.Count
 
     member internal this.Completed =
-        resChan.Count > 0
+        Volatile.Read &completed
 
     member internal this.Id =
         id
 
-    member private this.RescheduleBlockingWorkItems (activeWorkItemChan: InternalChannel<WorkItem>) =
+    member internal this.RescheduleBlockingWorkItems (activeWorkItemChan: InternalChannel<WorkItem>) =
         task {
             // TODO: This has been commented out as it was spamming the test suite.
             // TODO: Figure out why this was spamming the test suite. I don't see scenarios where a fiber should not be completed.
-            if resChan.Count = 0 then
+            if not this.Completed then
                 printfn "WARNING: InternalFiber: Rescheduling blocking work items on a fiber that has not yet been completed!"
             while blockingWorkItemChan.Count > 0 do
                 let! unblockedWorkItem = blockingWorkItemChan.TakeAsync ()

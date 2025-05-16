@@ -29,15 +29,15 @@ type internal BenchmarkConfig =
         let ci = CultureInfo("en-US")
         match this with
         | PingpongConfig rounds ->
-            $"""Actors: 2 Rounds: %s{rounds.ToString("N0", ci)}"""
+            $"""Actor Count: 2 Round Count: %s{rounds.ToString("N0", ci)}"""
         | ThreadringConfig (actors, rounds) ->
-            $"""Actors: %s{actors.ToString("N0", ci)} Rounds: %s{rounds.ToString("N0", ci)}"""
+            $"""Actor Count: %s{actors.ToString("N0", ci)} Round Count: %s{rounds.ToString("N0", ci)}"""
         | BigConfig (actors, rounds) ->
-            $"""Actors: %s{actors.ToString("N0", ci)} Rounds: %s{rounds.ToString("N0", ci)}"""
+            $"""Actor Count: %s{actors.ToString("N0", ci)} Round Count: %s{rounds.ToString("N0", ci)}"""
         | BangConfig (actors, rounds) ->
-            $"""Actors: %s{actors.ToString("N0", ci)} Rounds: %s{rounds.ToString("N0", ci)}"""
+            $"""Actor Count: %s{actors.ToString("N0", ci)} Round Count: %s{rounds.ToString("N0", ci)}"""
         | ForkConfig actors ->
-            $"""Actors: %s{actors.ToString("N0", ci)} Rounds: 1"""
+            $"""Actor Count: %s{actors.ToString("N0", ci)} Round Count: 1"""
 
     member internal this.ToFileString () =
         this.ToString()
