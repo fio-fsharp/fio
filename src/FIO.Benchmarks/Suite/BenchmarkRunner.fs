@@ -66,8 +66,8 @@ let private printResult result =
                 let std = standardDeviation onlyTimes
                 (acc
                     + "│                                                                           │\n"
-                    + "│  Average time (ms)                 Standard deviation                     │\n"
-                    + "│  ─────────────────────────-─────   ───────────────────────────-───────-─  │\n"
+                    + "│  Average time (ms)                 Standard deviation (ms)                │\n"
+                    + "│  ────────────────────────────────  ─────────────────────────────────────  │\n"
                    + $"│  %-33f{average} %-33f{std}      │\n"
                     + "└───────────────────────────────────────────────────────────────────────────┘")
             | (run, time) :: ts ->

@@ -10,7 +10,7 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<RepositoryUrl>https://github.com/iyyel/fio</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
-		<Version>0.0.20-alpha</Version>
+		<Version>0.0.21-alpha</Version>
 		<PackageIcon>fio_logo_wide.png</PackageIcon>
 	</PropertyGroup>
 
