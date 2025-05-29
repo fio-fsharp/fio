@@ -73,9 +73,9 @@ and internal InternalChannel<'R> (id: Guid) =
     let chan = Channel.CreateUnbounded<'R>()
     let mutable count = 0L
     
-    new() = InternalChannel (Guid.NewGuid())
+    new() = InternalChannel (Guid.NewGuid ())
 
-    member internal this.AddAsync (msg: 'R) =
+    member internal _.AddAsync (msg: 'R) =
         (chan.Writer.WriteAsync msg)
             .AsTask()
             .ContinueWith(fun _ ->
@@ -84,7 +84,7 @@ and internal InternalChannel<'R> (id: Guid) =
                 Task.FromResult ())
             .Unwrap()
     
-    member internal this.TakeAsync () =
+    member internal _.TakeAsync () =
         chan.Reader.ReadAsync()
             .AsTask()
             .ContinueWith(fun (task: Task<'R>) ->
@@ -92,16 +92,25 @@ and internal InternalChannel<'R> (id: Guid) =
                 |> ignore
                 task.Result)
 
-    member internal this.WaitToTakeAsync () =
+    member internal _.WaitToTakeAsync () =
         chan.Reader.WaitToReadAsync().AsTask()
+        
+    member internal _.Clear () =
+        let mutable item = Unchecked.defaultof<'R>
+        while chan.Reader.TryRead &item do
+            Interlocked.Decrement &count
+            |> ignore
 
-    member internal this.Count =
+    member internal _.Count =
         Volatile.Read &count
 
-    member internal this.Id =
+    member internal _.Id =
         id
 
-and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>, blockingWorkItemChan: InternalChannel<WorkItem>) =
+and internal InternalFiber () =
+    let id = Guid.NewGuid ()
+    let resChan = InternalChannel<Result<obj, obj>>()
+    let blockingWorkItemChan = InternalChannel<WorkItem>()
     let mutable completed = false
 
     let completeAlreadyCalledFail () =
@@ -110,7 +119,7 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
         invalidOp $"InternalFiber: Complete was called on an already
             completed InternalFiber! Result channel count: %i{resChan.Count}"
 
-    member internal this.Complete res =
+    member internal _.Complete res =
         task {
             if Interlocked.Exchange (&completed, true) = false then
                 do! resChan.AddAsync res
@@ -127,7 +136,7 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
                 completeAlreadyCalledFail ()
         }
 
-    member internal this.AwaitAsync () =
+    member internal _.AwaitAsync () =
         task {
             let! res = resChan.TakeAsync ()
             // Re-add the result to the channel to allow concurrent awaits
@@ -136,33 +145,29 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
             return res
         }
     
-    member internal this.AddBlockingWorkItem (blockingWorkItem: WorkItem) =
+    member internal _.AddBlockingWorkItem (blockingWorkItem: WorkItem) =
         task {
-            if this.Completed then
-                printfn "WARNING: InternalFiber: Adding a blocking item on a fiber that is already completed!"
-                // Current issue: So, 'this' fiber is returning null, but the blocking fiber is expecting a int64.
-                // This has something to do with the timer fiber. Why is that being weird?
+            // if completed then
+            //     printfn "WARNING: InternalFiber: Adding a blocking item on a fiber that is already completed!"
             do! blockingWorkItemChan.AddAsync blockingWorkItem
         }
     
-    member internal this.Count =
+    member internal _.Count =
         resChan.Count
         
-    member internal this.BlockingWorkItemCount =
+    member internal _.BlockingWorkItemCount =
         blockingWorkItemChan.Count
 
-    member internal this.Completed =
+    member internal _.Completed =
         Volatile.Read &completed
 
-    member internal this.Id =
+    member internal _.Id =
         id
 
-    member internal this.RescheduleBlockingWorkItems (activeWorkItemChan: InternalChannel<WorkItem>) =
+    member internal _.RescheduleBlockingWorkItems (activeWorkItemChan: InternalChannel<WorkItem>) =
         task {
-            // TODO: This has been commented out as it was spamming the test suite.
-            // TODO: Figure out why this was spamming the test suite. I don't see scenarios where a fiber should not be completed.
-            if not this.Completed then
-                printfn "WARNING: InternalFiber: Rescheduling blocking work items on a fiber that has not yet been completed!"
+            // if not completed then
+            //    printfn "WARNING: InternalFiber: Rescheduling blocking work items on a fiber that has not yet been completed!"
             while blockingWorkItemChan.Count > 0 do
                 let! unblockedWorkItem = blockingWorkItemChan.TakeAsync ()
                 do! activeWorkItemChan.AddAsync unblockedWorkItem
@@ -171,27 +176,25 @@ and internal InternalFiber (id: Guid, resChan: InternalChannel<Result<obj, obj>>
 /// A Fiber is a construct that represents a lightweight-thread.
 /// Fibers are used to interpret multiple effects in parallel and
 /// can be awaited to retrieve the result of the effect.
-and Fiber<'R, 'E> private (id: Guid, resChan: InternalChannel<Result<obj, obj>>, blockingWorkItemChan: InternalChannel<WorkItem>) =
-    let ifiber = InternalFiber (id, resChan, blockingWorkItemChan)
-    
-    new() = Fiber(Guid.NewGuid(), InternalChannel<Result<obj, obj>>(), InternalChannel<WorkItem>())
+and Fiber<'R, 'E> internal () =
+    let ifiber = InternalFiber ()
 
     /// Creates an effect that waits for the fiber and succeeds with its result.
-    member this.Await<'R, 'E> () : FIO<'R, 'E> =
+    member _.Await<'R, 'E> () : FIO<'R, 'E> =
         AwaitFiber ifiber
 
     /// Waits for the fiber and succeeds with its result.
-    member this.AwaitAsync<'R, 'E> () =
+    member _.AwaitAsync<'R, 'E> () =
         task {
             match! ifiber.AwaitAsync() with
             | Ok res -> return Ok (res :?> 'R)
             | Error err -> return Error (err :?> 'E)
         }
 
-    member this.Id =
+    member _.Id =
         id
 
-     member internal this.Internal =
+     member internal _.Internal =
         ifiber
  
 /// A channel represents a communication queue that holds
@@ -199,7 +202,7 @@ and Fiber<'R, 'E> private (id: Guid, resChan: InternalChannel<Result<obj, obj>>,
 /// received (blocking) on a channel.
 and Channel<'R> private (id: Guid, resChan: InternalChannel<obj>, blockingWorkItemChan: InternalChannel<WorkItem>) =
 
-    new() = Channel(Guid.NewGuid(), InternalChannel<obj>(), InternalChannel<WorkItem>())
+    new() = Channel(Guid.NewGuid (), InternalChannel<obj> (), InternalChannel<WorkItem> ())
 
     /// Send puts the message on the channel and succeeds with the message.
     member this.Send<'R, 'E> (msg: 'R) : FIO<'R, 'E> =
@@ -209,35 +212,35 @@ and Channel<'R> private (id: Guid, resChan: InternalChannel<obj>, blockingWorkIt
     member this.Receive<'R, 'E> () : FIO<'R, 'E> =
         ReceiveChan this
 
-    member this.Count =
+    member _.Count =
         resChan.Count
         
-    member this.Id =
+    member _.Id =
         id
 
-    member internal this.SendAsync (msg: 'R) =
+    member internal _.SendAsync (msg: 'R) =
         resChan.AddAsync msg
 
-    member internal this.ReceiveAsync () =
+    member internal _.ReceiveAsync () =
         task {
             let! res = resChan.TakeAsync()
             return res :?> 'R
         }
 
-    member internal this.AddBlockingWorkItem blockingItem =
+    member internal _.AddBlockingWorkItem blockingItem =
         blockingWorkItemChan.AddAsync blockingItem
 
-    member internal this.RescheduleNextBlockingWorkItem (activeWorkItemChan: InternalChannel<WorkItem>) =
+    member internal _.RescheduleNextBlockingWorkItem (activeWorkItemChan: InternalChannel<WorkItem>) =
         task {
             if blockingWorkItemChan.Count > 0 then
                 let! unblockedWorkItem = blockingWorkItemChan.TakeAsync()
                 do! activeWorkItemChan.AddAsync unblockedWorkItem
         }
 
-    member internal this.BlockingWorkItemCount =
+    member internal _.BlockingWorkItemCount =
         blockingWorkItemChan.Count
 
-    member internal this.Upcast () =
+    member internal _.Upcast () =
         Channel<obj> (id, resChan, blockingWorkItemChan)
 
 and channel<'R> = Channel<'R>

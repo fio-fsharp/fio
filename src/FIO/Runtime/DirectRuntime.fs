@@ -15,7 +15,7 @@ open System.Threading.Tasks
 type Runtime () =
     inherit FRuntime ()
 
-    override this.Name =
+    override _.Name =
         "Direct"
 
     [<TailCall>]

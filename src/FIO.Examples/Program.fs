@@ -155,7 +155,7 @@ let computationExpression3 () =
 type WelcomeApp() =
     inherit FIOApp<unit, exn>()
 
-    override this.effect : FIO<unit, exn> =
+    override _.effect : FIO<unit, exn> =
         fio {
             do! FConsole.PrintLine "Hello! What is your name?"
             let! name = FConsole.ReadLine ()
@@ -165,7 +165,7 @@ type WelcomeApp() =
 type EnterNumberApp() =
     inherit FIOApp<string, exn>()
 
-    override this.effect =
+    override _.effect =
         fio {
             do! FConsole.Print "Enter a number: "
             let! input = FConsole.ReadLine ()
@@ -180,7 +180,7 @@ type EnterNumberApp() =
 type TryCatchApp() =
     inherit FIOApp<string, int>()
 
-    override this.effect =
+    override _.effect =
         fio {
             try
                 do! !- 1
@@ -192,7 +192,7 @@ type TryCatchApp() =
 type ForApp() =
     inherit FIOApp<unit, exn>()
 
-    override this.effect =
+    override _.effect =
         fio {
             for number in 1..10 do
                 match! !<< (fun () -> number % 2 = 0) with
@@ -203,7 +203,7 @@ type ForApp() =
 type GuessNumberApp() =
     inherit FIOApp<int, exn>()
 
-    override this.effect =
+    override _.effect =
         fio {
             let! numberToGuess = !<< (fun () -> Random().Next(1, 100))
             let mutable guess = -1
@@ -244,7 +244,7 @@ type PingPongApp() =
         FConsole.PrintLine $"ponger sent: %s{pong}" >>= fun _ ->
         !+ ()
 
-    override this.effect =
+    override _.effect =
         let chan1 = Channel<string>()
         let chan2 = Channel<string>()
         pinger chan1 chan2 <~> ponger chan1 chan2
@@ -268,7 +268,7 @@ type PingPongCEApp() =
             do! FConsole.PrintLine $"ponger sent: %s{pong}"
         }
 
-    override this.effect =
+    override _.effect =
         fio {
             let chan1 = Channel<string>()
             let chan2 = Channel<string>()
@@ -305,7 +305,7 @@ type PingPongMatchApp() =
             do! FConsole.PrintLine ($"ponger sent: %A{sentMsg}", _.Message)
         }
 
-    override this.effect =
+    override _.effect =
         fio {
             let chan1 = Channel<Message>()
             let chan2 = Channel<Message>()
@@ -348,7 +348,7 @@ type ErrorHandlingApp() =
             return! awaitWebservice >>=? fun error -> !- (WsError error)
         }
 
-    override this.effect =
+    override _.effect =
         fio {
             return! databaseResult <^> webserviceResult
                     >>=? fun _ -> !+ ("default", 'D')
@@ -385,7 +385,7 @@ type AsyncErrorHandlingApp() =
         FIO<int, exn>.AwaitAsync webserviceAwaitTask
         >>=? fun exn -> !- (GeneralError exn.Message)
 
-    override this.effect =
+    override _.effect =
         fio {
             return! databaseResult <!> webserviceResult
         }
@@ -420,7 +420,7 @@ type HighlyConcurrentApp() =
                 return! create chan (count - 1) newAcc rand
         }
 
-    override this.effect =
+    override _.effect =
         fio {
             let fiberCount = 1000000
             let chan = Channel<int>()
@@ -454,7 +454,7 @@ type FiberFromTaskApp() =
                 return $"Fibonacci of %i{n} is %i{res}"
             }
 
-    override this.effect : FIO<unit, exn> =
+    override _.effect : FIO<unit, exn> =
         let awaitAndPrint (fiber: Fiber<string, exn>) =
             fio {
                  let! res = !<~~ fiber
@@ -539,7 +539,7 @@ type SocketApp(ip: string, port: int) =
             do! send socket <~> receive socket
         }
 
-    override this.effect =
+    override _.effect =
         fio {
             do! server ip port <~> client ip port
         }
@@ -608,7 +608,7 @@ type WebSocketApp(serverUrl, clientUrl) =
             do! send clientSocket <~> receive clientSocket
         }
 
-    override this.effect =
+    override _.effect =
         fio {
             do! server serverUrl <~> client clientUrl
         }

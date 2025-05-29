@@ -61,7 +61,7 @@ and private EvaluationWorker (config: EvaluationWorkerConfig) =
     do startWorker ()
 
     interface IDisposable with
-        member this.Dispose () =
+        member _.Dispose () =
             cancellationTokenSource.Cancel()
 
 and private BlockingWorker (config: BlockingWorkerConfig) =
@@ -105,10 +105,10 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
     do startWorker ()
 
     interface IDisposable with
-        member this.Dispose () =
+        member _.Dispose () =
             cancellationTokenSource.Cancel()
 
-    member internal this.RescheduleForBlocking blockingData =
+    member internal _.RescheduleForBlocking blockingData =
         config.ActiveBlockingDataChan.AddAsync blockingData
 
 and Runtime (config: WorkerConfig) as this =
@@ -140,7 +140,7 @@ and Runtime (config: WorkerConfig) as this =
         createEvaluationWorkers this (List.head blockingWorkers) config.EWSteps config.EWCount
         |> ignore
 
-    override this.Name =
+    override _.Name =
         "Cooperative"
 
     new() =
@@ -152,7 +152,7 @@ and Runtime (config: WorkerConfig) as this =
               EWSteps = 100 }
 
     [<TailCall>]
-    member internal this.InterpretAsync workItem evalSteps =
+    member internal _.InterpretAsync workItem evalSteps =
         let mutable currentEff = workItem.Eff
         let mutable currentContStack = workItem.Stack
         let mutable currentPrevAction = workItem.PrevAction
@@ -270,8 +270,13 @@ and Runtime (config: WorkerConfig) as this =
 
             return resultOpt.Value
         }
+        
+    member private _.Reset () =
+        activeWorkItemChan.Clear ()
+        activeBlockingDataChan.Clear ()
 
-    override this.Run<'R, 'E> (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
+    override _.Run<'R, 'E> (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
+        this.Reset ()
         let fiber = Fiber<'R, 'E>()
         activeWorkItemChan.AddAsync
         <| WorkItem.Create (eff.Upcast(), fiber.Internal, ContStack.Empty, Evaluated)

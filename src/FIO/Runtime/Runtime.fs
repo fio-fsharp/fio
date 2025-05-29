@@ -52,10 +52,10 @@ type FWorkerRuntime internal (config: WorkerConfig) as this =
 
     do validateWorkerConfiguration ()
 
-    member this.GetWorkerConfiguration () =
+    member _.GetWorkerConfiguration () =
         config
 
-    override this.ConfigString =
+    override _.ConfigString =
         let ci = CultureInfo "en-US"
         $"""EWC: %s{config.EWCount.ToString("N0", ci)} EWS: %s{config.EWSteps.ToString("N0", ci)} BWC: %s{config.BWCount.ToString("N0", ci)}"""
 

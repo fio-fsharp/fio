@@ -12,25 +12,25 @@ open System.Collections.Generic
 
 type FIOBuilder internal () =
 
-    member inline this.Bind<'R, 'R1, 'E> (eff: FIO<'R, 'E>, cont: 'R -> FIO<'R1, 'E>) : FIO<'R1, 'E> =
+    member inline _.Bind<'R, 'R1, 'E> (eff: FIO<'R, 'E>, cont: 'R -> FIO<'R1, 'E>) : FIO<'R1, 'E> =
         eff.Bind cont
         
-    member inline this.BindReturn<'R, 'R1, 'E> (eff: FIO<'R, 'E>, cont: 'R -> 'R1) : FIO<'R1, 'E> =
+    member inline _.BindReturn<'R, 'R1, 'E> (eff: FIO<'R, 'E>, cont: 'R -> 'R1) : FIO<'R1, 'E> =
         eff.Map cont
 
-    member inline this.Combine<'R, 'R1, 'E> (eff: FIO<'R, 'E>, eff': FIO<'R1, 'E>) : FIO<'R1, 'E> =
+    member inline _.Combine<'R, 'R1, 'E> (eff: FIO<'R, 'E>, eff': FIO<'R1, 'E>) : FIO<'R1, 'E> =
         eff.Then eff'
 
-    member inline this.Run<'R, 'E> (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
+    member inline _.Run<'R, 'E> (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
         eff
 
-    member inline this.Zero<'E> () : FIO<unit, 'E> =
+    member inline _.Zero<'E> () : FIO<unit, 'E> =
         FIO.Succeed ()
 
-    member inline this.Return<'R, 'E> (res: 'R) : FIO<'R, 'E> =
+    member inline _.Return<'R, 'E> (res: 'R) : FIO<'R, 'E> =
         FIO.Succeed res
 
-    member inline this.ReturnFrom<'R, 'E> (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
+    member inline _.ReturnFrom<'R, 'E> (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
         eff
 
     member inline this.Yield<'R, 'E> (res: 'R) : FIO<'R, 'E> =
@@ -39,7 +39,7 @@ type FIOBuilder internal () =
     member inline this.YieldFrom<'R, 'E> (eff: FIO<'R, 'E>) : FIO<'R, 'E> =
         this.ReturnFrom eff
 
-    member inline this.TryWith<'R, 'E, 'E1> (eff: FIO<'R, 'E>, cont: 'E -> FIO<'R, 'E1>) : FIO<'R, 'E1> =
+    member inline _.TryWith<'R, 'E, 'E1> (eff: FIO<'R, 'E>, cont: 'E -> FIO<'R, 'E1>) : FIO<'R, 'E1> =
         eff.BindError cont
 
     member inline this.TryFinally<'R, 'E when 'E :> exn> (eff: FIO<'R, 'E>, finalizer: unit -> unit) : FIO<'R, 'E> =
@@ -79,10 +79,10 @@ type FIOBuilder internal () =
     member inline this.Using (resource: #IDisposable, body: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
         this.TryFinally (body resource, fun () -> resource.Dispose())
 
-    member inline this.Match<'R, 'E, 'T> (value: 'T, cases: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
+    member inline _.Match<'R, 'E, 'T> (value: 'T, cases: 'T -> FIO<'R, 'E>) : FIO<'R, 'E> =
         cases value
 
-    member inline this.MergeSources<'R, 'R1, 'E> (eff: FIO<'R, 'E>, eff': FIO<'R1, 'E>) : FIO<'R * 'R1, 'E> =
+    member inline _.MergeSources<'R, 'R1, 'E> (eff: FIO<'R, 'E>, eff': FIO<'R1, 'E>) : FIO<'R * 'R1, 'E> =
         eff.Zip eff'
 
 /// The FIO computation expression builder.

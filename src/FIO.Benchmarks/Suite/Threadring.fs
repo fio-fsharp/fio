@@ -25,31 +25,37 @@ type private Actor =
       SendChan: int channel
       ReceiveChan: int channel }
 
-let private createActor actor roundCount timerChan =
+let private createActor actor isLastActor roundCount timerChan =
     fio {
         do! timerChan <!-- Start
         
-        for _ in 1..roundCount do
+        for round in 1..roundCount do
             let! receivedMsg = !<-- actor.ReceiveChan
             #if DEBUG
             do! FConsole.PrintLine $"[DEBUG]: %s{actor.Name} received: %i{receivedMsg}"
             #endif
-            let! sentMsg = actor.SendChan <-- receivedMsg + 1
-            #if DEBUG
-            do! FConsole.PrintLine $"[DEBUG]: %s{actor.Name} sent: %i{sentMsg}"
-            #endif
-            return ()
+            if isLastActor && round = roundCount then
+                // The last actor of the last round should not send a message
+                return ()
+            else
+                let! sentMsg = actor.SendChan <-- receivedMsg + 1
+                #if DEBUG
+                do! FConsole.PrintLine $"[DEBUG]: %s{actor.Name} sent: %i{sentMsg}"
+                #endif
+                return ()
         
         do! timerChan <!-- Stop
     }
 
 let private createThreadring (actors: Actor list) roundCount timerChan =
     fio {
-        let mutable currentEff = createActor actors.Head roundCount timerChan
+        let mutable currentEff = createActor actors.Head false roundCount timerChan
         do! timerChan <!-- MsgChannel actors.Head.ReceiveChan
         
-        for chan in actors.Tail do
-            currentEff <- createActor chan roundCount timerChan
+        for index, actor in List.indexed actors.Tail do
+            // +2 to compensate for the first actor and 0-indexed for loop
+            let isLastActor = (index + 2) = actors.Length
+            currentEff <- createActor actor isLastActor roundCount timerChan
                           <~> currentEff
             
         return! currentEff

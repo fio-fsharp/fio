@@ -49,7 +49,7 @@ let private msgLoop msgCount msg msgChan =
         let mutable currentMsg = msg
         
         while currentCount > 0 do
-            let! _ = msgChan <-- msg
+            do! msgChan <!-- msg
             #if DEBUG
             do! FConsole.PrintLine $"[DEBUG]: Timer sent %i{msg} to MsgChannel (%i{msgCount - currentCount + 1}/%i{msgCount})"
             #endif

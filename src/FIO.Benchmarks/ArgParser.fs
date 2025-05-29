@@ -61,14 +61,14 @@ type internal Arguments =
 type internal Parser() =
     let parser = ArgumentParser.Create<Arguments>()
 
-    member internal this.PrintArgs args =
+    member internal _.PrintArgs args =
         let argsStr = String.concat " " (Array.toList args)
         printfn $"benchmark arguments: %s{argsStr}"
 
-    member internal this.PrintUsage() =
+    member internal _.PrintUsage() =
         printfn $"%s{parser.PrintUsage()}"
 
-    member internal this.ParseArgs args =
+    member internal _.ParseArgs args =
         let results = parser.Parse args
 
         let runtime: FRuntime =

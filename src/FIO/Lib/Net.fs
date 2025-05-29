@@ -76,36 +76,36 @@ module Sockets =
                 return! FSocket.Create<'S, 'R, exn> (socket, host, port, id, JsonSerializerOptions())
             }
 
-        member this.Send<'S, 'E> (msg: 'S) : FIO<unit, 'E> =
+        member _.Send<'S, 'E> (msg: 'S) : FIO<unit, 'E> =
             fio {
                 let! json = !<<< (fun () -> JsonSerializer.Serialize(msg, options))
                 do! !<<< (fun () -> writer.WriteLine json)
                 do! !<<< writer.Flush
             }
 
-        member this.Receive<'R, 'E> () : FIO<'R, 'E> =
+        member _.Receive<'R, 'E> () : FIO<'R, 'E> =
             fio {
                 let! json = !<<< reader.ReadLine
                 let! msg = !<<< (fun () -> JsonSerializer.Deserialize<'R>(json, options))
                 return msg
             }
         
-        member this.Disconnect<'E> (reuseSocket: bool) : FIO<unit, 'E> =
+        member _.Disconnect<'E> (reuseSocket: bool) : FIO<unit, 'E> =
             fio {
                 do! !<<< (fun () -> socket.Disconnect reuseSocket)
             }
 
-        member this.Close<'E> () : FIO<unit, 'E> =
+        member _.Close<'E> () : FIO<unit, 'E> =
             fio {
                 do! !<<< (fun () -> socket.Close())
             }
         
-        member this.RemoteEndPoint<'E> () : FIO<EndPoint, 'E> =
+        member _.RemoteEndPoint<'E> () : FIO<EndPoint, 'E> =
             fio {
                 return! !<<< (fun () -> socket.RemoteEndPoint)
             }
         
-        member this.AddressFamily : FIO<AddressFamily, 'E> =
+        member _.AddressFamily : FIO<AddressFamily, 'E> =
             fio {
                 return! !<<< (fun () -> socket.AddressFamily)
             }
@@ -146,7 +146,7 @@ module WebSockets =
             return! FWebSocket.Create<'S, 'R, exn> (ctx, listenerCtx, id, JsonSerializerOptions())
             }
         
-        member this.Send<'S, 'E> (msg: 'S) : FIO<unit, 'E> =
+        member _.Send<'S, 'E> (msg: 'S) : FIO<unit, 'E> =
             fio {
                 let! json = !<<< (fun () -> JsonSerializer.Serialize(msg, options))
                 let! buffer = !<<< (fun () -> Encoding.UTF8.GetBytes json)
@@ -158,7 +158,7 @@ module WebSockets =
                 do! !<<~ task
             }
 
-        member this.Receive<'R, 'E> () : FIO<'R, 'E> =
+        member _.Receive<'R, 'E> () : FIO<'R, 'E> =
             fio {
                 let! buffer = !<<< (fun () -> Array.zeroCreate 1024)
                 let! receiveTask = !<<< (fun () ->
@@ -181,7 +181,7 @@ module WebSockets =
                     return msg
             }
 
-        member this.Close<'E> () : FIO<unit, 'E> =
+        member _.Close<'E> () : FIO<unit, 'E> =
             fio {
                 let! closeTask = !<<< (fun () ->
                     ctx.WebSocket.CloseAsync(
@@ -190,17 +190,17 @@ module WebSockets =
                 do! !<<~ closeTask
             }
 
-        member this.RemoteEndPoint<'E> () : FIO<IPEndPoint, 'E> =
+        member _.RemoteEndPoint<'E> () : FIO<IPEndPoint, 'E> =
             fio {
                 return! !<<< (fun () -> listenerCtx.Request.RemoteEndPoint)
             }
 
-        member this.LocalEndPoint<'E> () : FIO<IPEndPoint, 'E> =
+        member _.LocalEndPoint<'E> () : FIO<IPEndPoint, 'E> =
             fio {
                 return! !<<< (fun () -> listenerCtx.Request.LocalEndPoint)
             }
 
-        member this.State<'E> () : FIO<WebSocketState, 'E> =
+        member _.State<'E> () : FIO<WebSocketState, 'E> =
             fio {
                 return! !<<< (fun () -> ctx.WebSocket.State)
             }
@@ -240,13 +240,13 @@ module WebSockets =
                 return! FServerWebSocket.Create<'S, 'R, exn> (id, JsonSerializerOptions())
             }
 
-        member this.Start<'E> url : FIO<unit, 'E> =
+        member _.Start<'E> url : FIO<unit, 'E> =
             fio {
                 do! !<<< (fun () -> listener.Prefixes.Add url)
                 do! !<<< (fun () -> listener.Start())
             }
 
-        member this.Accept<'S, 'R, 'E> () : FIO<FWebSocket<'S, 'R, 'E>, 'E> =
+        member _.Accept<'S, 'R, 'E> () : FIO<FWebSocket<'S, 'R, 'E>, 'E> =
             fio {
                 let! listenerCtxTask = !<<< (fun () -> listener.GetContextAsync())
                 let! listenerCtx = !<<~~ listenerCtxTask
@@ -264,7 +264,7 @@ module WebSockets =
                     return error
             }
 
-        member this.Close<'E> () : FIO<unit, 'E> =
+        member _.Close<'E> () : FIO<unit, 'E> =
             fio {
                 do! !<<< (fun () -> listener.Stop())
             }
@@ -304,7 +304,7 @@ module WebSockets =
                 return! FClientWebSocket.Create<'S, 'R, exn> (id, JsonSerializerOptions())
             }
         
-        member this.Connect<'E> url : FIO<unit, 'E> =
+        member _.Connect<'E> url : FIO<unit, 'E> =
             fio {
                 let! uri = !<<< (fun () -> Uri url)
                 let! connectTask = !<<< (fun () ->
@@ -313,7 +313,7 @@ module WebSockets =
                 do! !<<~ connectTask
             }
         
-        member this.Send<'S, 'E> (msg: 'S) : FIO<unit, 'E> =
+        member _.Send<'S, 'E> (msg: 'S) : FIO<unit, 'E> =
             fio {
                 let! json = !<<< (fun () -> JsonSerializer.Serialize(msg, options))
                 let! buffer = !<<< (fun () -> Encoding.UTF8.GetBytes json)
@@ -325,7 +325,7 @@ module WebSockets =
                 do! !<<~ sendTask
             }
 
-        member this.Receive<'R, 'E> () : FIO<'R, 'E> =
+        member _.Receive<'R, 'E> () : FIO<'R, 'E> =
             fio {
                 let! buffer = !<<< (fun () -> Array.zeroCreate 1024)
                 let! receiveTask = !<<< (fun () ->
@@ -338,7 +338,7 @@ module WebSockets =
                 return msg
             }
 
-        member this.Close<'E> () : FIO<unit, 'E> =
+        member _.Close<'E> () : FIO<unit, 'E> =
             fio {
                 let! closeTask = !<<< (fun () ->
                     clientWebSocket.CloseAsync(

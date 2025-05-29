@@ -30,10 +30,24 @@ let private writeResultToCsv result savePath =
     let filePath = dirPath + @"\" + fileName
 
     File.WriteAllText(filePath, "Execution Time (ms)\n" + csvContent result.Times "")
-    printfn $"\nSaved benchmark results to file: '%s{filePath}'"
+    printfn $"\nSaved benchmark time results to file: '%s{filePath}'"
 
 let private printResult result =
 
+    let average onlyTimes =
+        onlyTimes |> List.averageBy float
+    
+    let standardDeviation (onlyTimes: int64 list) =
+        if onlyTimes.IsEmpty then
+            0.0
+        else
+            let mean = onlyTimes |> List.averageBy float
+            let variance = 
+                onlyTimes 
+                |> List.map (fun x -> pown (float x - mean) 2)
+                |> List.average
+            sqrt variance
+    
     let header =
         $"
 ┌───────────────────────────────────────────────────────────────────────────┐
@@ -48,12 +62,13 @@ let private printResult result =
             match curTimeRows with
             | [] ->
                 let onlyTimes = List.map snd allTimes
-                let average = (float (List.sum onlyTimes) / float (List.length onlyTimes))
+                let average = average onlyTimes
+                let std = standardDeviation onlyTimes
                 (acc
                     + "│                                                                           │\n"
-                    + "│                                    Average time (ms)                      │\n"
-                    + "│                                    ─────────────────────────────────────  │\n"
-                   + $"│                                    %-35f{average}    │\n"
+                    + "│  Average time (ms)                 Standard deviation                     │\n"
+                    + "│  ─────────────────────────-─────   ───────────────────────────-───────-─  │\n"
+                   + $"│  %-33f{average} %-33f{std}      │\n"
                     + "└───────────────────────────────────────────────────────────────────────────┘")
             | (run, time) :: ts ->
                 let str = $"│  #%-10i{run}                       %-35i{time}    │\n"
@@ -69,40 +84,34 @@ let private runBenchmark (runtime: FRuntime) totalRuns (config: BenchmarkConfig)
                 let mutable results = []
                 
                 for currentRun in 1..totalRuns do
-                    #if DEBUG
-                    printfn $"[DEBUG]: Executing benchmark: Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Current run (%i{currentRun}/%i{totalRuns})"
-                    #endif
+                    printfn $"[DEBUG]: Executing benchmark: Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Run (%i{currentRun}/%i{totalRuns})"
                     let! res = runtime.Run(eff).AwaitAsync()
                     let time =
                         match res with
                         | Ok time -> time
                         | Error err -> invalidOp $"BenchmarkRunner: Failed executing benchmark with error: %A{err}"
                             
-                    #if DEBUG
-                    printfn $"[DEBUG]: Executing benchmark completed: Time: %i{time}ms, Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Current run (%i{currentRun}/%i{totalRuns})"
-                    #endif
+                    printfn $"[DEBUG]: Executing benchmark completed: Time: %i{time}ms, Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Run (%i{currentRun}/%i{totalRuns})"
                     results <- List.append results [(currentRun, time)]
                     
                 return results
             }
     
     task {
-        #if DEBUG
-        printfn $"[DEBUG]: Starting benchmark session: Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Total runs: %i{totalRuns}"
-        #endif
+        printfn $"[DEBUG]: Starting benchmark session: Name: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Runs: %i{totalRuns}"
         
         let eff =
             match config with
-            | PingpongConfig rounds ->
-                Pingpong.Create <| PingpongConfig rounds
-            | ThreadringConfig (actors, rounds) ->
-                Threadring.Create <| ThreadringConfig (actors, rounds)
-            | BigConfig (actors, rounds) ->
-                Big.Create <| BigConfig (actors, rounds)
-            | BangConfig (actors, rounds) ->
-                Bang.Create <| BangConfig (actors, rounds)
-            | ForkConfig actors ->
-                Fork.Create <| ForkConfig actors
+            | PingpongConfig roundCount ->
+                Pingpong.Create <| PingpongConfig roundCount
+            | ThreadringConfig (actorCount, roundCount) ->
+                Threadring.Create <| ThreadringConfig (actorCount, roundCount)
+            | BigConfig (actorCount, roundCount) ->
+                Big.Create <| BigConfig (actorCount, roundCount)
+            | BangConfig (actorCount, roundCount) ->
+                Bang.Create <| BangConfig (actorCount, roundCount)
+            | ForkConfig actorCount ->
+                Fork.Create <| ForkConfig actorCount
 
         let! times = executeBenchmark eff
         

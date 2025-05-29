@@ -39,26 +39,26 @@ type internal DeadlockDetector<'B, 'E when 'B :> Worker and 'E :> Worker>(active
 
     do startMonitor ()
 
-    member internal this.AddBlockingItem blockingItem =
+    member internal _.AddBlockingItem blockingItem =
         blockingItems.TryAdd (blockingItem, ())
 
-    member internal this.RemoveBlockingItem blockingItem =
+    member internal _.RemoveBlockingItem blockingItem =
         blockingItems.TryRemove blockingItem |> ignore
 
-    member private this.AllEvalWorkersIdle () =
+    member private _.AllEvalWorkersIdle () =
         not (
             List.contains true
             <| List.map (fun (evalWorker: 'E) -> evalWorker.Working ()) evalWorkers
         )
 
-    member private this.AllBlockingWorkersIdle () =
+    member private _.AllBlockingWorkersIdle () =
         not (
             List.contains true
             <| List.map (fun (evalWorker: 'B) -> evalWorker.Working ()) blockingWorkers
         )
 
-    member internal this.SetEvalWorkers workers =
+    member internal _.SetEvalWorkers workers =
         evalWorkers <- workers
 
-    member internal this.SetBlockingWorkers workers =
+    member internal _.SetBlockingWorkers workers =
         blockingWorkers <- workers

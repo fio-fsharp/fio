@@ -42,7 +42,7 @@ type internal Monitor (
 
     do startMonitor ()
 
-    member private this.PrintActiveWorkItemChanInfo chan =
+    member private _.PrintActiveWorkItemChanInfo chan =
         task {
             printfn "MONITOR: ------------ activeWorkItemChan monitoring information start ------------"
             printfn $"MONITOR: activeWorkItemChan count: %i{chan.Count}"
@@ -66,7 +66,7 @@ type internal Monitor (
             printfn "MONITOR: ------------ activeWorkItemChan monitoring information end ------------"
         }
         
-    member private this.PrintActiveBlockingDataChanInfo chan =
+    member private _.PrintActiveBlockingDataChanInfo chan =
         task {
             printfn "MONITOR: ------------ activeBlockingDataChan monitoring information start ------------"
             printfn $"MONITOR: activeBlockingDataChan count: %i{chan.Count}"
@@ -107,7 +107,7 @@ type internal Monitor (
             printfn "MONITOR: ------------ activeBlockingDataChan monitoring information end ------------"
         }
 
-    member private this.PrintBlockingEventChanInfo chan =
+    member private _.PrintBlockingEventChanInfo chan =
         task {
             printfn $"MONITOR: ------------ activeBlockingEventChan monitoring information start ------------"
             printfn $"MONITOR: activeBlockingEventChan count: %i{chan.Count}"

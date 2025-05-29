@@ -28,16 +28,16 @@ type internal BenchmarkConfig =
     member internal this.ConfigString =
         let ci = CultureInfo("en-US")
         match this with
-        | PingpongConfig rounds ->
-            $"""Actor Count: 2 Round Count: %s{rounds.ToString("N0", ci)}"""
-        | ThreadringConfig (actors, rounds) ->
-            $"""Actor Count: %s{actors.ToString("N0", ci)} Round Count: %s{rounds.ToString("N0", ci)}"""
-        | BigConfig (actors, rounds) ->
-            $"""Actor Count: %s{actors.ToString("N0", ci)} Round Count: %s{rounds.ToString("N0", ci)}"""
-        | BangConfig (actors, rounds) ->
-            $"""Actor Count: %s{actors.ToString("N0", ci)} Round Count: %s{rounds.ToString("N0", ci)}"""
-        | ForkConfig actors ->
-            $"""Actor Count: %s{actors.ToString("N0", ci)} Round Count: 1"""
+        | PingpongConfig roundCount ->
+            $"""Actor Count: 2 Round Count: %s{roundCount.ToString("N0", ci)}"""
+        | ThreadringConfig (actorCount, roundCount) ->
+            $"""Actor Count: %s{actorCount.ToString("N0", ci)} Round Count: %s{roundCount.ToString("N0", ci)}"""
+        | BigConfig (actorCount, roundCount) ->
+            $"""Actor Count: %s{actorCount.ToString("N0", ci)} Round Count: %s{roundCount.ToString("N0", ci)}"""
+        | BangConfig (actorCount, roundCount) ->
+            $"""Actor Count: %s{actorCount.ToString("N0", ci)} Round Count: %s{roundCount.ToString("N0", ci)}"""
+        | ForkConfig actorCount ->
+            $"""Actor Count: %s{actorCount.ToString("N0", ci)} Round Count: 1"""
 
     member internal this.ToFileString () =
         this.ToString()

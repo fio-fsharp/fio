@@ -59,7 +59,7 @@ and private EvaluationWorker (config: EvaluationWorkerConfig) =
     do startWorker ()
     
     interface IDisposable with
-        member this.Dispose () =
+        member _.Dispose () =
             cancellationTokenSource.Cancel()
 
 and private BlockingWorker (config: BlockingWorkerConfig) =
@@ -93,7 +93,7 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
     do startWorker ()
 
     interface IDisposable with
-        member this.Dispose () =
+        member _.Dispose () =
             cancellationTokenSource.Cancel()
 
 and Runtime (config: WorkerConfig) as this =
@@ -125,7 +125,7 @@ and Runtime (config: WorkerConfig) as this =
         createEvaluationWorkers this (List.head blockingWorkers) config.EWSteps config.EWCount
         |> ignore
 
-    override this.Name =
+    override _.Name =
         "Concurrent"
 
     new() =
@@ -137,7 +137,7 @@ and Runtime (config: WorkerConfig) as this =
               EWSteps = 100 }
 
     [<TailCall>]
-    member internal this.InterpretAsync workItem evalSteps =
+    member internal _.InterpretAsync workItem evalSteps =
         let mutable currentEff = workItem.Eff
         let mutable currentContStack = workItem.Stack
         let mutable currentEWSteps = evalSteps
@@ -237,7 +237,6 @@ and Runtime (config: WorkerConfig) as this =
                         else
                             do! ifiber.AddBlockingWorkItem (WorkItem.Create (AwaitFiber ifiber, workItem.IFiber, currentContStack, Skipped))
                             // TODO: This double check here fixes a race condition, but is not optimal.
-                            // Channels are bad at synconizing, so we need to check if the fiber is completed again. Should we try again?
                             if ifiber.Completed then
                                 do! ifiber.RescheduleBlockingWorkItems activeWorkItemChan
                             resultOpt <- Some (Success (), ContStack.Empty, Skipped)
@@ -256,8 +255,13 @@ and Runtime (config: WorkerConfig) as this =
 
             return resultOpt.Value
         }
+        
+    member private _.Reset () =
+        activeWorkItemChan.Clear ()
+        activeBlockingEventChan.Clear ()
 
-    override this.Run<'R, 'E> (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
+    override _.Run<'R, 'E> (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
+        this.Reset ()
         let fiber = Fiber<'R, 'E>()
         activeWorkItemChan.AddAsync
         <| WorkItem.Create (eff.Upcast(), fiber.Internal, ContStack.Empty, Evaluated)
