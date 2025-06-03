@@ -4,7 +4,7 @@
 (* All rights reserved                                                                                       *)
 (*************************************************************************************************************)
 
-module internal ArgParser
+module internal FIO.Benchmarks.ArgParser
 
 open FIO.Runtime
 open FIO.Benchmarks.Suite
@@ -13,7 +13,7 @@ open Argu
 
 open System.IO
 
-type internal Arguments =
+type private Arguments =
     | Direct_Runtime
     | Cooperative_Runtime of ewc: int * ews: int * bwc: int
     | Concurrent_Runtime of ewc: int * ews: int * bwc: int
@@ -58,68 +58,67 @@ type internal Arguments =
             | SavePath _ ->
                 "specify absolute path to save the benchmark results csv file"
 
-type internal Parser() =
-    let parser = ArgumentParser.Create<Arguments>()
+let private parser =
+    ArgumentParser.Create<Arguments>(programName = "FIO.Benchmarks")
 
-    member internal _.PrintArgs args =
-        let argsStr = String.concat " " (Array.toList args)
-        printfn $"benchmark arguments: %s{argsStr}"
+let printArgs args =
+    printfn "%s arguments: %s" parser.ProgramName (String.concat " " args)
 
-    member internal _.PrintUsage() =
-        printfn $"%s{parser.PrintUsage()}"
+let printUsage () =
+    printfn $"%s{parser.PrintUsage ()}"
 
-    member internal _.ParseArgs args =
-        let results = parser.Parse args
+let parseArgs args =
+    let results = parser.Parse args
 
-        let runtime: FRuntime =
-            if results.Contains Direct_Runtime then
-                Direct.Runtime()
-            elif results.Contains Cooperative_Runtime then
-                let ewc, ews, bwc = results.GetResult Cooperative_Runtime
-                Cooperative.Runtime({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
-            elif results.Contains Concurrent_Runtime then
-                let ewc, ews, bwc = results.GetResult Concurrent_Runtime
-                Concurrent.Runtime({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
-            else
-                invalidArg "args" "Runtime should be specified!"
+    let runtime: FRuntime =
+        if results.Contains Direct_Runtime then
+            Direct.Runtime ()
+        elif results.Contains Cooperative_Runtime then
+            let ewc, ews, bwc = results.GetResult Cooperative_Runtime
+            Cooperative.Runtime ({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
+        elif results.Contains Concurrent_Runtime then
+            let ewc, ews, bwc = results.GetResult Concurrent_Runtime
+            Concurrent.Runtime ({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
+        else
+            invalidArg "args" "Runtime should be specified!"
 
-        let runs = results.TryGetResult Runs |> Option.defaultValue 1 
+    let runs = results.TryGetResult Runs|> Option.defaultValue 1
 
-        let actorInc = results.TryGetResult Actor_Increment |> Option.defaultValue (0, 0)
+    let actorInc = results.TryGetResult Actor_Increment |> Option.defaultValue (0, 0)
 
-        let roundInc = results.TryGetResult Round_Increment |> Option.defaultValue (0, 0)
+    let roundInc = results.TryGetResult Round_Increment |> Option.defaultValue (0, 0)
 
-        let configs =
-            [ results.TryGetResult Pingpong |> Option.map PingpongConfig
-              results.TryGetResult Threadring |> Option.map ThreadringConfig
-              results.TryGetResult Big |> Option.map BigConfig
-              results.TryGetResult Bang |> Option.map BangConfig
-              results.TryGetResult Fork |> Option.map  ForkConfig ]
-            |> List.choose id
+    let configs =
+        [ results.TryGetResult Pingpong |> Option.map PingpongConfig
+          results.TryGetResult Threadring |> Option.map ThreadringConfig
+          results.TryGetResult Big |> Option.map BigConfig
+          results.TryGetResult Bang |> Option.map BangConfig
+          results.TryGetResult Fork |> Option.map  ForkConfig ]
+        |> List.choose id
 
-        if configs.IsEmpty then
-            invalidArg "args" "At least one benchmark should be specified!"
+    if configs.IsEmpty then
+        invalidArg "args" "At least one benchmark should be specified!"
 
-        let saveToCsv =
-            results.TryGetResult Save
-            |> Option.defaultValue false
+    let saveToCsv =
+        results.TryGetResult Save
+        |> Option.defaultValue false
 
-        let projectDirPath =
-            Directory.GetCurrentDirectory()
-            |> Directory.GetParent
-            |> _.Parent
-            |> _.Parent
-            |> function
-                | null -> failwith "Unexpected directory structure!"
-                | di -> di.FullName
-        let savePath =
-           results.TryGetResult SavePath
-           |> Option.defaultValue (projectDirPath + @"\data\")
+    let projectDirPath =
+        Directory.GetCurrentDirectory()
+        |> Directory.GetParent
+        |> _.Parent
+        |> _.Parent
+        |> function
+            | null -> failwith "Unexpected directory structure!"
+            | di -> di.FullName
+    let savePath =
+       results.TryGetResult SavePath
+       |> Option.defaultValue (projectDirPath + @"\data\")
 
-        { Runtime = runtime
-          Runs = runs
-          ActorIncrement = actorInc
-          RoundIncrement = roundInc
-          BenchmarkConfigs = configs
-          SaveToCsv = saveToCsv
-          SavePath = savePath }
+    { Runtime = runtime
+      Runs = runs
+      ActorIncrement = actorInc
+      RoundIncrement = roundInc
+      BenchmarkConfigs = configs
+      SaveToCsv = saveToCsv
+      SavePath = savePath }

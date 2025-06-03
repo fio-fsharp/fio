@@ -9,6 +9,12 @@ module internal FIO.Benchmarks.Suite.BenchmarkRunner
 open FIO.DSL
 open FIO.Runtime
 
+open FIO.Benchmarks.Suite.Pingpong
+open FIO.Benchmarks.Suite.Threadring
+open FIO.Benchmarks.Suite.Big
+open FIO.Benchmarks.Suite.Bang
+open FIO.Benchmarks.Suite.Fork
+
 open System
 open System.IO
 
@@ -103,16 +109,16 @@ let private runBenchmark (runtime: FRuntime) totalRuns (config: BenchmarkConfig)
         let eff =
             match config with
             | PingpongConfig roundCount ->
-                Pingpong.Create <| PingpongConfig roundCount
+                createPingpongBenchmark <| PingpongConfig roundCount
             | ThreadringConfig (actorCount, roundCount) ->
-                Threadring.Create <| ThreadringConfig (actorCount, roundCount)
+                createThreadringBenchmark <| ThreadringConfig (actorCount, roundCount)
             | BigConfig (actorCount, roundCount) ->
-                Big.Create <| BigConfig (actorCount, roundCount)
+                createBigBenchmark <| BigConfig (actorCount, roundCount)
             | BangConfig (actorCount, roundCount) ->
-                Bang.Create <| BangConfig (actorCount, roundCount)
+                createBangBenchmark <| BangConfig (actorCount, roundCount)
             | ForkConfig actorCount ->
-                Fork.Create <| ForkConfig actorCount
-
+                createForkBenchmark <| ForkConfig actorCount
+            
         let! times = executeBenchmark eff
         
         #if DEBUG
@@ -126,7 +132,7 @@ let private runBenchmark (runtime: FRuntime) totalRuns (config: BenchmarkConfig)
               Times = times }
     }
 
-let internal Run args =
+let internal runBenchmarks args =
     task {
         let actorInc, actorIncTimes = args.ActorIncrement
         let roundInc, roundIncTimes = args.RoundIncrement

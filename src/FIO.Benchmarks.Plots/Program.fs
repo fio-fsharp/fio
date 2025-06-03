@@ -1,35 +1,16 @@
-﻿module private Program
+﻿(*************************************************************************************************************)
+(* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
+(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
+(* All rights reserved                                                                                       *)
+(*************************************************************************************************************)
 
-open System.IO
+module private FIO.Benchmarks.Plots.Program
 
-open Plotly.NET
-
-open FIO.Benchmarks.Plots
-open FIO.Benchmarks.Plots.DataParser
+open FIO.Benchmarks.Plots.ArgParser
+open FIO.Benchmarks.Plots.ChartMaker
 
 [<EntryPoint>]
-let main _ =
-    let projectDirPath =
-        Directory.GetCurrentDirectory()
-        |> Directory.GetParent
-        |> _.Parent
-        |> _.Parent
-        |> _.Parent
-        |> function
-            | null -> failwith "Unexpected directory structure!"
-            | di -> di.FullName
-
-    let data = GetAllCsvFiles (projectDirPath + @"\FIO.Benchmarks\data\")
-
-    let rows = (data.Length + 1) / 2
-    let cols = if data.Length = 1 then 1 else 2
-
-    let titles, charts =
-        List.map (fun innerList ->
-            let metadata: FileMetadata = (innerList |> List.head |> fst)
-            (metadata.Title(), BoxPlots.CreateBoxPlot innerList)) data
-            |> List.unzip
-
-    Chart.Grid (rows, cols, SubPlotTitles = titles) charts
-    |> Chart.show
+let main args =
+    printArgs args
+    createAndShowCharts <| parseArgs args
     0

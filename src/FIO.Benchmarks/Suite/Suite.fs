@@ -17,7 +17,7 @@ type internal BenchmarkConfig =
     | BangConfig of actorCount: int * roundCount: int
     | ForkConfig of actorCount: int
 
-    member internal this.Name =
+    member this.Name =
         match this with
         | PingpongConfig _ -> "Pingpong"
         | ThreadringConfig _ -> "Threadring"
@@ -25,7 +25,7 @@ type internal BenchmarkConfig =
         | BangConfig _ -> "Bang"
         | ForkConfig _ -> "Fork"
 
-    member internal this.ConfigString =
+    member this.ConfigString =
         let ci = CultureInfo("en-US")
         match this with
         | PingpongConfig roundCount ->
@@ -39,7 +39,7 @@ type internal BenchmarkConfig =
         | ForkConfig actorCount ->
             $"""Actor Count: %s{actorCount.ToString("N0", ci)} Round Count: 1"""
 
-    member internal this.ToFileString () =
+    member this.ToFileString () =
         this.ToString()
             .ToLowerInvariant()
             .Replace("(", "") 
