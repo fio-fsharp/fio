@@ -75,7 +75,7 @@ let rec private createActors chans (allChans: Channel<int> list) index acc =
                 | index -> allChans.Item(index - 1) }
         createActors chans' allChans (index + 1) (acc @ [actor])
 
-let internal Create config : FIO<int64, exn> =
+let createThreadringBenchmark config : FIO<int64, exn> =
     fio {
         let! actorCount, roundCount =
             match config with

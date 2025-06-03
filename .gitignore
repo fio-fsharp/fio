@@ -458,4 +458,8 @@ Scripts/
 ### CUSTOM ###
 .ionide
 .config
+
+### FIO ###
 /src/FIO.Benchmarks/data
+/src/FIO.Benchmarks.Plots/boxplot_data
+/src/FIO.Benchmarks.Plots/linechart_data

@@ -79,7 +79,7 @@ let private stopLoop stopCount timerChan (stopwatch: Stopwatch) =
         #endif
     }
 
-let internal TimerEff startCount msgCount stopCount timerChan =
+let TimerEff startCount msgCount stopCount timerChan =
     fio {
         let mutable msgChan = Channel<int>()
         let! stopwatch = !<< (fun () -> Stopwatch())

@@ -134,7 +134,7 @@ let private createBig (actors: Actor list) roundCount msg timerChan startChan : 
         return! currentEff
     }
 
-let internal Create config : FIO<int64, exn> =
+let createBigBenchmark config : FIO<int64, exn> =
     fio {
         let! actorCount, roundCount =
             match config with

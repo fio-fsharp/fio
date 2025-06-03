@@ -70,7 +70,7 @@ let private createSendingActors receiveActorChan actorCount =
               Chan = receiveActorChan })
         [ 1..actorCount ]
 
-let internal Create config : FIO<int64, exn> =
+let createBangBenchmark config : FIO<int64, exn> =
     fio {
         let! actorCount, roundCount =
             match config with

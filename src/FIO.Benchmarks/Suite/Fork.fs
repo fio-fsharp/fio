@@ -29,7 +29,7 @@ let private createFork actorCount timerChan =
         return! currentEff
     }
 
-let internal Create config : FIO<int64, exn> =
+let createForkBenchmark config : FIO<int64, exn> =
     fio {
         let! actorCount =
             match config with

@@ -61,7 +61,7 @@ let private createPonger ponger roundCount startChan =
             return ()
     }
 
-let internal Create config : FIO<int64, exn> =
+let createPingpongBenchmark config : FIO<int64, exn> =
     fio {
         let! roundCount =
             match config with

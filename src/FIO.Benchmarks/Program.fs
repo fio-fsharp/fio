@@ -4,9 +4,10 @@
 (* All rights reserved                                                                                       *)
 (*************************************************************************************************************)
 
-module private Program
+module private FIO.Benchmarks.Program
 
-open FIO.Benchmarks.Suite
+open FIO.Benchmarks.ArgParser
+open FIO.Benchmarks.Suite.BenchmarkRunner
 
 open System.Threading
 
@@ -17,10 +18,7 @@ ThreadPool.SetMinThreads(maxThreads, maxThreads) |> ignore
 
 [<EntryPoint>]
 let main args =
-    let parser = ArgParser.Parser()
-    parser.PrintArgs args
-    let task =
-        BenchmarkRunner.Run
-        <| parser.ParseArgs args
-    task.Wait()
+    printArgs args
+    let task = runBenchmarks <| parseArgs args
+    task.Wait ()
     0
