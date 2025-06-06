@@ -56,7 +56,13 @@ type internal BenchmarkResult =
     { Config: BenchmarkConfig
       RuntimeName: string
       RuntimeFileName: string
-      Times: (int * int64) list }
+      Runs: int64 list
+      ExecutionTimes: int64 list
+      AvgExecutionTime: float
+      StdExecutionTime: float
+      MemoryUsages: int64 list
+      AvgMemoryUsage: float
+      StdMemoryUsage: float }
 
 type internal BenchmarkArgs = 
     { Runtime: FRuntime
