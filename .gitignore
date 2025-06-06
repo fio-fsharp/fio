@@ -222,7 +222,6 @@ _pkginfo.txt
 # Others
 ClientBin/
 ~$*
-*~
 *.dbmdl
 *.dbproj.schemaview
 *.pfx
@@ -326,27 +325,22 @@ Temporary Items
 ### XamarinStudio ###
 bin/
 obj/
-*.userprefs
 
 
 ### F# ###
 lib/debug
 lib/release
 Debug
-*.suo
-*.user
 obj
 bin
 *.exe
 
 
 ### MonoDevelop ###
-#User Specific
-*.userprefs
+# User Specific
 *.usertasks
 
-#Mono Project Files
-*.pidb
+# Mono Project Files
 *.resources
 test-results/
 
@@ -359,14 +353,12 @@ test-results/
 Session.vim
 # temporary
 .netrwhist
-*~
 # auto-generated tag files
 tags
 
 
 ### Emacs ###
 # -*- mode: gitignore; -*-
-*~
 \#*\#
 /.emacs.desktop
 /.emacs.desktop.lock
@@ -410,7 +402,6 @@ flycheck_*.el
 ### Node ###
 # Logs
 logs
-*.log
 npm-debug.log*
 
 # Runtime data
@@ -459,7 +450,8 @@ Scripts/
 .ionide
 .config
 
+
 ### FIO ###
-/src/FIO.Benchmarks/data
+/src/FIO.Benchmarks/results
 /src/FIO.Benchmarks.Plots/boxplot_data
 /src/FIO.Benchmarks.Plots/linechart_data

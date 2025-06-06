@@ -20,7 +20,7 @@ type PlotType =
 
 let private generatePastelPurples (count: int) : string list =
     let generateSplitDeltas (n: int) : int list =
-        let step = 30
+        let step = 10
         let half = n / 2
         let negatives = [ for i in 1 .. half -> -step * i ]
         let positives = [ for i in 1 .. half -> step * i ]
@@ -57,13 +57,13 @@ let private projectDirPath =
         | di -> di.FullName
 
 let private generateBoxPlotCharts () =
-    let boxplotData = getAllCsvFilesData (projectDirPath + @"\FIO.Benchmarks.Plots\boxplot_data\")
+    let boxplotData = getAllCsvResults (projectDirPath + @"\FIO.Benchmarks.Plots\boxplot_data\")
     let colors = generatePastelPurples boxplotData.Length
     
     let titles, charts =
         List.map (fun (innerList, color) ->
             let metadata: FileMetadata = (innerList |> List.head |> fst)
-            let width = innerList.Length * 500
+            let width = innerList.Length * 250
             (metadata.Title(), createBoxPlot innerList width color)) (List.zip boxplotData colors)
             |> List.unzip
             
@@ -71,7 +71,7 @@ let private generateBoxPlotCharts () =
     
 let private generateLineCharts () =
     let lineChartData =
-        getAllCsvFilesData (projectDirPath + @"\FIO.Benchmarks.Plots\linechart_data\")
+        getAllCsvResults (projectDirPath + @"\FIO.Benchmarks.Plots\linechart_data\")
         |> List.collect id
         |> List.groupBy (fst >> _.BenchmarkName)
         |> List.map (fun (_, group) ->
@@ -90,11 +90,11 @@ let private generateLineCharts () =
     charts, titles, lineChartData.Length + 1, 1
     
 let createAndShowCharts args =
-    let charts, plotTitles, rows, cols =
+    let charts, titles, rowCount, colCount =
         match args with
         | BoxPlots -> generateBoxPlotCharts ()
         | LinePlots -> generateLineCharts ()
         | All -> [], [], 0, 0
-    Chart.Grid (rows, cols, SubPlotTitles = plotTitles) charts
+    Chart.Grid (rowCount, colCount, SubPlotTitles = titles) charts
     |> Chart.show
     

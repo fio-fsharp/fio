@@ -15,17 +15,21 @@ let createBoxPlot (data: (FileMetadata * BenchmarkData) list) width color =
     
     let createChart (data: FileMetadata * BenchmarkData) =
         let metadata, data = data
-        let x = List.replicate data.Results.Length (metadata.ToString())
-        let y = data.Results
+        let x = List.replicate data.ExecutionTimes.Length (metadata.ToString())
+        let y = data.ExecutionTimes
         Chart.BoxPlot(
             X = x,
             Y = y,
-            ShowLegend = true,
+            ShowLegend = false,
             MarkerColor = Color.fromString color,
-            BoxPoints = StyleParam.BoxPoints.All)
+            BoxPoints = StyleParam.BoxPoints.SuspectedOutliers)
         |> Chart.withTraceInfo (metadata.ToString())
         |> Chart.withSize (width, 4000)
-        |> Chart.withYAxisStyle data.Header
+        |> Chart.withYAxisStyle (data.Headers[0] + " (lower is better)")
+        |> Chart.withLayout (Layout.init (
+            PlotBGColor = Color.fromHex "#DCDCDC",
+            PaperBGColor = Color.fromString "white"
+        ))
         
     Chart.combine
     <| List.map createChart data
@@ -34,7 +38,7 @@ let createLinePlot (data: (FileMetadata * BenchmarkData) list list) width colors
     
     let createChart (data: (FileMetadata * BenchmarkData) list) color =
         let x = List.map (fun x -> (fst x).ActorCount) data
-        let y = List.map (fun x -> (snd x).Results |> List.averageBy float) data
+        let y = List.map (fun x -> (snd x).ExecutionTimes |> List.averageBy float) data
         Chart.Scatter(
             x,
             y,
@@ -45,7 +49,11 @@ let createLinePlot (data: (FileMetadata * BenchmarkData) list list) width colors
         |> Chart.withTraceInfo ((fst data.Head).ToString())
         |> Chart.withSize (width, 2000)
         |> Chart.withXAxisStyle "Forked Fibers"
-        |> Chart.withYAxisStyle (snd data.Head).Header
-
+        |> Chart.withYAxisStyle ((snd data.Head).Headers[0] + " (lower is better)") 
+        |> Chart.withLayout (Layout.init (
+            PlotBGColor = Color.fromHex "#DCDCDC",
+            PaperBGColor = Color.fromString "white"
+        ))
+    
     Chart.combine
     <| List.map (fun (data, color) -> createChart data color) (List.zip data colors)

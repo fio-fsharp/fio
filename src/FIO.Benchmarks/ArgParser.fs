@@ -75,10 +75,10 @@ let parseArgs args =
             Direct.Runtime ()
         elif results.Contains Cooperative_Runtime then
             let ewc, ews, bwc = results.GetResult Cooperative_Runtime
-            Cooperative.Runtime ({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
+            Cooperative.Runtime { EWCount = ewc; EWSteps = ews; BWCount = bwc }
         elif results.Contains Concurrent_Runtime then
             let ewc, ews, bwc = results.GetResult Concurrent_Runtime
-            Concurrent.Runtime ({ EWCount = ewc; EWSteps = ews; BWCount = bwc })
+            Concurrent.Runtime { EWCount = ewc; EWSteps = ews; BWCount = bwc }
         else
             invalidArg "args" "Runtime should be specified!"
 
@@ -113,7 +113,7 @@ let parseArgs args =
             | di -> di.FullName
     let savePath =
        results.TryGetResult SavePath
-       |> Option.defaultValue (projectDirPath + @"\data\")
+       |> Option.defaultValue (projectDirPath + @"\results\")
 
     { Runtime = runtime
       Runs = runs
