@@ -12,6 +12,10 @@ open FIO.Runtime
 open FsCheck
 open FsCheck.FSharp
 
+// TODO: These are currently property tests.
+// It would be wise to add tests such as failing tasks to fibers, succeding, etc.
+// i.e. all kinds of edge cases.
+
 type RuntimeGenerator =
     static member Runtime () : Arbitrary<FRuntime> =
         Arb.fromGen <| Gen.oneof [

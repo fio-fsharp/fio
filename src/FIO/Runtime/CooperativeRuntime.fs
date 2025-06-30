@@ -162,32 +162,38 @@ and Runtime (config: WorkerConfig) as this =
         let handleSuccess res =
             let mutable loop = true
             while loop do
-                match currentContStack with
-                | [] -> 
-                    resultOpt <- Some (Success res, ContStack.Empty, Evaluated)
+                if currentContStack.Count = 0 then
+                    resultOpt <- Some (Success res, ResizeArray<ContStackFrame> (), Evaluated)
                     loop <- false
-                | (SuccessCont, cont) :: ss -> 
-                    currentEff <- cont res
-                    currentPrevAction <- Evaluated
-                    currentContStack <- ss
-                    loop <- false
-                | (FailureCont, _) :: ss -> 
-                    currentContStack <- ss
+                else
+                    let lastIndex = currentContStack.Count - 1
+                    let stackFrame = currentContStack[lastIndex]
+                    currentContStack.RemoveAt lastIndex
+                    match stackFrame.ContType with
+                    | SuccessCont ->
+                        currentEff <- stackFrame.Cont res
+                        currentPrevAction <- Evaluated
+                        loop <- false
+                    | FailureCont ->
+                        ()
 
         let handleError err =
             let mutable loop = true
             while loop do
-                match currentContStack with
-                | [] -> 
-                    resultOpt <- Some (Failure err, ContStack.Empty, Evaluated)
+                if currentContStack.Count = 0 then
+                    resultOpt <- Some (Failure err, ResizeArray<ContStackFrame> (), Evaluated)
                     loop <- false
-                | (SuccessCont, _) :: ss -> 
-                    currentContStack <- ss
-                | (FailureCont, cont) :: ss ->
-                    currentEff <- cont err
-                    currentContStack <- ss
-                    currentPrevAction <- Evaluated
-                    loop <- false
+                else
+                    let lastIndex = currentContStack.Count - 1
+                    let stackFrame = currentContStack[lastIndex]
+                    currentContStack.RemoveAt lastIndex
+                    match stackFrame.ContType with
+                    | SuccessCont ->
+                        ()
+                    | FailureCont ->
+                        currentEff <- stackFrame.Cont err
+                        currentPrevAction <- Evaluated
+                        loop <- false
 
         let handleResult res =
             match res with
@@ -226,11 +232,30 @@ and Runtime (config: WorkerConfig) as this =
                             resultOpt <- Some (ReceiveChan chan, currentContStack, newPrevAction)
                     | ConcurrentEffect (eff, fiber, ifiber) ->
                         do! activeWorkItemChan.AddAsync
-                            <| WorkItem.Create (eff, ifiber, ContStack.Empty, currentPrevAction)
+                            <| WorkItem.Create (eff, ifiber, ResizeArray<ContStackFrame> (), currentPrevAction)
                         handleSuccess fiber
-                    | ConcurrentTPLTask (task, onError, fiber, ifiber) ->
+                    | ConcurrentTPLTask (lazyTask, onError, fiber, ifiber) ->
                         do! Task.Run(fun () -> 
-                            (task ()).ContinueWith((fun (t: Task<obj>) ->
+                            (lazyTask ()).ContinueWith((fun (t: Task) ->
+                                if t.IsFaulted then
+                                    ifiber.Complete
+                                    <| Error (onError t.Exception.InnerException)
+                                elif t.IsCanceled then
+                                    ifiber.Complete
+                                    <| Error (onError <| TaskCanceledException "Task has been cancelled.")
+                                elif t.IsCompleted then
+                                    ifiber.Complete
+                                    <| Ok ()
+                                else
+                                    ifiber.Complete
+                                    <| Error (onError <| InvalidOperationException "Task not completed.")),
+                                CancellationToken.None,
+                                TaskContinuationOptions.RunContinuationsAsynchronously,
+                                TaskScheduler.Default) :> Task)
+                        handleSuccess fiber
+                    | ConcurrentGenericTPLTask (lazyTask, onError, fiber, ifiber) ->
+                        do! Task.Run(fun () -> 
+                            (lazyTask ()).ContinueWith((fun (t: Task<obj>) ->
                                 if t.IsFaulted then
                                     ifiber.Complete
                                     <| Error (onError t.Exception.InnerException)
@@ -249,12 +274,18 @@ and Runtime (config: WorkerConfig) as this =
                         handleSuccess fiber
                     | AwaitFiber ifiber ->
                         if ifiber.Completed then
-                            let! res = ifiber.AwaitAsync()
+                            let! res = ifiber.Task
                             handleResult res
                         else
                             let newPrevAction = RescheduleForBlocking <| BlockingIFiber ifiber
                             currentPrevAction <- newPrevAction
                             resultOpt <- Some (AwaitFiber ifiber, currentContStack, newPrevAction)
+                    | AwaitTPLTask (task, onError) ->
+                        try
+                            let! res = task
+                            handleSuccess res
+                        with exn ->
+                            handleError <| onError exn
                     | AwaitGenericTPLTask (task, onError) ->
                         try
                             let! res = task
@@ -263,10 +294,12 @@ and Runtime (config: WorkerConfig) as this =
                             handleError <| onError exn
                     | ChainSuccess (eff, cont) ->
                         currentEff <- eff
-                        currentContStack <- (SuccessCont, cont) :: currentContStack
+                        currentContStack.Add
+                        <| ContStackFrame (SuccessCont, cont)
                     | ChainError (eff, cont) ->
                         currentEff <- eff
-                        currentContStack <- (FailureCont, cont) :: currentContStack
+                        currentContStack.Add
+                        <| ContStackFrame (FailureCont, cont)
 
             return resultOpt.Value
         }
@@ -279,6 +312,6 @@ and Runtime (config: WorkerConfig) as this =
         this.Reset ()
         let fiber = Fiber<'R, 'E>()
         activeWorkItemChan.AddAsync
-        <| WorkItem.Create (eff.Upcast(), fiber.Internal, ContStack.Empty, Evaluated)
+        <| WorkItem.Create (eff.Upcast (), fiber.Internal, ResizeArray<ContStackFrame> (), Evaluated)
         |> ignore
         fiber

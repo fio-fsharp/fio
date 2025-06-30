@@ -89,9 +89,29 @@ type Runtime () =
                     )
                     |> ignore
                     handleSuccess fiber
-                | ConcurrentTPLTask (task, onError, fiber, ifiber) ->
+                | ConcurrentTPLTask (lazyTask, onError, fiber, ifiber) ->
                     Task.Run(fun () ->
-                        (task ()).ContinueWith((fun (t: Task<obj>) ->
+                        (lazyTask ()).ContinueWith((fun (t: Task) ->
+                            if t.IsFaulted then
+                                ifiber.Complete
+                                <| Error (onError t.Exception.InnerException)
+                            elif t.IsCanceled then
+                                ifiber.Complete
+                                <| Error (onError <| TaskCanceledException "Task has been cancelled.")
+                            elif t.IsCompleted then
+                                ifiber.Complete
+                                <| Ok ()
+                            else
+                                ifiber.Complete
+                                <| Error (onError <| InvalidOperationException "Task not completed.")),
+                            CancellationToken.None,
+                            TaskContinuationOptions.RunContinuationsAsynchronously,
+                            TaskScheduler.Default) :> Task
+                    ) |> ignore
+                    handleSuccess fiber
+                | ConcurrentGenericTPLTask (lazyTask, onError, fiber, ifiber) ->
+                    Task.Run(fun () ->
+                        (lazyTask ()).ContinueWith((fun (t: Task<obj>) ->
                             if t.IsFaulted then
                                 ifiber.Complete
                                 <| Error (onError t.Exception.InnerException)
@@ -110,8 +130,14 @@ type Runtime () =
                     ) |> ignore
                     handleSuccess fiber
                 | AwaitFiber ifiber ->
-                    let! res = ifiber.AwaitAsync()
+                    let! res = ifiber.Task
                     handleResult res
+                | AwaitTPLTask (task, onError) ->
+                    try
+                        let! res = task
+                        handleSuccess res
+                    with exn ->
+                        handleError <| onError exn
                 | AwaitGenericTPLTask (task, onError) ->
                     try
                         let! res = task
@@ -131,7 +157,8 @@ type Runtime () =
     override this.Run<'R, 'E> (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
         let fiber = Fiber<'R, 'E>()
         task {
-            let! res = this.InterpretAsync <| eff.Upcast()
+            let! res = this.InterpretAsync
+                       <| eff.Upcast ()
             do! fiber.Internal.Complete res
         } |> ignore
         fiber
