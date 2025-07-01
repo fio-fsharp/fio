@@ -21,38 +21,43 @@ type Runtime () =
     [<TailCall>]
     member private this.InterpretAsync eff =
         let mutable currentEff = eff
-        let mutable contStack = []
-        let mutable resultOpt = None
+        let mutable contStack = ResizeArray<ContStackFrame> ()
+        let mutable result = Unchecked.defaultof<_>
+        let mutable completed = false
 
-        let handleSuccess res =
+        let inline handleSuccess res =
             let mutable loop = true
             while loop do
-                match contStack with
-                | [] ->
-                    resultOpt <- Some <| Ok res
+                if contStack.Count = 0 then
+                    result <- Ok res
+                    completed <- true
                     loop <- false
-                | (SuccessCont, cont) :: ss ->
-                    currentEff <- cont res
-                    contStack <- ss
-                    loop <- false
-                | (FailureCont, _) :: ss ->
-                    contStack <- ss
+                else
+                    let stackFrame = pop contStack
+                    match stackFrame.ContType with
+                    | SuccessCont ->
+                        currentEff <- stackFrame.Cont res
+                        loop <- false
+                    | FailureCont ->
+                        ()
 
-        let handleError err =
+        let inline handleError err =
             let mutable loop = true
             while loop do
-                match contStack with
-                | [] ->
-                    resultOpt <- Some <| Error err
+                if contStack.Count = 0 then
+                    result <- Error err
+                    completed <- true
                     loop <- false
-                | (SuccessCont, _) :: ss ->
-                    contStack <- ss
-                | (FailureCont, cont) :: ss ->
-                    currentEff <- cont err
-                    contStack <- ss
-                    loop <- false
+                else
+                    let stackFrame = pop contStack
+                    match stackFrame.ContType with
+                    | SuccessCont ->
+                        ()
+                    | FailureCont ->
+                        currentEff <- stackFrame.Cont err
+                        loop <- false
 
-        let handleResult res =
+        let inline handleResult res =
             match res with
             | Ok res ->
                 handleSuccess res
@@ -60,7 +65,7 @@ type Runtime () =
                 handleError err
 
         task {
-            while resultOpt.IsNone do
+            while not completed do
                 match currentEff with
                 | Success res ->
                     handleSuccess res
@@ -77,7 +82,7 @@ type Runtime () =
                     do! chan.SendAsync msg
                     handleSuccess msg
                 | ReceiveChan chan ->
-                    let! res = chan.ReceiveAsync()
+                    let! res = chan.ReceiveAsync ()
                     handleSuccess res
                 | ConcurrentEffect (eff, fiber, ifiber) ->
                     // This runs the task on a separate thread pool.
@@ -146,16 +151,18 @@ type Runtime () =
                         handleError <| onError exn
                 | ChainSuccess (eff, cont) ->
                     currentEff <- eff
-                    contStack <- (SuccessCont, cont) :: contStack
+                    contStack.Add
+                    <| ContStackFrame (SuccessCont, cont)
                 | ChainError (eff, cont) ->
                     currentEff <- eff
-                    contStack <- (FailureCont, cont) :: contStack
+                    contStack.Add
+                    <| ContStackFrame (FailureCont, cont)
 
-            return resultOpt.Value
+            return result
         }
 
     override this.Run<'R, 'E> (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
-        let fiber = Fiber<'R, 'E>()
+        let fiber = Fiber<'R, 'E> ()
         task {
             let! res = this.InterpretAsync
                        <| eff.Upcast ()

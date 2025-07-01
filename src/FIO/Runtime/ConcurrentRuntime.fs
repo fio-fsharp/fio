@@ -46,21 +46,21 @@ and private EvaluationWorker (config: EvaluationWorkerConfig) =
             task {
                 let mutable loop = true
                 while loop do
-                    let! hasWorkItem = config.ActiveWorkItemChan.WaitToTakeAsync()
+                    let! hasWorkItem = config.ActiveWorkItemChan.WaitToTakeAsync ()
                     if not hasWorkItem then
                         loop <- false
                     else
-                        let! workItem = config.ActiveWorkItemChan.TakeAsync()
+                        let! workItem = config.ActiveWorkItemChan.TakeAsync ()
                         do! processWorkItem workItem
             } |> ignore), TaskCreationOptions.LongRunning))
             .Start TaskScheduler.Default
 
-    let cancellationTokenSource = new CancellationTokenSource()
+    let cancellationTokenSource = new CancellationTokenSource ()
     do startWorker ()
     
     interface IDisposable with
         member _.Dispose () =
-            cancellationTokenSource.Cancel()
+            cancellationTokenSource.Cancel ()
 
 and private BlockingWorker (config: BlockingWorkerConfig) =
 
@@ -80,27 +80,27 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
                 while loop do
                     // When the BlockingWorker receives a channel, it is an "event" that the
                     // the given channel now has received one element, that the next blocking effect can retrieve.
-                    let! hasBlockingItem = config.ActiveBlockingEventChan.WaitToTakeAsync()
+                    let! hasBlockingItem = config.ActiveBlockingEventChan.WaitToTakeAsync ()
                     if not hasBlockingItem then
                         loop <- false 
                     else
-                        let! blockingChanEvent = config.ActiveBlockingEventChan.TakeAsync()
+                        let! blockingChanEvent = config.ActiveBlockingEventChan.TakeAsync ()
                         do! processBlockingChannel blockingChanEvent
             } |> ignore), TaskCreationOptions.LongRunning))
             .Start TaskScheduler.Default
 
-    let cancellationTokenSource = new CancellationTokenSource()
+    let cancellationTokenSource = new CancellationTokenSource ()
     do startWorker ()
 
     interface IDisposable with
         member _.Dispose () =
-            cancellationTokenSource.Cancel()
+            cancellationTokenSource.Cancel ()
 
 and Runtime (config: WorkerConfig) as this =
     inherit FWorkerRuntime(config)
 
-    let activeWorkItemChan = InternalChannel<WorkItem>()
-    let activeBlockingEventChan = InternalChannel<Channel<obj>>()
+    let activeWorkItemChan = InternalChannel<WorkItem> ()
+    let activeBlockingEventChan = InternalChannel<Channel<obj>> ()
 
     let createBlockingWorkers count =
         List.init count <| fun _ ->
@@ -141,18 +141,18 @@ and Runtime (config: WorkerConfig) as this =
         let mutable currentEff = workItem.Eff
         let mutable currentContStack = workItem.Stack
         let mutable currentEWSteps = evalSteps
-        let mutable resultOpt = None
+        let mutable result = Unchecked.defaultof<_>
+        let mutable completed = false
 
-        let handleSuccess res =
+        let inline handleSuccess res =
             let mutable loop = true
             while loop do
                 if currentContStack.Count = 0 then
-                    resultOpt <- Some (Success res, ResizeArray<ContStackFrame> (), Evaluated)
+                    result <- (Success res, ResizeArray<ContStackFrame> (), Evaluated)
+                    completed <- true
                     loop <- false
                 else
-                    let lastIndex = currentContStack.Count - 1
-                    let stackFrame = currentContStack[lastIndex]
-                    currentContStack.RemoveAt lastIndex
+                    let stackFrame = pop currentContStack
                     match stackFrame.ContType with
                     | SuccessCont ->
                         currentEff <- stackFrame.Cont res
@@ -160,16 +160,15 @@ and Runtime (config: WorkerConfig) as this =
                     | FailureCont ->
                         ()
 
-        let handleError err =
+        let inline handleError err =
             let mutable loop = true
             while loop do
                 if currentContStack.Count = 0 then
-                    resultOpt <- Some (Failure err, ResizeArray<ContStackFrame> (), Evaluated)
+                    result <- (Failure err, ResizeArray<ContStackFrame> (), Evaluated)
+                    completed <- true
                     loop <- false
                 else
-                    let lastIndex = currentContStack.Count - 1
-                    let stackFrame = currentContStack[lastIndex]
-                    currentContStack.RemoveAt lastIndex
+                    let stackFrame = pop currentContStack
                     match stackFrame.ContType with
                     | SuccessCont ->
                         ()
@@ -177,7 +176,7 @@ and Runtime (config: WorkerConfig) as this =
                         currentEff <- stackFrame.Cont err
                         loop <- false
 
-        let handleResult res =
+        let inline handleResult res =
             match res with
             | Ok res ->
                 handleSuccess res
@@ -185,9 +184,10 @@ and Runtime (config: WorkerConfig) as this =
                 handleError err
 
         task {
-            while resultOpt.IsNone do
+            while not completed do
                 if currentEWSteps = 0 then
-                    resultOpt <- Some (currentEff, currentContStack, RescheduleForRunning)
+                    result <- (currentEff, currentContStack, RescheduleForRunning)
+                    completed <- true
                 else
                     currentEWSteps <- currentEWSteps - 1
                     match currentEff with
@@ -207,12 +207,13 @@ and Runtime (config: WorkerConfig) as this =
                         handleSuccess msg
                     | ReceiveChan chan ->
                         if chan.Count > 0 then
-                            let! res = chan.ReceiveAsync()
+                            let! res = chan.ReceiveAsync ()
                             handleSuccess res
                         else
                             do! chan.AddBlockingWorkItem
                                 <| WorkItem.Create (ReceiveChan chan, workItem.IFiber, currentContStack, Skipped)
-                            resultOpt <- Some (Success (), ResizeArray<ContStackFrame> (), Skipped)
+                            result <- (Success (), ResizeArray<ContStackFrame> (), Skipped)
+                            completed <- true
                     | ConcurrentEffect (eff, fiber, ifiber) ->
                         do! activeWorkItemChan.AddAsync
                             <| WorkItem.Create (eff, ifiber, ResizeArray<ContStackFrame> (), workItem.PrevAction)
@@ -264,7 +265,8 @@ and Runtime (config: WorkerConfig) as this =
                             // TODO: This double check here fixes a race condition, but is not optimal.
                             if ifiber.Completed then
                                 do! ifiber.RescheduleBlockingWorkItems activeWorkItemChan
-                            resultOpt <- Some (Success (), ResizeArray<ContStackFrame> (), Skipped)
+                            result <- (Success (), ResizeArray<ContStackFrame> (), Skipped)
+                            completed <- true
                     | AwaitTPLTask (task, onError) ->
                         try
                             let! res = task
@@ -286,7 +288,7 @@ and Runtime (config: WorkerConfig) as this =
                         currentContStack.Add
                         <| ContStackFrame (FailureCont, cont)
 
-            return resultOpt.Value
+            return result
         }
         
     member private _.Reset () =
@@ -295,7 +297,7 @@ and Runtime (config: WorkerConfig) as this =
 
     override _.Run<'R, 'E> (eff: FIO<'R, 'E>) : Fiber<'R, 'E> =
         this.Reset ()
-        let fiber = Fiber<'R, 'E>()
+        let fiber = Fiber<'R, 'E> ()
         activeWorkItemChan.AddAsync
         <| WorkItem.Create (eff.Upcast (), fiber.Internal, ResizeArray<ContStackFrame> (), Evaluated)
         |> ignore

@@ -99,7 +99,11 @@ and internal InternalChannel<'R> (id: Guid) =
         }
         
     member internal _.TryTake (res: byref<'R>) =
-        chan.Reader.TryRead &res
+        let success = chan.Reader.TryRead &res
+        if success then
+            Interlocked.Decrement &count
+            |> ignore
+        success
     
     member internal _.WaitToTakeAsync () =
         chan.Reader.WaitToReadAsync().AsTask()
