@@ -160,7 +160,7 @@ and Runtime (config: WorkerConfig) as this =
         let mutable result = Unchecked.defaultof<_>
         let mutable completed = false
 
-        let inline handleSuccess res =
+        let inline processSuccess res =
             let mutable loop = true
             while loop do
                 if currentContStack.Count = 0 then
@@ -177,7 +177,7 @@ and Runtime (config: WorkerConfig) as this =
                     | FailureCont ->
                         ()
 
-        let inline handleError err =
+        let inline processError err =
             let mutable loop = true
             while loop do
                 if currentContStack.Count = 0 then
@@ -194,12 +194,12 @@ and Runtime (config: WorkerConfig) as this =
                         currentPrevAction <- Evaluated
                         loop <- false
 
-        let inline handleResult res =
+        let inline processResult res =
             match res with
             | Ok res ->
-                handleSuccess res
+                processSuccess res
             | Error err ->
-                handleError err
+                processError err
 
         task {
             while not completed do
@@ -210,22 +210,23 @@ and Runtime (config: WorkerConfig) as this =
                     currentEWSteps <- currentEWSteps - 1
                     match currentEff with
                     | Success res ->
-                        handleSuccess res
+                        processSuccess res
                     | Failure err ->
-                        handleError err
+                        processError err
                     | Action (func, onError) ->
                         try 
                             let res = func ()
-                            handleSuccess res
+                            processSuccess res
                         with exn ->
-                            handleError <| onError exn
+                            processError
+                            <| onError exn
                     | SendChan (msg, chan) ->
                         do! chan.SendAsync msg
-                        handleSuccess msg
+                        processSuccess msg
                     | ReceiveChan chan ->
                         if chan.Count > 0 then
                             let! res = chan.ReceiveAsync ()
-                            handleSuccess res
+                            processSuccess res
                         else
                             let newPrevAction = RescheduleForBlocking <| BlockingChannel chan
                             currentPrevAction <- newPrevAction
@@ -234,7 +235,7 @@ and Runtime (config: WorkerConfig) as this =
                     | ConcurrentEffect (eff, fiber, ifiber) ->
                         do! activeWorkItemChan.AddAsync
                             <| WorkItem.Create (eff, ifiber, ResizeArray<ContStackFrame> (), currentPrevAction)
-                        handleSuccess fiber
+                        processSuccess fiber
                     | ConcurrentTPLTask (lazyTask, onError, fiber, ifiber) ->
                         do! Task.Run(fun () -> 
                             (lazyTask ()).ContinueWith((fun (t: Task) ->
@@ -253,7 +254,7 @@ and Runtime (config: WorkerConfig) as this =
                                 CancellationToken.None,
                                 TaskContinuationOptions.RunContinuationsAsynchronously,
                                 TaskScheduler.Default) :> Task)
-                        handleSuccess fiber
+                        processSuccess fiber
                     | ConcurrentGenericTPLTask (lazyTask, onError, fiber, ifiber) ->
                         do! Task.Run(fun () -> 
                             (lazyTask ()).ContinueWith((fun (t: Task<obj>) ->
@@ -272,11 +273,11 @@ and Runtime (config: WorkerConfig) as this =
                                 CancellationToken.None,
                                 TaskContinuationOptions.RunContinuationsAsynchronously,
                                 TaskScheduler.Default) :> Task)
-                        handleSuccess fiber
+                        processSuccess fiber
                     | AwaitFiber ifiber ->
                         if ifiber.Completed then
                             let! res = ifiber.Task
-                            handleResult res
+                            processResult res
                         else
                             let newPrevAction = RescheduleForBlocking <| BlockingIFiber ifiber
                             currentPrevAction <- newPrevAction
@@ -285,15 +286,15 @@ and Runtime (config: WorkerConfig) as this =
                     | AwaitTPLTask (task, onError) ->
                         try
                             let! res = task
-                            handleSuccess res
+                            processSuccess res
                         with exn ->
-                            handleError <| onError exn
+                            processError <| onError exn
                     | AwaitGenericTPLTask (task, onError) ->
                         try
                             let! res = task
-                            handleSuccess res
+                            processSuccess res
                         with exn ->
-                            handleError <| onError exn
+                            processError <| onError exn
                     | ChainSuccess (eff, cont) ->
                         currentEff <- eff
                         currentContStack.Add

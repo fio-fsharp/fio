@@ -9,7 +9,8 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<Compile Include="TestSuite.fs" />
+		<Compile Include="PropertyTests.fs" />
+		<Compile Include="RuntimeTests.fs" />
 	</ItemGroup>
 
 	<ItemGroup>

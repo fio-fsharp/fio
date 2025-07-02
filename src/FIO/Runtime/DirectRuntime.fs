@@ -25,7 +25,7 @@ type Runtime () =
         let mutable result = Unchecked.defaultof<_>
         let mutable completed = false
 
-        let inline handleSuccess res =
+        let inline processSuccess res =
             let mutable loop = true
             while loop do
                 if contStack.Count = 0 then
@@ -41,7 +41,7 @@ type Runtime () =
                     | FailureCont ->
                         ()
 
-        let inline handleError err =
+        let inline processError err =
             let mutable loop = true
             while loop do
                 if contStack.Count = 0 then
@@ -57,33 +57,33 @@ type Runtime () =
                         currentEff <- stackFrame.Cont err
                         loop <- false
 
-        let inline handleResult res =
+        let inline processResult res =
             match res with
             | Ok res ->
-                handleSuccess res
+                processSuccess res
             | Error err ->
-                handleError err
+                processError err
 
         task {
             while not completed do
                 match currentEff with
                 | Success res ->
-                    handleSuccess res
+                    processSuccess res
                 | Failure err ->
-                    handleError err
+                    processError err
                 | Action (func, onError) ->
                     try 
                         let res = func ()
-                        handleSuccess res
+                        processSuccess res
                     with exn ->
-                        handleError
+                        processError
                         <| onError exn
                 | SendChan (msg, chan) ->
                     do! chan.SendAsync msg
-                    handleSuccess msg
+                    processSuccess msg
                 | ReceiveChan chan ->
                     let! res = chan.ReceiveAsync ()
-                    handleSuccess res
+                    processSuccess res
                 | ConcurrentEffect (eff, fiber, ifiber) ->
                     // This runs the task on a separate thread pool.
                     Task.Run(fun () ->
@@ -93,7 +93,7 @@ type Runtime () =
                         } :> Task
                     )
                     |> ignore
-                    handleSuccess fiber
+                    processSuccess fiber
                 | ConcurrentTPLTask (lazyTask, onError, fiber, ifiber) ->
                     Task.Run(fun () ->
                         (lazyTask ()).ContinueWith((fun (t: Task) ->
@@ -113,7 +113,7 @@ type Runtime () =
                             TaskContinuationOptions.RunContinuationsAsynchronously,
                             TaskScheduler.Default) :> Task
                     ) |> ignore
-                    handleSuccess fiber
+                    processSuccess fiber
                 | ConcurrentGenericTPLTask (lazyTask, onError, fiber, ifiber) ->
                     Task.Run(fun () ->
                         (lazyTask ()).ContinueWith((fun (t: Task<obj>) ->
@@ -133,22 +133,22 @@ type Runtime () =
                             TaskContinuationOptions.RunContinuationsAsynchronously,
                             TaskScheduler.Default) :> Task
                     ) |> ignore
-                    handleSuccess fiber
+                    processSuccess fiber
                 | AwaitFiber ifiber ->
                     let! res = ifiber.Task
-                    handleResult res
+                    processResult res
                 | AwaitTPLTask (task, onError) ->
                     try
                         let! res = task
-                        handleSuccess res
+                        processSuccess res
                     with exn ->
-                        handleError <| onError exn
+                        processError <| onError exn
                 | AwaitGenericTPLTask (task, onError) ->
                     try
                         let! res = task
-                        handleSuccess res
+                        processSuccess res
                     with exn ->
-                        handleError <| onError exn
+                        processError <| onError exn
                 | ChainSuccess (eff, cont) ->
                     currentEff <- eff
                     contStack.Add
