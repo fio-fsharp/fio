@@ -21,7 +21,7 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore src/FIO/FIO.sln
+        run: dotnet restore src/FIO.sln
 
       - name: Build
         run: dotnet build --no-restore
