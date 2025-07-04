@@ -24,7 +24,7 @@ jobs:
         run: dotnet restore src/FIO.sln
 
       - name: Build
-        run: dotnet build --no-restore
+        run: dotnet build --no-restore src/FIO.sln
 
       - name: Run tests
-        run: dotnet test --no-build --verbosity normal
+        run: dotnet test --no-build --verbosity normal src/FIO.sln
