@@ -654,10 +654,7 @@ type WebSocketApp(serverUrl, clientUrl) =
         fio {
             do! server serverUrl <~> client clientUrl
         }
-
-WebSocketApp("http://localhost:8080/", "ws://localhost:8080/").Run()
-Console.ReadLine() |> ignore
-
+        
 helloWorld1 ()
 Console.ReadLine() |> ignore
 

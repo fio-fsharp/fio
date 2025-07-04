@@ -350,6 +350,332 @@ let ``AwaitAsync always fails when the computation fails and converts error`` =
         let expected = exnMsg
 
         actual = expected
+               
+let ``FromTask with onError always succeeds when the task succeeds`` =
+    forAllRuntimes <| fun runtime () ->
+        let lazyTask = fun () ->
+            Task.Run(fun () -> ())
+        
+        let onError (exn: exn) =
+            exn
+        
+        let eff = FIO.FromTask<Fiber<unit, exn>, exn> (lazyTask, onError)
+        
+        let actual = (result <| runtime.Run eff).GetType()
+        let expected = typeof<Fiber<unit, exn>>
+        
+        actual = expected
+
+let ``FromTask effect with onError always succeeds with fiber when the task fails`` =
+    forAllRuntimes <| fun runtime (exnMsg: string) ->
+        let lazyTask = fun () ->
+            Task.Run(fun () ->
+            invalidOp exnMsg)
+        
+        let onError (exn: exn) =
+            exn
+        
+        let eff = FIO.FromTask<Fiber<unit, exn>, exn> (lazyTask, onError)
+        
+        let actual = (result <| runtime.Run eff).GetType()
+        let expected = typeof<Fiber<unit, exn>>
+        
+        actual = expected
+
+let ``FromTask fiber with onError always fails when the task fails and converts error`` =
+    forAllRuntimes <| fun runtime (exnMsg: string) ->
+        let lazyTask = fun () ->
+            Task.Run(fun () ->
+            invalidOp exnMsg)
+        
+        let onError (exn: exn) =
+            exn.Message
+        
+        let eff = FIO.FromTask<Fiber<unit, string>, string> (lazyTask, onError)
+        
+        let actual = error <| result (runtime.Run eff)
+        let expected = exnMsg
+        
+        actual = expected
+
+let ``FromTask always succeeds when the task succeeds`` =
+    forAllRuntimes <| fun runtime () ->
+        let lazyTask = fun () ->
+            Task.Run(fun () -> ())
+        
+        let eff = FIO.FromTask<Fiber<unit, exn>, exn> lazyTask
+        
+        let actual = (result <| runtime.Run eff).GetType()
+        let expected = typeof<Fiber<unit, exn>>
+        
+        actual = expected
+        
+let ``FromTask effect always succeeds with fiber when the task fails`` =
+    forAllRuntimes <| fun runtime (exnMsg: string) ->
+        let lazyTask = fun () ->
+            Task.Run(fun () ->
+            invalidOp exnMsg)
+        
+        let eff = FIO.FromTask<Fiber<unit, exn>, exn> lazyTask
+        
+        let actual = (result <| runtime.Run eff).GetType()
+        let expected = typeof<Fiber<unit, exn>>
+        
+        actual = expected
+        
+let ``FromTask fiber always fails when the task fails`` =
+    forAllRuntimes <| fun runtime (exnMsg: string) ->
+        let lazyTask = fun () ->
+            Task.Run(fun () ->
+            invalidOp exnMsg)
+        
+        let eff = FIO.FromTask<Fiber<unit, exn>, exn> lazyTask
+        
+        let actual = (error <| result (runtime.Run eff)).Message
+        let expected = exnMsg
+        
+        actual = expected
+
+let ``FromGenericTask with onError always succeeds when the task succeeds`` =
+    forAllRuntimes <| fun runtime (res: int) ->
+        let lazyTask = fun () ->
+            task {
+                return res
+            }
+        
+        let onError (exn: exn) =
+            exn
+        
+        let eff = FIO.FromGenericTask<Fiber<int, exn>, exn> (lazyTask, onError)
+        
+        let actual = (result <| runtime.Run eff).GetType()
+        let expected = typeof<Fiber<int, exn>>
+        
+        actual = expected
+
+let ``FromGenericTask effect with onError always succeeds with fiber when the task fails`` =
+    forAllRuntimes <| fun runtime (res: int, exnMsg: string) ->
+        let lazyTask = fun () ->
+            task {
+                invalidOp exnMsg
+                return res
+            }
+        
+        let onError (exn: exn) =
+            exn
+        
+        let eff = FIO.FromGenericTask<Fiber<int, exn>, exn> (lazyTask, onError)
+        
+        let actual = (result <| runtime.Run eff).GetType()
+        let expected = typeof<Fiber<int, exn>>
+        
+        actual = expected
+
+let ``FromGenericTask fiber with onError always fails when the task fails and converts error`` =
+    forAllRuntimes <| fun runtime (res: int, exnMsg: string) ->
+        let lazyTask = fun () ->
+            task {
+                invalidOp exnMsg
+                return res
+            }
+        
+        let onError (exn: exn) =
+            exn.Message
+        
+        let eff = FIO.FromGenericTask<Fiber<int, string>, string> (lazyTask, onError)
+        
+        let actual = error <| result (runtime.Run eff)
+        let expected = exnMsg
+        
+        actual = expected
+
+let ``FromGenericTask always succeeds when the task succeeds`` =
+    forAllRuntimes <| fun runtime (res: int) ->
+        let lazyTask = fun () ->
+            task {
+                return res
+            }
+        
+        let eff = FIO.FromGenericTask<Fiber<int, exn>, exn> lazyTask
+        
+        let actual = (result <| runtime.Run eff).GetType()
+        let expected = typeof<Fiber<int, exn>>
+        
+        actual = expected
+
+let ``FromGenericTask effect always succeeds with fiber when the task fails`` =
+    forAllRuntimes <| fun runtime (res: int, exnMsg: string) ->
+        let lazyTask = fun () ->
+            task {
+                invalidOp exnMsg
+                return res
+            }
+        
+        let eff = FIO.FromGenericTask<Fiber<int, exn>, exn> lazyTask
+        
+        let actual = (result <| runtime.Run eff).GetType()
+        let expected = typeof<Fiber<int, exn>>
+        
+        actual = expected
+
+let ``FromGenericTask fiber always fails when the task fails`` =
+    forAllRuntimes <| fun runtime (res: int, exnMsg: string) ->
+        let lazyTask = fun () ->
+            task {
+                invalidOp exnMsg
+                return res
+            }
+        
+        let eff = FIO.FromGenericTask<Fiber<int, exn>, exn> lazyTask
+        
+        let actual = (error <| result (runtime.Run eff)).Message
+        let expected = exnMsg
+        
+        actual = expected
+
+let ``Fork always succeeds when the effect succeeds`` =
+    forAllRuntimes <| fun runtime (res: int) ->
+        let eff = (FIO.Succeed res).Fork()
+        
+        let actual = (result <| runtime.Run eff).GetType()
+        let expected = typeof<Fiber<int, obj>>
+        
+        actual = expected
+        
+let ``Fork always succeeds when the effect fails`` =
+    forAllRuntimes <| fun runtime (err: int) ->
+        let eff = (FIO.Fail err).Fork()
+        
+        let actual = (result <| runtime.Run eff).GetType()
+        let expected = typeof<Fiber<obj, int>>
+        
+        actual = expected
+        
+let ``Fork fiber always succeeds when the effect succeeds`` =
+    forAllRuntimes <| fun runtime (res: int) ->
+        let eff = (FIO.Succeed res).Fork()
+        
+        let actual = result (result <| runtime.Run eff)
+        let expected = res
+        
+        actual = expected
+        
+let ``Fork fiber always fails when the effect fails`` =
+    forAllRuntimes <| fun runtime (err: int) ->
+        let eff = (FIO.Fail err).Fork()
+        
+        let actual = error (result <| runtime.Run eff)
+        let expected = err
+        
+        actual = expected
+
+let ``Bind always succeeds when the initial effect succeeds and continuation succeeds`` =
+    forAllRuntimes <| fun runtime (res: int) ->
+        let eff = (FIO.Succeed res).Bind(FIO.Succeed)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res
+        
+        actual = expected
+        
+let ``Bind always fails when the initial effect fails and continuation fails`` =
+    forAllRuntimes <| fun runtime (err: int) ->
+        let eff = (FIO.Fail err).Bind(FIO.Fail)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err
+        
+        actual = expected
+    
+let ``Bind always fails when the initial effect fails and continuation succeeds`` =
+    forAllRuntimes <| fun runtime (err: int) ->
+        let eff = (FIO.Fail err).Bind(FIO.Succeed)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err
+        
+        actual = expected
+
+let ``Bind always fails when the initial effect succeeds and continuation fails`` =
+    forAllRuntimes <| fun runtime (res: int) ->
+        let eff = (FIO.Succeed res).Bind(FIO.Fail)
+        
+        let actual = error <| runtime.Run eff
+        let expected = res
+        
+        actual = expected
+
+let ``BindError always succeeds when the initial effect succeeds and continuation fails`` =
+    forAllRuntimes <| fun runtime (res: int) ->
+        let eff = (FIO.Succeed res).BindError(FIO.Fail)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res
+        
+        actual = expected
+    
+let ``BindError always succeeds when the initial effect fails and continuation succeeds`` =
+    forAllRuntimes <| fun runtime (err: int) ->
+        let eff = (FIO.Fail err).BindError(FIO.Succeed)
+        
+        let actual = result <| runtime.Run eff
+        let expected = err
+        
+        actual = expected
+        
+let ``BindError always succeeds with the initial effect when the initial effect succeeds and continuation succeeds`` =
+    forAllRuntimes <| fun runtime (res: int) ->
+        let eff = (FIO.Succeed res).BindError(fun r -> FIO.Succeed <| r + 1)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res
+        
+        actual = expected
+        
+let ``BindError always fails with the continuation when the initial effect fails and continuation fails`` =
+    forAllRuntimes <| fun runtime (err: int) ->
+        let eff = (FIO.Fail err).BindError(fun e -> FIO.Fail <| e + 1)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err + 1
+        
+        actual = expected
+
+let ``Map always succeeds when the effect succeeds and transforms result`` =
+    forAllRuntimes <| fun runtime (res: int) ->
+        let eff = (FIO.Succeed res).Map(string) 
+        
+        let actual = result <| runtime.Run eff
+        let expected = string res
+        
+        actual = expected
+        
+let ``Map always fails when the effect fails and does not transform result`` =
+    forAllRuntimes <| fun runtime (err: int) ->
+        let eff = (FIO.Fail err).Map(string) 
+        
+        let actual = error <| runtime.Run eff
+        let expected = err
+        
+        actual = expected
+        
+let ``MapError always succeeds when the effect succeeds and does not transform result`` =
+    forAllRuntimes <| fun runtime (res: int) ->
+        let eff = (FIO.Succeed res).MapError(string) 
+        
+        let actual = result <| runtime.Run eff
+        let expected = res
+        
+        actual = expected
+        
+let ``MapError always fails when the effect fails and transforms result`` =
+    forAllRuntimes <| fun runtime (err: int) ->
+        let eff = (FIO.Fail err).MapError(string) 
+        
+        let actual = error <| runtime.Run eff
+        let expected = string err
+        
+        actual = expected
 
 Check.Quick ``Succeed always succeeds``
 Check.Quick ``Fail always fails``
@@ -386,3 +712,40 @@ Check.Quick ``AwaitAsync with onError always fails when the computation fails an
 
 Check.Quick ``AwaitAsync always succeeds when the computation succeeds``
 Check.Quick ``AwaitAsync always fails when the computation fails and converts error``
+
+Check.Quick ``FromTask with onError always succeeds when the task succeeds``
+Check.Quick ``FromTask effect with onError always succeeds with fiber when the task fails``
+Check.Quick ``FromTask fiber with onError always fails when the task fails and converts error``
+
+Check.Quick ``FromTask always succeeds when the task succeeds``
+Check.Quick ``FromTask effect always succeeds with fiber when the task fails``
+Check.Quick ``FromTask fiber always fails when the task fails``
+
+Check.Quick ``FromGenericTask with onError always succeeds when the task succeeds``
+Check.Quick ``FromGenericTask effect with onError always succeeds with fiber when the task fails``
+Check.Quick ``FromGenericTask fiber with onError always fails when the task fails and converts error``
+
+Check.Quick ``FromGenericTask always succeeds when the task succeeds``
+Check.Quick ``FromGenericTask effect always succeeds with fiber when the task fails``
+Check.Quick ``FromGenericTask fiber always fails when the task fails``
+
+Check.Quick ``Fork always succeeds when the effect succeeds``
+Check.Quick ``Fork always succeeds when the effect fails``
+Check.Quick ``Fork fiber always succeeds when the effect succeeds``
+Check.Quick ``Fork fiber always fails when the effect fails``
+
+Check.Quick ``Bind always succeeds when the initial effect succeeds and continuation succeeds``
+Check.Quick ``Bind always fails when the initial effect fails and continuation fails``
+Check.Quick ``Bind always fails when the initial effect fails and continuation succeeds``
+Check.Quick ``Bind always fails when the initial effect succeeds and continuation fails``
+
+Check.Quick ``BindError always succeeds when the initial effect succeeds and continuation fails``
+Check.Quick ``BindError always succeeds when the initial effect fails and continuation succeeds``
+Check.Quick ``BindError always succeeds with the initial effect when the initial effect succeeds and continuation succeeds``
+Check.Quick ``BindError always fails with the continuation when the initial effect fails and continuation fails``
+
+Check.Quick ``Map always succeeds when the effect succeeds and transforms result``
+Check.Quick ``Map always fails when the effect fails and does not transform result``
+
+Check.Quick ``MapError always succeeds when the effect succeeds and does not transform result``
+Check.Quick ``MapError always fails when the effect fails and transforms result``
