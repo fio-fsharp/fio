@@ -56,7 +56,6 @@ type internal Monitor (
                     let! workItem = chan.TakeAsync()
                     printfn $"MONITOR:    ------------ workItem start ------------"
                     printfn $"MONITOR:      WorkItem IFiber Id: %A{workItem.IFiber.Id}"
-                    printfn $"MONITOR:      WorkItem IFiber count: %i{workItem.IFiber.Count}"
                     printfn $"MONITOR:      WorkItem IFiber completed: %b{workItem.IFiber.Completed}"
                     printfn $"MONITOR:      WorkItem IFiber blocking items count: %i{workItem.IFiber.BlockingWorkItemCount}"
                     printfn $"MONITOR:      WorkItem PrevAction: %A{workItem.PrevAction}"
@@ -82,7 +81,6 @@ type internal Monitor (
                     let! blockingData = chan.TakeAsync()
                     printfn $"MONITOR:    ------------ waitingWorkItem start ------------"
                     printfn $"MONITOR:      WorkItem IFiber Id: %A{blockingData.WaitingWorkItem.IFiber.Id}"
-                    printfn $"MONITOR:      WorkItem IFiber count: %i{blockingData.WaitingWorkItem.IFiber.Count}"
                     printfn $"MONITOR:      WorkItem IFiber completed: %b{blockingData.WaitingWorkItem.IFiber.Completed}"
                     printfn $"MONITOR:      WorkItem IFiber blocking items count: %i{blockingData.WaitingWorkItem.IFiber.BlockingWorkItemCount}"
                     printfn $"MONITOR:      WorkItem PrevAction: %A{blockingData.WaitingWorkItem.PrevAction}"
@@ -99,7 +97,6 @@ type internal Monitor (
                     | BlockingIFiber ifiber ->
                         printfn $"MONITOR:    ------------ blockingIFiber start ------------"
                         printfn $"MONITOR:      IFiber Id: %A{ifiber.Id}"
-                        printfn $"MONITOR:      IFiber count: %i{ifiber.Count}"
                         printfn $"MONITOR:      IFiber completed: %b{ifiber.Completed}"
                         printfn $"MONITOR:      IFiber blocking items count: %i{ifiber.BlockingWorkItemCount}"
                         printfn $"MONITOR:    ------------ blockingIFiber end ------------"

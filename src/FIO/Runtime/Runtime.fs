@@ -10,6 +10,15 @@ open FIO.DSL
 
 open System.Globalization
 
+[<AutoOpen>]
+module private Utils =
+    
+    let inline pop (contStack: ResizeArray<ContStackFrame>) =
+        let lastIndex = contStack.Count - 1
+        let stackFrame = contStack[lastIndex]
+        contStack.RemoveAt lastIndex
+        stackFrame
+
 /// Functional runtime
 [<AbstractClass>]
 type FRuntime internal () =
@@ -48,7 +57,7 @@ type FWorkerRuntime internal (config: WorkerConfig) as this =
         if config.EWCount <= 0 ||
            config.EWSteps <= 0 ||
            config.BWCount <= 0 then
-            invalidArg "config" $"Invalid worker configuration! %s{this.ToString()}"
+            invalidArg "config" $"Invalid worker configuration! %s{this.ToString ()}"
 
     do validateWorkerConfiguration ()
 
