@@ -1,30 +1,31 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<PropertyGroup>
-		<TargetFramework>net9.0</TargetFramework>
-		<LangVersion>latest</LangVersion>
-		<IsPackable>false</IsPackable>
-		<GenerateProgramFile>false</GenerateProgramFile>
-		<WarningsAsErrors>true</WarningsAsErrors>
-	</PropertyGroup>
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+        <WarningsAsErrors>true</WarningsAsErrors>
+    </PropertyGroup>
 
-	<ItemGroup>
-		<Compile Include="PropertyTests.fs" />
-		<Compile Include="RuntimeTests.fs" />
-	</ItemGroup>
+    <ItemGroup>
+        <Compile Include="PropertyTests.fs" />
+        <Compile Include="RuntimeProperties.fs" />
+    </ItemGroup>
 
-	<ItemGroup>
-		<PackageReference Include="coverlet.collector" Version="6.0.4">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-		<PackageReference Update="FSharp.Core" Version="9.0.300" />
-		<PackageReference Include="FsCheck" Version="3.3.0" />
-	</ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="coverlet.collector" Version="6.0.4">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="FsCheck.Xunit" Version="3.3.0" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+        <PackageReference Update="FSharp.Core" Version="9.0.300" />
+        <PackageReference Include="FsCheck" Version="3.3.0" />
+    </ItemGroup>
 
-	<ItemGroup>
-		<ProjectReference Include="..\FIO\FIO.fsproj" />
-	</ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\FIO\FIO.fsproj" />
+    </ItemGroup>
 
 </Project>
