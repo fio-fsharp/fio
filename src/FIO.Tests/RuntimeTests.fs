@@ -4,7 +4,7 @@
 (* All rights reserved                                                                                       *)
 (*************************************************************************************************************)
 
-module FIO.Tests.RuntimeProperties
+module FIO.Tests.RuntimeTests
 
 open FIO.DSL
 open FIO.Runtime
@@ -15,8 +15,8 @@ open FsCheck.FSharp
 
 open System.Threading.Tasks
 
-[<Properties(Arbitrary = [| typeof<RuntimeProperties> |])>]
-type RuntimeProperties() =
+[<Properties(Arbitrary = [| typeof<RuntimeTests> |])>]
+type RuntimeTests () =
 
     let result (fiber: Fiber<'R, 'E>) =
         match fiber.AwaitAsync().Result with
