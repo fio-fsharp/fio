@@ -677,6 +677,78 @@ let ``MapError always fails when the effect fails and transforms result`` =
         
         actual = expected
 
+let ``Then always succeeds with the second effect when the initial effect succeeds and second effect succeeds`` =
+    forAllRuntimes <| fun runtime (res1: int, res2: int) ->
+        let eff = (FIO.Succeed res1).Then(FIO.Succeed res2)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res2
+        
+        actual = expected
+        
+let ``Then always fails with the initial effect when the initial effect fails and second effect succeeds`` =
+    forAllRuntimes <| fun runtime (err: int, res: int) ->
+        let eff = (FIO.Fail err).Then(FIO.Succeed res)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err
+        
+        actual = expected
+        
+let ``Then always fails with the second effect when the initial effect succeeds and second effect fails`` =
+    forAllRuntimes <| fun runtime (res: int, err: int) ->
+        let eff = (FIO.Succeed res).Then(FIO.Fail err)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err
+        
+        actual = expected
+        
+let ``Then always fails with the initial effect when the initial effect fails and second effect fails`` =
+    forAllRuntimes <| fun runtime (err1: int, err2: int) ->
+        let eff = (FIO.Fail err1).Then(FIO.Fail err2)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err1
+        
+        actual = expected
+
+let ``ThenError always succeeds with the initial effect when the initial effect succeeds and second effect fails`` =
+    forAllRuntimes <| fun runtime (err: int, res: int) ->
+        let eff = (FIO.Succeed res).ThenError(FIO.Fail err)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res
+        
+        actual = expected
+        
+let ``ThenError always succeeds with the second effect when the initial effect fails and second effect succeeds`` =
+    forAllRuntimes <| fun runtime (res: int, err: int) ->
+        let eff = (FIO.Fail err).ThenError(FIO.Succeed res)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res
+        
+        actual = expected
+
+let ``ThenError always succeeds with the initial effect when the initial effect succeeds and second effect succeeds`` =
+    forAllRuntimes <| fun runtime (res1: int, res2: int) ->
+        let eff = (FIO.Succeed res1).ThenError(FIO.Succeed res2)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res1
+        
+        actual = expected
+
+let ``ThenError always fails with the second effect when the initial effect fails and second effect fails`` =
+    forAllRuntimes <| fun runtime (err1: int, err2: int) ->
+        let eff = (FIO.Fail err1).ThenError(FIO.Fail err2)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err2
+        
+        actual = expected
+
 Check.Quick ``Succeed always succeeds``
 Check.Quick ``Fail always fails``
 
@@ -749,3 +821,13 @@ Check.Quick ``Map always fails when the effect fails and does not transform resu
 
 Check.Quick ``MapError always succeeds when the effect succeeds and does not transform result``
 Check.Quick ``MapError always fails when the effect fails and transforms result``
+
+Check.Quick ``Then always succeeds with the second effect when the initial effect succeeds and second effect succeeds``
+Check.Quick ``Then always fails with the initial effect when the initial effect fails and second effect succeeds``
+Check.Quick ``Then always fails with the second effect when the initial effect succeeds and second effect fails``
+Check.Quick ``Then always fails with the initial effect when the initial effect fails and second effect fails``
+
+Check.Quick ``ThenError always succeeds with the initial effect when the initial effect succeeds and second effect fails``
+Check.Quick ``ThenError always succeeds with the second effect when the initial effect fails and second effect succeeds``
+Check.Quick ``ThenError always succeeds with the initial effect when the initial effect succeeds and second effect succeeds``
+Check.Quick ``ThenError always fails with the second effect when the initial effect fails and second effect fails``

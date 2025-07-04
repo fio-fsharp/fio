@@ -18,9 +18,9 @@
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
 		<PackageReference Update="FSharp.Core" Version="9.0.300" />
-		<PackageReference Include="FsCheck" Version="3.2.0" />
+		<PackageReference Include="FsCheck" Version="3.3.0" />
 	</ItemGroup>
 
 	<ItemGroup>
