@@ -20,7 +20,7 @@ type FConsole private =
     static member inline PrintLine<'E> (format, onError: exn -> 'E) : FIO<unit, 'E> =
         !<<< (fun () -> printfn format) onError
 
-    static member inline PrintLine format: FIO<unit, exn> =
+    static member inline PrintLine format : FIO<unit, exn> =
         FConsole.PrintLine<exn> (format, id)
 
     static member inline WriteLine<'E> (format, onError: exn -> 'E) : FIO<string, 'E> =

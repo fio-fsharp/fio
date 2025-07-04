@@ -429,8 +429,50 @@ type HighlyConcurrentApp() =
                       <~> receiver chan fiberCount fiberCount
             return! create chan (fiberCount - 1) acc rand
         }
-        
+
 type FiberFromTaskApp() =
+    inherit FIOApp<unit, exn>()
+
+    let fibonacci n =
+        FIO.FromTask<Fiber<string, exn>, exn> <| fun () ->
+            task {
+                let fib (n: int64) =
+                    let mutable a = 0L
+                    let mutable b = 1L
+                    let mutable i = 0L
+
+                    while i < n do
+                        let temp = a + b
+                        a <- b
+                        b <- temp
+                        i <- i + 1L
+                        
+                    a
+
+                printfn $"Task computing Fibonacci of %i{n}..."
+                let res = fib n
+                printfn $"Fibonacci of %i{n} is %i{res}"
+                return ()
+            }
+
+    override _.effect : FIO<unit, exn> =
+        let await (fiber: Fiber<unit, exn>) =
+            fio {
+                do! !!<~~ fiber
+                return ()
+            }
+            
+        fio {
+            let! fiber35 = fibonacci 35L
+            and! fiber40 = fibonacci 40L
+            and! fiber45 = fibonacci 45L
+
+            do! await fiber35 <~>
+                await fiber40 <~>
+                await fiber45
+        }
+
+type FiberFromGenericTaskApp() =
     inherit FIOApp<unit, exn>()
 
     let fibonacci n =
@@ -612,7 +654,7 @@ type WebSocketApp(serverUrl, clientUrl) =
         fio {
             do! server serverUrl <~> client clientUrl
         }
-
+        
 helloWorld1 ()
 Console.ReadLine() |> ignore
 
@@ -679,11 +721,13 @@ Console.ReadLine() |> ignore
 AsyncErrorHandlingApp().Run()
 Console.ReadLine() |> ignore
 
-// TODO: Seems to be waiting forever after finishing. Investigate!
 HighlyConcurrentApp().Run()
 Console.ReadLine() |> ignore
 
 FiberFromTaskApp().Run()
+Console.ReadLine() |> ignore
+
+FiberFromGenericTaskApp().Run()
 Console.ReadLine() |> ignore
 
 SocketApp("127.0.0.1", 5000).Run()
