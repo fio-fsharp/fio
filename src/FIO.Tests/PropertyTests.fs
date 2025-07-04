@@ -4,7 +4,7 @@
 (* All rights reserved                                                                                       *)
 (*************************************************************************************************************)
 
-module private FIO.Tests.PropertyTests
+module FIO.Tests.PropertyTests
 
 open FIO.DSL
 open FIO.Runtime
