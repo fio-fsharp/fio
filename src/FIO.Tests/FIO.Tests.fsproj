@@ -10,7 +10,7 @@
 
     <ItemGroup>
         <Compile Include="PropertyTests.fs" />
-        <Compile Include="RuntimeProperties.fs" />
+        <Compile Include="RuntimeTests.fs" />
     </ItemGroup>
 
     <ItemGroup>

@@ -10,35 +10,31 @@ open FIO.DSL
 open FIO.Runtime
 
 open FsCheck
+open FsCheck.Xunit
 open FsCheck.FSharp
 
-// TODO: These are currently property tests.
-// It would be wise to add tests such as failing tasks to fibers, succeding, etc.
-// i.e. all kinds of edge cases.
+[<Properties(Arbitrary = [| typeof<PropertyTests> |])>]
+type PropertyTests () =
 
-type RuntimeGenerator =
-    static member Runtime () : Arbitrary<FRuntime> =
+    let result (fiber: Fiber<'R, 'E>) =
+        match fiber.AwaitAsync().Result with
+        | Ok res -> res
+        | Error _ -> failwith "Error happened when result was expected!"
+        
+    let error (fiber: Fiber<'R, 'E>) =
+        match fiber.AwaitAsync().Result with
+        | Ok _ -> failwith "Result happened when error was expected!"
+        | Error err -> err
+    
+    static member Runtime() : Arbitrary<FRuntime> =
         Arb.fromGen <| Gen.oneof [
-            Gen.constant <| Direct.Runtime()
-            Gen.constant <| Cooperative.Runtime()
-            Gen.constant <| Concurrent.Runtime()
+            Gen.constant (Direct.Runtime())
+            Gen.constant (Cooperative.Runtime())
+            Gen.constant (Concurrent.Runtime())
         ]
 
-let forAllRuntimes (property: FRuntime -> 'a -> bool) =
-    Prop.forAll (RuntimeGenerator.Runtime()) property
-        
-let result (fiber: Fiber<'R, 'E>) =
-    match fiber.AwaitAsync().Result with
-    | Ok res -> res
-    | Error _ -> failwith "Error happened when result was expected!"
-    
-let error (fiber: Fiber<'R, 'E>) =
-    match fiber.AwaitAsync().Result with
-    | Ok _ -> failwith "Result happened when error was expected!"
-    | Error err -> err
-    
-let ``Functor identity for result`` =
-    forAllRuntimes <| fun runtime (res: int) ->
+    [<Property>]
+    member _.``Functor identity for result`` (runtime: FRuntime, res: int) =
         let eff = FIO.Succeed res
         
         let lhs = eff.Map id
@@ -48,8 +44,8 @@ let ``Functor identity for result`` =
         let rhs' = result <| runtime.Run rhs
         lhs' = rhs'
 
-let ``Functor identity for error`` =
-    forAllRuntimes <| fun runtime (err: int) ->
+    [<Property>]
+    member _.``Functor identity for error`` (runtime: FRuntime, err: int) =
         let eff = FIO.Fail err
         
         let lhs = eff.Map id
@@ -59,8 +55,8 @@ let ``Functor identity for error`` =
         let rhs' = error <| runtime.Run rhs
         lhs' = rhs'
 
-let ``Functor composition for success`` =
-    forAllRuntimes <| fun (runtime: FRuntime) (res: int) ->
+    [<Property>]
+    member _.``Functor composition for success`` (runtime: FRuntime, res: int) =
         let eff = FIO.Succeed res
         let f x = x + 1
         let g x = x - 2
@@ -71,9 +67,9 @@ let ``Functor composition for success`` =
         let lhs' = result <| runtime.Run lhs
         let rhs' = result <| runtime.Run rhs
         lhs' = rhs'
-        
-let ``Functor composition for error`` =
-    forAllRuntimes <| fun (runtime: FRuntime) (err: int) ->
+
+    [<Property>]
+    member _.``Functor composition for error`` (runtime: FRuntime, err: int) =
         let eff = FIO.Fail err
         let f x = x + 1
         let g x = x - 2
@@ -85,19 +81,19 @@ let ``Functor composition for error`` =
         let rhs' = error <| runtime.Run rhs
         lhs' = rhs'
 
-let ``Applicative identity for success`` =
-    forAllRuntimes <| fun (runtime: FRuntime) (res: int) ->
+    [<Property>]
+    member _.``Applicative identity for success`` (runtime: FRuntime, res: int) =
         let eff = FIO.Succeed res
-        
+
         let lhs = eff.Apply <| FIO.Succeed id
         let rhs = eff
-        
+
         let lhs' = result <| runtime.Run lhs
         let rhs' = result <| runtime.Run rhs
         lhs' = rhs'
-        
-let ``Applicative identity for error`` =
-    forAllRuntimes <| fun (runtime: FRuntime) (err: int) ->
+
+    [<Property>]
+    member _.``Applicative identity for error`` (runtime: FRuntime, err: int) =
         let eff = FIO.Fail err
         
         let lhs = eff.ApplyError <| FIO.Fail id
@@ -107,8 +103,8 @@ let ``Applicative identity for error`` =
         let rhs' = error <| runtime.Run rhs
         lhs' = rhs'
 
-let ``Applicative homomorphism for success`` (res: int) =
-    forAllRuntimes <| fun (runtime: FRuntime) (f: int -> int) ->
+    [<Property>]
+    member _.``Applicative homomorphism for success`` (res: int, runtime: FRuntime, f: int -> int) =
         let eff = FIO.Succeed res
         let effF = FIO.Succeed f
         
@@ -118,9 +114,9 @@ let ``Applicative homomorphism for success`` (res: int) =
         let lhs' = result <| runtime.Run lhs
         let rhs' = result <| runtime.Run rhs
         lhs' = rhs'
-            
-let ``Applicative homomorphism for error`` (err: int) =
-    forAllRuntimes <| fun (runtime: FRuntime) (f: int -> int) ->
+
+    [<Property>]   
+    member _.``Applicative homomorphism for error`` (err: int, runtime: FRuntime, f: int -> int) =
         let eff = FIO.Fail err
         let effF = FIO.Fail f
         
@@ -130,11 +126,11 @@ let ``Applicative homomorphism for error`` (err: int) =
         let lhs' = error <| runtime.Run lhs
         let rhs' = error <| runtime.Run rhs
         lhs' = rhs'
-    
-let ``Applicative composition for success`` (f: int -> int) (g: int -> int) =
-    let compose (f: int -> int) (g: int -> int) (x: int) : int =
-        f (g x)
-    forAllRuntimes <| fun (runtime: FRuntime) (res: int) ->
+
+    [<Property>]
+    member _.``Applicative composition for success`` (f: int -> int, g: int -> int, runtime: FRuntime, res: int) =
+        let compose (f: int -> int) (g: int -> int) (x: int) : int =
+            f (g x)
         let ff = FIO.Succeed f
         let gg = FIO.Succeed g
         let eff = FIO.Succeed res
@@ -146,10 +142,10 @@ let ``Applicative composition for success`` (f: int -> int) (g: int -> int) =
         let rhs' = result <| runtime.Run rhs
         lhs' = rhs'
 
-let ``Applicative composition for error`` (f: int -> int) (g: int -> int) =
-    let compose (f: int -> int) (g: int -> int) (x: int) : int =
-        f (g x)
-    forAllRuntimes <| fun (runtime: FRuntime) (err: int) ->
+    [<Property>]
+    member _.``Applicative composition for error`` (f: int -> int, g: int -> int, runtime: FRuntime, err: int) =
+        let compose (f: int -> int) (g: int -> int) (x: int) : int =
+            f (g x)
         let ff = FIO.Fail f
         let gg = FIO.Fail g
         let eff = FIO.Fail err
@@ -161,8 +157,8 @@ let ``Applicative composition for error`` (f: int -> int) (g: int -> int) =
         let rhs' = error <| runtime.Run rhs
         lhs' = rhs'
 
-let ``Bind identity for success`` =
-    forAllRuntimes <| fun (runtime: FRuntime) (res: int) ->
+    [<Property>]
+    member _.``Bind identity for success`` (runtime: FRuntime, res: int) =
         let f = FIO.Succeed
         let lhs = (FIO.Succeed res).Bind f
         let rhs = f res
@@ -171,8 +167,8 @@ let ``Bind identity for success`` =
         let rhs' = result <| runtime.Run rhs
         lhs' = rhs'
 
-let ``Bind identity for error`` =
-    forAllRuntimes <| fun (runtime: FRuntime) (err: int) ->
+    [<Property>]
+    member _.``Bind identity for error`` (runtime: FRuntime, err: int) =
         let f = FIO.Fail
         let lhs = (FIO.Fail err).BindError f
         let rhs = f err
@@ -181,8 +177,8 @@ let ``Bind identity for error`` =
         let rhs' = error <| runtime.Run rhs
         lhs' = rhs'
 
-let ``Bind associativity for success`` =
-    forAllRuntimes <| fun (runtime: FRuntime) (res: int) ->
+    [<Property>]
+    member _.``Bind associativity for success`` (runtime: FRuntime, res: int) =
         let eff = FIO.Succeed res
         let f = FIO.Succeed
         let g = FIO.Succeed
@@ -193,33 +189,16 @@ let ``Bind associativity for success`` =
         let lhs' = result <| runtime.Run lhs
         let rhs' = result <| runtime.Run rhs
         lhs' = rhs'
-        
-let ``Bind associativity for error`` =
-    forAllRuntimes <| fun (runtime: FRuntime) (err: int) ->
+
+    [<Property>]
+    member _.``Bind associativity for error`` (runtime: FRuntime, err: int) =
         let eff = FIO.Fail err
         let f = FIO.Fail
         let g = FIO.Fail
-        
+
         let lhs = (eff.BindError f).BindError g
         let rhs = (eff.BindError (fun x -> (f x).BindError g))
-        
+
         let lhs' = error <| runtime.Run lhs
         let rhs' = error <| runtime.Run rhs
         lhs' = rhs'
-
-Check.Quick ``Functor identity for result``
-Check.Quick ``Functor identity for error``
-Check.Quick ``Functor composition for success``
-Check.Quick ``Functor composition for error``
-
-Check.Quick ``Applicative identity for success``
-Check.Quick ``Applicative identity for error``
-Check.Quick ``Applicative homomorphism for success``
-Check.Quick ``Applicative homomorphism for error``
-Check.Quick ``Applicative composition for success``
-Check.Quick ``Applicative composition for error``
-
-Check.Quick ``Bind identity for success``
-Check.Quick ``Bind identity for error``
-Check.Quick ``Bind associativity for success``
-Check.Quick ``Bind associativity for error``
