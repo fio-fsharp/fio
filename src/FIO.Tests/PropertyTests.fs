@@ -202,4 +202,3 @@ type PropertyTests () =
         let lhs' = error <| runtime.Run lhs
         let rhs' = error <| runtime.Run rhs
         lhs' = rhs'
-

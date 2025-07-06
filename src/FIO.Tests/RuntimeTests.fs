@@ -748,3 +748,219 @@ type RuntimeTests () =
         let expected = err2
         
         actual = expected
+
+    [<Property>]
+    member _.``Apply always succeeds when the initial effect succeeds and function effects succeeds and transforms result`` (runtime: FRuntime, res: int) =
+        let eff = (FIO.Succeed res).Apply(FIO.Succeed <| string)
+        
+        let actual = result <| runtime.Run eff
+        let expected = string res
+        
+        actual = expected
+
+    [<Property>]
+    member _.``Apply always fails when the initial effect fails and function effects succeeds`` (runtime: FRuntime, err: int) =
+        let eff = (FIO.Fail err).Apply(FIO.Succeed <| string)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err
+        
+        actual = expected
+
+    [<Property>]
+    member _.``Apply always fails when the initial effect succeeds and function effects fails`` (runtime: FRuntime, res: int, err: int) =
+        let eff = (FIO.Succeed res).Apply(FIO.Fail err)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err
+        
+        actual = expected
+
+    [<Property>]
+    member _.``Apply always fails with the function effect when the initial effect fails and function effects fails`` (runtime: FRuntime, err1: int, err2: int) =
+        let eff = (FIO.Fail err1).Apply(FIO.Fail err2)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err2
+        
+        actual = expected
+
+    [<Property>]
+    member _.``ApplyError always fails when the initial effect fails and function effects fails and transforms error`` (runtime: FRuntime, err: int) =
+        let eff = (FIO.Fail err).ApplyError(FIO.Fail <| string)
+        
+        let actual = error <| runtime.Run eff
+        let expected = string err
+        
+        actual = expected
+
+    [<Property>]
+    member _.``ApplyError always succeeds when the initial effect fails and function effects succeeds`` (runtime: FRuntime, err: int, res: int) =
+        let eff = (FIO.Fail err).ApplyError(FIO.Succeed res)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``ApplyError always succeeds when the initial effect succeeds and function effects fails`` (runtime: FRuntime, res: int) =
+        let eff = (FIO.Succeed res).ApplyError(FIO.Fail <| string)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res
+        
+        actual = expected
+
+    [<Property>]
+    member _.``ApplyError always succeeds with the function effect when the initial effect succeeds and function effects succeeds`` (runtime: FRuntime, res1: int, res2: int) =
+        let eff = (FIO.Succeed res1).ApplyError(FIO.Succeed res2)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res2
+        
+        actual = expected
+    
+    [<Property>]
+    member _.``Zip always succeeds when the initial effect succeeds and second effect succeeds`` (runtime: FRuntime, res1: int, res2: int) =
+        let eff = (FIO.Succeed res1).Zip(FIO.Succeed res2)
+        
+        let actual = result <| runtime.Run eff
+        let expected = (res1, res2)
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``Zip always fails when the initial effect fails and second effect succeeds`` (runtime: FRuntime, err: int, res: int) =
+        let eff = (FIO.Fail err).Zip(FIO.Succeed res)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``Zip always fails when the initial effect succeeds and second effect fails`` (runtime: FRuntime, err: int, res: int) =
+        let eff = (FIO.Succeed res).Zip(FIO.Fail err)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``Zip always fails when the initial effect fails and second effect fails`` (runtime: FRuntime, err1: int, err2: int) =
+        let eff = (FIO.Fail err1).Zip(FIO.Fail err2)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err1
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``ZipError always fails when the initial effect fails and second effect fails`` (runtime: FRuntime, err1: int, err2: int) =
+        let eff = (FIO.Fail err1).ZipError(FIO.Fail err2)
+        
+        let actual = error <| runtime.Run eff
+        let expected = (err1, err2)
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``ZipError always succeeds when the initial effect fails and second effect succeeds`` (runtime: FRuntime, err: int, res: int) =
+        let eff = (FIO.Fail err).ZipError(FIO.Succeed res)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``ZipError always succeeds when the initial effect succeeds and second effect fails`` (runtime: FRuntime, err: int, res: int) =
+        let eff = (FIO.Succeed res).ZipError(FIO.Fail err)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``ZipError always succeeds with the initial effect when the initial effect succeeds and second effect succeeds`` (runtime: FRuntime, res1: int, res2: int) =
+        let eff = (FIO.Succeed res1).ZipError(FIO.Succeed res2)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res1
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``Parallel always succeeds when the initial effect succeeds and second effect succeeds`` (runtime: FRuntime, res1: int, res2: int) =
+        let eff = (FIO.Succeed res1).Parallel(FIO.Succeed res2)
+        
+        let actual = result <| runtime.Run eff
+        let expected = (res1, res2)
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``Parallel always fails when the initial effect fails and second effect succeeds`` (runtime: FRuntime, err: int, res: int) =
+        let eff = (FIO.Fail err).Parallel(FIO.Succeed res)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``Parallel always fails when the initial effect succeeds and second effect fails`` (runtime: FRuntime, err: int, res: int) =
+        let eff = (FIO.Succeed res).Parallel(FIO.Fail err)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``Parallel always fails when the initial effect fails and second effect fails`` (runtime: FRuntime, err1: int, err2: int) =
+        let eff = (FIO.Fail err1).Parallel(FIO.Fail err2)
+        
+        let actual = error <| runtime.Run eff
+        let expected = err1
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``ParallelError always fails when the initial effect fails and second effect fails`` (runtime: FRuntime, err1: int, err2: int) =
+        let eff = (FIO.Fail err1).ParallelError(FIO.Fail err2)
+        
+        let actual = error <| runtime.Run eff
+        let expected = (err1, err2)
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``ParallelError always succeeds when the initial effect fails and second effect succeeds`` (runtime: FRuntime, err: int, res: int) =
+        let eff = (FIO.Fail err).ParallelError(FIO.Succeed res)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``ParallelError always succeeds when the initial effect succeeds and second effect fails`` (runtime: FRuntime, err: int, res: int) =
+        let eff = (FIO.Succeed res).ParallelError(FIO.Fail err)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res
+        
+        actual = expected
+        
+    [<Property>]
+    member _.``ParallelError always succeeds with the initial effect when the initial effect succeeds and second effect succeeds`` (runtime: FRuntime, res1: int, res2: int) =
+        let eff = (FIO.Succeed res1).ParallelError(FIO.Succeed res2)
+        
+        let actual = result <| runtime.Run eff
+        let expected = res1
+        
+        actual = expected
