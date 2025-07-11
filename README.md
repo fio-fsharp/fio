@@ -37,21 +37,45 @@
   <summary>Table of Contents</summary>
   <ol>
     <li>
-      <a href="#about-the-project">About The Project</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
+      <a href="#about-fio">About FIO</a>
     </li>
     <li>
       <a href="#getting-started">Getting Started</a>
       <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
+        <li><a href="#usage">Usage</a></li>
+        <ul>
+          <li><a href="#direct-usage">Direct Usage</a></li>
+          <li><a href="#using-fioapp-(recommended)">Using FIOApp (Recommended)</a></li>
+          <li><a href="#alternative:-dsl-only-style">Alternative: DSL-Only Style</a></li>
+        </ul>
       </ul>
     </li>
-    <li><a href="#usage">Usage</a></li>
+    <li>
+      <a href="#Benchmarks">Benchmarks</a>
+      <ul>
+        <li><a href="#benchmark-overview">Benchmark Overview</a></li>
+        <li><a href="#running-benchmarks">Running Benchmarks</a></li>
+        <li><a href="#example">Example</a></li>
+        <li><a href="#experimental-flags">Experimental Flags</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#performance">Performance</a>
+      <ul>
+        <li><a href="#threadring">Threadring</a></li>
+        <li><a href="#big">Big</a></li>
+        <li><a href="#bang">Bang</a></li>
+        <li><a href="#fork">Fork</a></li>
+      </ul>
+    </li>
     <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#contributing">Contributing</a></li>
+    <li>
+      <a href="#contributing">Contributing</a>
+      <ul>
+        <li><a href="#quick-start">Quick Start</a></li>
+        <li><a href="#top-contributors">Top Contributors</a></li>
+      </ul>
+    </li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
@@ -82,15 +106,6 @@ FIO was developed as part of a master’s thesis in Computer Science at [**DTU**
 
 
 
-### Built With
-
-* [![FSharp][FSharp]][FSharp-url]
-* [![.NET][.NET]][.NET-url]
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
 <!-- GETTING STARTED -->
 ## Getting Started
 
@@ -108,7 +123,7 @@ You can use **FIO** in two ways:
 - **Directly** by creating and running effects manually  
 - Via **`FIOApp`**, which simplifies setup and runtime management
 
-### Direct Usage
+#### Direct Usage
 
 Create a new F# file and open the DSL, IO and Concurrent runtime modules:
 
@@ -148,7 +163,7 @@ Hello, Daniel, welcome to FIO! 🪻💜
 Ok ()
 ```
 
-### Using FIOApp (Recommended)
+#### Using FIOApp (Recommended)
 
 Wrap your effect in a `FIOApp` to simplify boilerplate. Open the App module:
 
@@ -186,7 +201,7 @@ Hello, Daniel, welcome to FIO! 🪻💜
 Ok ()
 ```
 
-### Alternative: DSL-Only Style
+#### Alternative: DSL-Only Style
 
 Prefer DSL chaining? Use bind (>>=) directly:
 
@@ -283,7 +298,7 @@ The runtimes differ in how they manage fibers and blocked operations:
 - **Intermediate** – Fibers with linear-time handling of blocked fibers  
 - **Advanced** – Fibers with constant-time handling of blocked fibers
 
-### **ThreadRing**
+### **Threadring**
 
 <img src="assets/images/threadring_scalability_plot.png" alt="Threadring scalability plot" height="500" />
 
@@ -328,7 +343,7 @@ Got an idea or improvement? Feel free to:
 4. Push the branch: `git push origin feature/AmazingFeature`
 5. Open a pull request
 
-### Top contributors:
+### Top contributors
 
 <a href="https://github.com/fio-fsharp/fio/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=fio-fsharp/fio" alt="Contributors Image" />
