@@ -1,3 +1,5 @@
+<a id="readme-top"></a>
+
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
@@ -13,93 +15,131 @@
     <img src="assets/images/fio_logo_wide.png" width="auto" height="300" alt="FIO Logo">
   </a>
 
+  <h3 align="center">🪻 A Type-Safe, Purely Functional Effect System for Asynchronous and Concurrent F#</h3>
+
   <p align="center">
+    <!-- An awesome README template to jumpstart your projects! -->
     <br />
-    🪻 A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming
+    <a href="https://github.com/fio-fsharp/fio"><strong>Explore the docs »</strong></a>
     <br />
+    <br />
+    <a href="https://iyyel.io/projects/fio/">View Post</a>
+    &middot;
+    <a href="https://github.com/fio-fsharp/fio/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
+    &middot;
+    <a href="https://github.com/fio-fsharp/fio/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
   </p>
 </div>
 
 
 
-## Table of Contents
-- [Introduction](#introduction)
-- [Built With](#built-with)
-- [Getting Started](#getting-started)
-- [Usage](#usage)
-- [Benchmarks](#benchmarks)
-- [Performance](#performance)
-- [License](#license)
-- [Contact](#contact)
-- [Acknowledgments](#acknowledgments)
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+      <ul>
+        <li><a href="#built-with">Built With</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#installation">Installation</a></li>
+      </ul>
+    </li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#license">License</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#acknowledgments">Acknowledgments</a></li>
+  </ol>
+</details>
 
 
 
-## Introduction
-**FIO** is a type-safe, highly concurrent and asynchronous library for the [**F#**](https://fsharp.org/) programming language. Based on pure functional programming principles, it serves as an embedded [**domain-specific language (DSL)**](https://martinfowler.com/dsl.html) empowering developers to craft type-safe, concurrent and maintainable programs with ease using functional effects.
+## About FIO
 
-Harnessing concepts from functional programming, **FIO** simplifies the creation of scalable and efficient concurrent applications. It introduces the **IO monad** to manage expressions with side effects and employs “green threads” (also known as fibers) for scalable and efficient concurrency. **FIO** aims to provide an environment similar to that of [**ZIO**](https://zio.dev/), drawing inspiration from both [**ZIO**](https://zio.dev/) and [**Cats Effect**](https://typelevel.org/cats-effect/).
+<!-- [![Product Name Screen Shot][product-screenshot]](https://example.com) !-->
 
-**FIO** was initially developed as part of a master's thesis in Computer Science and Engineering at the [**Technical University of Denmark (DTU)**](https://www.dtu.dk/english/). You can read the thesis, which provides more details about **FIO**, [**here**](https://iyyel.io/assets/doc/masters_thesis_daniel_larsen.pdf). Some parts may be outdated as development continues.
+**FIO** is a type-safe, purely functional effect system for [**F#**](https://fsharp.org/), designed for building **highly concurrent** and **asynchronous** applications. It provides a lightweight [**DSL**](https://martinfowler.com/dsl.html) for writing composable programs using functional effects.
 
-**DISCLAIMER:** **FIO** is in early development stages and a lot of improvements and enhancements can be made. If you think the project sounds interesting, do not hesitate to create a PR or contact me for further information or assistance.
+Inspired by [**ZIO**](https://zio.dev/) and [**Cats Effect**](https://typelevel.org/cats-effect/), **FIO** features:
+
+- An **IO monad** for managing side effects  
+- **Fibers** (green threads) for scalable concurrency  
+- A focus on **purity**, **type safety**, and **performance**
+
+FIO was developed as part of a master’s thesis in Computer Science at [**DTU**](https://www.dtu.dk/english). [**Read the thesis**](https://iyyel.io/assets/doc/masters_thesis_daniel_larsen.pdf) (some parts may be outdated).
+
+> **Note:** **FIO** is under active development. Contributions, feedback, and questions are very welcome!  
+> Feel free to report bugs, request features or [reach out](mailto:daniel@iyyel.io).
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 
-## Built With
-**FIO** is built using the following technologies:
+### Built With
 
-* [**F#**](https://fsharp.org/)
-* [**.NET**](https://dotnet.microsoft.com/en-us/)
+* [![FSharp][FSharp]][FSharp-url]
+* [![.NET][.NET]][.NET-url]
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 
+<!-- GETTING STARTED -->
 ## Getting Started
-It is easy to get started with **FIO**.
 
-* Download and install [**.NET**](https://dotnet.microsoft.com/en-us/)
-* Download and install a compatible IDE such as [**Visual Studio**](https://visualstudio.microsoft.com/downloads/) or [**Rider**](https://www.jetbrains.com/rider/download/), or a text editor like [**Visual Studio Code**](https://code.visualstudio.com/)
+Getting started with **FIO** is simple:
 
-* Download or clone this repository
-* Open it in your IDE or text editor of choice
-* Navigate to the [**FIO.Examples**](https://github.com/fio-fsharp/fio/tree/dev/src/FIO.Examples) project and check out the example programs or create a new F# file to start using **FIO**
+1. Install [.NET](https://dotnet.microsoft.com/en-us/)
+2. Use an editor like [VS Code](https://code.visualstudio.com/), [Visual Studio](https://visualstudio.microsoft.com/downloads/), or [Rider](https://www.jetbrains.com/rider/download/) 
+3. Clone this repository
+4. Open it in your editor
+5. Explore the [**FIO.Examples**](https://github.com/fio-fsharp/fio/tree/dev/src/FIO.Examples) project or create your own F# file
 
+### Usage
 
+You can use **FIO** in two ways:  
+- **Directly** by creating and running effects manually  
+- Via **`FIOApp`**, which simplifies setup and runtime management
 
-## Usage
+### Direct Usage
 
-There are currently two ways of using **FIO**. It is possible to create effects directly and execute them using one of **FIO**'s runtime systems. This gives the developer more control over the runtime and how the effect is executed. In addition, the core **FIO** library provides a **FIOApp** type which encapsulates elements such as the runtime which may not be important for the developer.
-
-### Direct usage of effects
-Create a new F# file and import the library using ```open FIO.Core``` in either the cloned repository or a project with the **FIO** NuGet package installed. To use **FIO**'s advanced runtime, add ```open FIO.Runtime.Advanced``` as well. For example:
+Create a new F# file and open the DSL, IO and Concurrent runtime modules:
 
 ```fsharp
 module DirectUsage
 
-open System
-
-open FIO.Core
-open FIO.Runtime.Advanced
+open FIO.DSL
+open FIO.Lib.IO
+open FIO.Runtime.Concurrent
 
 [<EntryPoint>]
 let main _ =
     let askForName = fio {
-        do! !+ printfn("Hello! What is your name?")
-        let! name = !+ Console.ReadLine()
-        do! !+ printfn($"Hello, %s{name}, welcome to FIO! 🪻💜")
+        do! FConsole.PrintLine "Hello! What is your name?"
+        let! name = FConsole.ReadLine ()
+        do! FConsole.PrintLine $"Hello, %s{name}! Welcome to FIO! 🪻💜"
     }
 
-    let fiber = AdvancedRuntime().Run askForName
-    let result = fiber.AwaitResult()
+    let fiber = Runtime().Run askForName
+    let result = fiber.AwaitAsync ()
     printfn $"%A{result}"
     exit 0
 ```
 
-You can then execute the program with
+Run it with:
 
-```$ dotnet run```
+```
+$ dotnet run
+```
 
-and you'll see
+And you'll see the following output:
 
 ```
 Hello! What is your name?
@@ -108,34 +148,36 @@ Hello, Daniel, welcome to FIO! 🪻💜
 Ok ()
 ```
 
-### FIOApp usage
+### Using FIOApp (Recommended)
 
-In general it is recommended to create a type extending the **FIOApp** type. A **FIOApp** is essentially a wrapper around the effect which hides elements such as the runtime system and makes it possible to write cleaner **FIO** programs. For example:
+Wrap your effect in a `FIOApp` to simplify boilerplate. Open the App module:
 
 ```fsharp
 module FIOAppUsage
 
-open System
-
-open FIO.Core
+open FIO.DSL
+open FIO.Lib.IO
+open FIO.App
 
 type WelcomeApp() =
     inherit FIOApp<unit, obj>()
 
     override this.effect = fio {
-        do! !+ printfn("Hello! What is your name?")
-        let! name = !+ Console.ReadLine()
-        do! !+ printfn($"Hello, %s{name}, welcome to FIO! 🪻💜")
+        do! FConsole.PrintLine "Hello! What is your name?"
+        let! name = FConsole.ReadLine ()
+        do! FConsole.PrintLine $"Hello, %s{name}! Welcome to FIO! 🪻💜"
     }
-  
+
 WelcomeApp().Run()
 ```
 
-Once again, you can execute the **FIOApp** using
+Same execution as before:
 
-```$ dotnet run```
+```
+$ dotnet run
+```
 
-and you'll see the same result as before
+and same output as well:
 
 ```
 Hello! What is your name?
@@ -144,30 +186,41 @@ Hello, Daniel, welcome to FIO! 🪻💜
 Ok ()
 ```
 
-**Side note:** It is also possible to avoid using the **FIO** computation expression and instead directly use the **FIO** DSL. The above example would then look like this:
+### Alternative: DSL-Only Style
+
+Prefer DSL chaining? Use bind (>>=) directly:
 
 ```fsharp
-let askForName =
-    !+ printfn("Hello! What is your name?") >>= fun _ ->
-    !+ Console.ReadLine() >>= fun name ->
-    !+ printfn($"Hello, %s{name}, welcome to FIO! 🪻💜")
-```
+module DSLOnly
 
-where ```>>=``` is **FIO**'s bind function.
+open FIO.DSL
+open FIO.Lib.IO
+
+let askForName =
+    FConsole.PrintLine "Hello! What is your name?" >>= fun _ ->
+    FConsole.ReadLine () >>= fun name ->
+    FConsole.PrintLine $"Hello, %s{name}, welcome to FIO! 🪻💜"
+```
 
 
 
 ## Benchmarks
-This repository contains five benchmarks that each test an aspect of concurrent computing.
-All benchmarks reside from the [**Savina - An Actor Benchmark Suite**](http://soft.vub.ac.be/AGERE14/papers/ageresplash2014_submission_19.pdf) paper.
 
-* Pingpong (Message sending and retrieval)
-* ThreadRing (Message sending and retrieval, context switching between fibers)
-* Big (Contention on channel, many-to-many message passing)
-* Bang (Many-to-one messaging)
-* Fork (Spawning time of fibers)
+This repository includes five benchmarks, each designed to evaluate a specific aspect of concurrent computation. All benchmarks are adapted from the [**Savina – An Actor Benchmark Suite**](http://soft.vub.ac.be/AGERE14/papers/ageresplash2014_submission_19.pdf).
 
-The benchmarks can be given the following command line options:
+### Benchmark Overview
+
+- **Pingpong** – Message sending and retrieval between two actors  
+- **Threadring** – Message passing with frequent fiber context switching  
+- **Big** – Many-to-many message passing with high channel contention  
+- **Bang** – Many-to-one messaging, stressing a single receiver  
+- **Fork** – Measures fiber spawning overhead
+
+### Running Benchmarks
+
+The benchmarks accept a variety of command-line options:
+
+# TODO: Re-print!
 
 ```
 USAGE: FIO.Benchmarks [--help] [--native-runtime] [--intermediate-runtime <evalworkers> <blockingworkers> <evalsteps>]
@@ -200,52 +253,120 @@ OPTIONS:
     --help                display this list of options.
 ```
 
-For example, running 30 runs of each benchmark using the advanced runtime with 7 evaluation workers, 1 blocking worker and 15 evaluation steps would look as so:
+### Example
 
-```
+To run each benchmark 30 times using the concurrent runtime (7 evaluation workers, 1 blocking worker, 15 evaluation steps):
+
+```bash
 --advanced-runtime 7 1 15 --runs 30 --pingpong 120000 --threadring 2000 1 --big 500 1 --bang 3000 1 --fork 3000
 ```
 
-Additionally, **FIO** supports two conditional compilation options:
 
-* **DETECT_DEADLOCK:** Enables a naive deadlock detecting thread that attempts to detect if a deadlock has occurred when running **FIO** programs
-* **MONITOR:** Enables a monitoring thread that prints out data structure content during when running **FIO** programs
+### Experimental Flags
+FIO also supports optional compile-time flags:
 
-**DISCLAIMER:** These features are very experimental and may not work as intended.
+- `DETECT_DEADLOCK` – Enables a simple thread that attempts to detect deadlocks during execution
 
+- `MONITOR` – Starts a monitoring thread that prints internal runtime structure state during execution
+
+> **Note:** These features are experimental and may behave unpredictably.
 
 
 ## Performance
-Below the scalability of each runtime system can be seen for each benchmark. **I** is denoting the intermediate runtime and **A** the advanced. To give some insight into the runtimes, the naive runtime uses operating system threads, the intermediate uses fibers with handling of blocked fibers in linear time, and the advanced uses fibers with constant time handling.
 
-#### **Threadring**
-<img src="assets/images/threadring_scalability_plot.png" width="auto" height="500" alt="Threadring scalability plot">
- 
-#### **Big**
-<img src="assets/images/big_scalability_plot.png" width="auto" height="500" alt="Big scalability plot">
+The following plots illustrate the **scalability** of the available runtime systems across benchmarks.  
+**Legend**: `I` = Intermediate Runtime, `A` = Advanced Runtime
 
-#### **Bang**
-<img src="assets/images/bang_scalability_plot.png" width="auto" height="500" alt="Bang scalability plot">
+The runtimes differ in how they manage fibers and blocked operations:
 
-#### **Fork** (previously called Spawn)
-<img src="assets/images/spawn_scalability_plot.png" width="auto" height="500" alt="Fork scalability plot">
+- **Native** – Uses OS threads directly  
+- **Intermediate** – Fibers with linear-time handling of blocked fibers  
+- **Advanced** – Fibers with constant-time handling of blocked fibers
+
+### **ThreadRing**
+
+<img src="assets/images/threadring_scalability_plot.png" alt="Threadring scalability plot" height="500" />
+
+### **Big**
+
+<img src="assets/images/big_scalability_plot.png" alt="Big scalability plot" height="500" />
+
+### **Bang**
+
+<img src="assets/images/bang_scalability_plot.png" alt="Bang scalability plot" height="500" />
+
+### **Fork**
+
+<img src="assets/images/spawn_scalability_plot.png" alt="Fork scalability plot" height="500" />
 
 
 
+<!-- ROADMAP -->
+## Roadmap
+
+See the [open issues](https://github.com/fio-fsharp/fio/issues) for a full list of proposed features (and known issues).
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- CONTRIBUTING -->
+## 🤝 Contributing
+
+Contributions are welcome and appreciated!
+
+Got an idea or improvement? Feel free to:
+- ⭐ Star the repository
+- 🐛 Open an issue (tag it with `enhancement`)
+- 🔀 Fork the project and submit a pull request
+
+### Quick Start
+
+1. Fork the repository
+2. Create a branch: `git checkout -b feature/AmazingFeature`
+3. Commit your changes: `git commit -m 'Add AmazingFeature'`
+4. Push the branch: `git push origin feature/AmazingFeature`
+5. Open a pull request
+
+### Top contributors:
+
+<a href="https://github.com/fio-fsharp/fio/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=fio-fsharp/fio" alt="Contributors Image" />
+</a>
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- LICENSE -->
 ## License
-Distributed under the GNU General Public License v3.0. See [**LICENSE.md**](LICENSE.md) for more information.
+
+Distributed under the MIT License See [**LICENSE.md**](LICENSE.md) for more information.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 
+<!-- CONTACT -->
 ## Contact
-Daniel Larsen (iyyel) - [**iyyel.io**](https://iyyel.io) - [**me@iyyel.io**](mailto:me@iyyel.io)
+
+Daniel "iyyel" Larsen - [**iyyel.io**](https://iyyel.io) - [**me@iyyel.io**](mailto:me@iyyel.io)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 
+<!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
+
 Alceste Scalas - [**alcsc**](https://people.compute.dtu.dk/alcsc/) - [**github**](https://github.com/alcestes)
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+
+
+
+<!-- MARKDOWN LINKS & IMAGES -->
 
 <!-- MARKDOWN LINKS & IMAGES -->
 [contributors-shield]: https://img.shields.io/github/contributors/fio-fsharp/fio.svg?style=for-the-badge
@@ -258,5 +379,12 @@ Alceste Scalas - [**alcsc**](https://people.compute.dtu.dk/alcsc/) - [**github**
 [issues-url]: https://github.com/fio-fsharp/fio/issues
 [license-shield]: https://img.shields.io/github/license/fio-fsharp/fio.svg?style=for-the-badge
 [license-url]: https://github.com/fio-fsharp/fio/blob/main/LICENSE.md
+[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
+[linkedin-url]: https://linkedin.com/in/iyyel
+[product-screenshot]: images/screenshot.png
 [nuget-shield]: https://img.shields.io/nuget/v/FIO.svg?style=for-the-badge
-[nuget-url]: https://www.nuget.org/packages/FIO/0.0.9-alpha
+[nuget-url]: https://www.nuget.org/packages/FIO/0.0.21-alpha
+[FSharp]: https://img.shields.io/badge/F%23-378BBA?style=for-the-badge&logo=.NET&logoColor=white
+[FSharp-url]: https://fsharp.org/
+[.NET]: https://img.shields.io/badge/.NET-5C2D91?style=for-the-badge&logo=.NET&logoColor=white
+[.NET-url]: https://dotnet.microsoft.com/en-us/

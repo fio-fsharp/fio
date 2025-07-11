@@ -134,10 +134,10 @@ and Runtime (config: WorkerConfig) as this =
             })
 
     do
-        let blockingWorkers = createBlockingWorkers config.BWCount
+        let blockingWorkers = createBlockingWorkers config.BWC
         // Currently we take head of the list, as the IntermediateRuntime
         // only supports a single blocking worker.
-        createEvaluationWorkers this (List.head blockingWorkers) config.EWSteps config.EWCount
+        createEvaluationWorkers this (List.head blockingWorkers) config.EWS config.EWC
         |> ignore
 
     override _.Name =
@@ -145,11 +145,11 @@ and Runtime (config: WorkerConfig) as this =
 
     new() =
         Runtime
-            { EWCount =
+            { EWC =
                 let coreCount = Environment.ProcessorCount - 1
                 if coreCount >= 2 then coreCount else 2
-              BWCount = 1
-              EWSteps = 100 }
+              BWC = 1
+              EWS = 200 }
 
     [<TailCall>]
     member internal _.InterpretAsync workItem evalSteps =

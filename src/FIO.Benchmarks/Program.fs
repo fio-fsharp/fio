@@ -19,6 +19,8 @@ ThreadPool.SetMinThreads(maxThreads, maxThreads) |> ignore
 [<EntryPoint>]
 let main args =
     printArgs args
-    let task = runBenchmarks <| parseArgs args
+    let task =
+        runBenchmarks
+        <| parseArgs args
     task.Wait ()
     0

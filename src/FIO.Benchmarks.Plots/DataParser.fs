@@ -21,7 +21,7 @@ type FileMetadata =
       WorkerMetaData: WorkerMetaData option }
 
     member this.Title () =
-        let ci = CultureInfo("en-US")
+        let ci = CultureInfo "en-US"
         $"""%s{this.BenchmarkName} (Actor Count: %s{this.ActorCount.ToString("N0", ci)} Round Count: %s{this.RoundCount.ToString("N0", ci)})"""
 
     override this.ToString () = 
@@ -35,8 +35,8 @@ and WorkerMetaData =
       BWC: int }
 
     override this.ToString () = 
-        let ci = CultureInfo("en-US")
-        $"""EWC: %s{this.EWC.ToString("N0", ci)} EWS: %s{this.EWS.ToString("N0", ci)}"""
+        let ci = CultureInfo "en-US"
+        $"""EWC: %s{this.EWC.ToString("N0", ci)} EWS: %s{this.EWS.ToString("N0", ci)} BWC: %s{this.BWC.ToString("N0", ci)}"""
 
 and BenchmarkData =
     { Headers: string list
@@ -82,7 +82,7 @@ let private parseBenchmarkData (path: string) =
 
 let private parseFileMetadata (path: string) =
     let fileName = path.ToLowerInvariant().Split Path.DirectorySeparatorChar |> Array.last
-    let split = fileName.Split('_').[0].Split('-') |> fun s -> s[..s.Length - 2]
+    let split = fileName.Split('_').[0].Split '-' |> fun s -> s[..s.Length - 2]
 
     let bench = split[0].Trim()
     let runtime = split[9].Trim()
@@ -116,7 +116,7 @@ let getAllCsvResults rootDir =
     Directory.GetDirectories rootDir
     |> Array.toList
     |> List.map (fun benchDir ->
-        Directory.GetFiles(benchDir, "*.csv", SearchOption.AllDirectories)
+        Directory.GetFiles (benchDir, "*.csv", SearchOption.AllDirectories)
         |> Array.toList
         |> List.rev
-        |> List.map (fun path -> (parseFileMetadata path, parseBenchmarkData path)))
+        |> List.map (fun path -> parseFileMetadata path, parseBenchmarkData path))

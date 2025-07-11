@@ -1,8 +1,8 @@
 {
   "profiles": {
-    "Benchmarks.Plots": {
+    "FIO.Benchmarks.Plots": {
       "commandName": "Project",
-      "commandLineArgs": "--lineplots"
+      "commandLineArgs": "--lineplot"
     }
   }
 }

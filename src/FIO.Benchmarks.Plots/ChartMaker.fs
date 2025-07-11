@@ -10,91 +10,113 @@ open FIO.Benchmarks.Plots.Charts
 open FIO.Benchmarks.Plots.DataParser
 
 open Plotly.NET
-
-open System.IO
     
 type PlotType =
-    | BoxPlots
-    | LinePlots
-    | All
+    | BoxPlot
+    | LinePlot
+    
+type PlotArgs = {
+    PlotType : PlotType
+    LoadPath : string
+}
 
 let private generatePastelPurples (count: int) : string list =
-    let generateSplitDeltas (n: int) : int list =
-        let step = 10
-        let half = n / 2
-        let negatives = [ for i in 1 .. half -> -step * i ]
-        let positives = [ for i in 1 .. half -> step * i ]
-        let middle = if n % 2 = 1 then [0] else []
-        negatives @ middle @ positives
-    
-    let deltas = generateSplitDeltas count
-    
-    let clamp v = max 0 (min 255 v)
-    List.init count (fun index ->
-        let dr = deltas[index % deltas.Length]
-        let dg = deltas[(index + 1) % deltas.Length]
-        let db = deltas[(index + 2) % deltas.Length]
+    if count <= 0 then []
+    else
+        let baseR, baseG, baseB = 147, 112, 219
+        let stepSize = 15
         
-        let baseR = 200 + dr
-        let baseG = 150 + dg
-        let baseB = 230 + db
+        let generateBalancedDeltas (n: int) : int list =
+            if n = 1 then [0]
+            else
+                let steps = [ for i in 1 .. (n / 2) -> stepSize * i ]
+                let negatives = List.map (~-) steps
+                let positives = steps
+                let middle = if n % 2 = 1 then [0] else []
+                negatives @ middle @ positives
+        
+        let deltas = generateBalancedDeltas count
+        let clamp value = max 0 (min 255 value)
+        
+        let createPurpleVariant index =
+            let rDelta = deltas[index % deltas.Length]
+            let gDelta = deltas[(index + 1) % deltas.Length] 
+            let bDelta = deltas[(index + 2) % deltas.Length]
+            
+            let r = clamp (baseR + rDelta)
+            let g = clamp (baseG + gDelta)
+            let b = clamp (baseB + bDelta)
+            
+            $"rgb({r},{g},{b})"
+        
+        List.init count createPurpleVariant
 
-        let r = clamp baseR
-        let g = clamp baseG
-        let b = clamp baseB
+let groupPredicates =
+    [
+        fun (d: (FileMetadata * BenchmarkData) list) ->
+            d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "pingpong"
+        fun d -> d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "threadring"
+        fun d -> d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "big"
+        fun d -> d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "bang"
+        fun d -> d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "fork"
+    ]
 
-        $"rgb({r},{g},{b})"
-    )
+let reorderByPredicates predicates items =
+    let rec loop preds remaining acc =
+        match preds with
+        | [] -> List.rev acc
+        | pred :: rest ->
+            match List.tryFind pred remaining with
+            | Some matchItem ->
+                let remaining' = List.filter ((<>) matchItem) remaining
+                loop rest remaining' (matchItem :: acc)
+            | None -> failwith "No matching item found for predicate"
+    loop predicates items []
 
-let private projectDirPath =
-    Directory.GetCurrentDirectory ()
-    |> Directory.GetParent
-    |> _.Parent
-    |> _.Parent
-    |> _.Parent
-    |> function
-        | null -> failwith "Unexpected directory structure!"
-        | di -> di.FullName
-
-let private generateBoxPlotCharts () =
-    let boxplotData = getAllCsvResults (projectDirPath + @"\FIO.Benchmarks.Plots\boxplot_data\")
+let private generateBoxPlotCharts path boxPlotWidth plotHeight =
+    let boxplotData =
+        reorderByPredicates groupPredicates
+        <| getAllCsvResults path
     let colors = generatePastelPurples boxplotData.Length
+    let rowCount, colCount =
+        boxplotData.Length + 1, 1
     
     let titles, charts =
         List.map (fun (innerList, color) ->
-            let metadata: FileMetadata = (innerList |> List.head |> fst)
-            let width = innerList.Length * 250
-            (metadata.Title(), createBoxPlot innerList width color)) (List.zip boxplotData colors)
+            let metadata: FileMetadata = innerList |> List.head |> fst
+            let plotWidth = innerList.Length * boxPlotWidth
+            metadata.Title(), createBoxPlot innerList plotWidth plotHeight color) (List.zip boxplotData colors)
             |> List.unzip
             
-    charts, titles, boxplotData.Length + 1, 1
+    rowCount, colCount, titles, charts
     
-let private generateLineCharts () =
-    let lineChartData =
-        getAllCsvResults (projectDirPath + @"\FIO.Benchmarks.Plots\linechart_data\")
+let private generateLineCharts path linePlotWidth plotHeight =
+    let linePlotData =
+        reorderByPredicates groupPredicates
+        <| getAllCsvResults path
         |> List.collect id
         |> List.groupBy (fst >> _.BenchmarkName)
         |> List.map (fun (_, group) ->
             group
             |> List.groupBy (fst >> _.RuntimeName)
             |> List.map (snd >> List.sortBy (fst >> _.ActorCount)))                                    
-    
+    let rowCount, colCount =
+        linePlotData.Length + 1, 1
+
     let titles, charts =
         List.map (fun innerList ->
-            let metadata: FileMetadata = (innerList |> List.head |> List.head |> fst)
-            let width = innerList.Length * 500
+            let metadata: FileMetadata = innerList |> List.head |> List.head |> fst
+            let plotWidth = innerList.Length * linePlotWidth
             let colors = generatePastelPurples innerList.Length
-            (metadata.BenchmarkName, createLinePlot innerList width colors)) lineChartData
+            metadata.BenchmarkName, createLinePlot innerList plotWidth plotHeight colors) linePlotData
             |> List.unzip
             
-    charts, titles, lineChartData.Length + 1, 1
+    rowCount, colCount, titles, charts
     
 let createAndShowCharts args =
-    let charts, titles, rowCount, colCount =
-        match args with
-        | BoxPlots -> generateBoxPlotCharts ()
-        | LinePlots -> generateLineCharts ()
-        | All -> [], [], 0, 0
+    let rowCount, colCount, titles, charts =
+        match args.PlotType with
+        | BoxPlot -> generateBoxPlotCharts args.LoadPath 150 5000
+        | LinePlot -> generateLineCharts args.LoadPath 500 2000
     Chart.Grid (rowCount, colCount, SubPlotTitles = titles) charts
     |> Chart.show
-    

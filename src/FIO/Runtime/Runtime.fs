@@ -44,9 +44,9 @@ type FRuntime internal () =
         this.ConfigString
 
 type WorkerConfig =
-    { EWCount: int
-      EWSteps: int
-      BWCount: int }
+    { EWC: int
+      EWS: int
+      BWC: int }
 
 /// Functional worker runtime
 [<AbstractClass>]
@@ -54,9 +54,9 @@ type FWorkerRuntime internal (config: WorkerConfig) as this =
     inherit FRuntime ()
 
     let validateWorkerConfiguration () =
-        if config.EWCount <= 0 ||
-           config.EWSteps <= 0 ||
-           config.BWCount <= 0 then
+        if config.EWC <= 0 ||
+           config.EWS <= 0 ||
+           config.BWC <= 0 then
             invalidArg "config" $"Invalid worker configuration! %s{this.ToString ()}"
 
     do validateWorkerConfiguration ()
@@ -66,7 +66,7 @@ type FWorkerRuntime internal (config: WorkerConfig) as this =
 
     override _.ConfigString =
         let ci = CultureInfo "en-US"
-        $"""EWC: %s{config.EWCount.ToString("N0", ci)} EWS: %s{config.EWSteps.ToString("N0", ci)} BWC: %s{config.BWCount.ToString("N0", ci)}"""
+        $"""EWC: %s{config.EWC.ToString("N0", ci)} EWS: %s{config.EWS.ToString("N0", ci)} BWC: %s{config.BWC.ToString("N0", ci)}"""
 
     override this.ToString () =
         $"{this.Name} ({this.ConfigString})"

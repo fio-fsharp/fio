@@ -454,4 +454,5 @@ Scripts/
 ### FIO ###
 /src/FIO.Benchmarks/results
 /src/FIO.Benchmarks.Plots/boxplot_data
-/src/FIO.Benchmarks.Plots/linechart_data
+/src/FIO.Benchmarks.Plots/lineplot_data
+.vscode/*

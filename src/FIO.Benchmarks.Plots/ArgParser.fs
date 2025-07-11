@@ -10,32 +10,51 @@ open FIO.Benchmarks.Plots.ChartMaker
 
 open Argu
 
+open System.IO
+
+let DefaultBoxPlotFolder = "boxplot_data"
+let DefaultLinePlotFolder = "lineplot_data"
+
 type private Arguments =
-    | [<Unique; AltCommandLine("-b")>] BoxPlots
-    | [<Unique; AltCommandLine("-l")>] LinePlots
-    | [<Unique; AltCommandLine("-a")>] All
+    | [<Unique; AltCommandLine("-b")>] BoxPlot
+    | [<Unique; AltCommandLine("-l")>] LinePlot
+    | [<AltCommandLine("-p")>] LoadPath of absolutePath: string
     
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | BoxPlots -> "Generate box plots"
-            | LinePlots -> "Generate line plots"
-            | All -> "Generate all plots (box + line)"
+            | BoxPlot -> "Generate box plot"
+            | LinePlot -> "Generate line plot"
+            | LoadPath _ -> "Specify path to load benchmark data files from (default is 'boxplot_data' or 'lineplot_data' in the current directory)."
 
 let private parser =
-    ArgumentParser.Create<Arguments>(programName = "FIO.Benchmarks.Plots")
+    ArgumentParser.Create<Arguments> (programName = "FIO.Benchmarks.Plots")
+
+let printUsage () =
+    parser.PrintUsage ()
+    |> printfn "%s"
 
 let printArgs args =
     printfn "%s arguments: %s" parser.ProgramName (String.concat " " args)
 
-let printUsage () =
-    printfn $"%s{parser.PrintUsage ()}"
-
 let parseArgs args =
     let results = parser.Parse args
-    match results.GetAllResults() with
-    | [BoxPlots] -> PlotType.BoxPlots
-    | [LinePlots] -> PlotType.LinePlots
-    | [All] -> PlotType.All
-    | [] -> invalidArg "args" "You must specify one of: --boxplots, --lineplots, or --all."
-    | _ -> invalidArg "args" "Only one plot type can be specified at a time."
+    
+    let plotType =
+        match results.Contains BoxPlot, results.Contains LinePlot with
+        | true, false -> PlotType.BoxPlot
+        | false, true -> PlotType.LinePlot
+        | false, false -> invalidArg  (nameof args) "You must specify one of: --boxplots or --lineplots."
+        | true, true -> invalidArg  (nameof args) "Only one plot type can be specified at a time."
+    
+    let loadPath =
+        match results.TryGetResult LoadPath with
+        | Some path -> path
+        | None ->
+            let subfolder = 
+                match plotType with
+                | PlotType.BoxPlot -> DefaultBoxPlotFolder
+                | PlotType.LinePlot -> DefaultLinePlotFolder
+            Path.Combine(Directory.GetCurrentDirectory(), subfolder)
+    
+    { PlotType = plotType; LoadPath = loadPath }

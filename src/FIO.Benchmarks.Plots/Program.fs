@@ -12,5 +12,6 @@ open FIO.Benchmarks.Plots.ChartMaker
 [<EntryPoint>]
 let main args =
     printArgs args
-    createAndShowCharts <| parseArgs args
+    createAndShowCharts
+    <| parseArgs args
     0

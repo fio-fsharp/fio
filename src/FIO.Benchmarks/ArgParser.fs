@@ -59,13 +59,14 @@ type private Arguments =
                 "specify absolute path to save the benchmark results csv file"
 
 let private parser =
-    ArgumentParser.Create<Arguments>(programName = "FIO.Benchmarks")
+    ArgumentParser.Create<Arguments> (programName = "FIO.Benchmarks")
+
+let printUsage () =
+    parser.PrintUsage ()
+    |> printfn "%s"
 
 let printArgs args =
     printfn "%s arguments: %s" parser.ProgramName (String.concat " " args)
-
-let printUsage () =
-    printfn $"%s{parser.PrintUsage ()}"
 
 let parseArgs args =
     let results = parser.Parse args
@@ -75,10 +76,10 @@ let parseArgs args =
             Direct.Runtime ()
         elif results.Contains Cooperative_Runtime then
             let ewc, ews, bwc = results.GetResult Cooperative_Runtime
-            Cooperative.Runtime { EWCount = ewc; EWSteps = ews; BWCount = bwc }
+            Cooperative.Runtime { EWC = ewc; EWS = ews; BWC = bwc }
         elif results.Contains Concurrent_Runtime then
             let ewc, ews, bwc = results.GetResult Concurrent_Runtime
-            Concurrent.Runtime { EWCount = ewc; EWSteps = ews; BWCount = bwc }
+            Concurrent.Runtime { EWC = ewc; EWS = ews; BWC = bwc }
         else
             invalidArg "args" "Runtime should be specified!"
 
@@ -93,7 +94,7 @@ let parseArgs args =
           results.TryGetResult Threadring |> Option.map ThreadringConfig
           results.TryGetResult Big |> Option.map BigConfig
           results.TryGetResult Bang |> Option.map BangConfig
-          results.TryGetResult Fork |> Option.map  ForkConfig ]
+          results.TryGetResult Fork |> Option.map ForkConfig ]
         |> List.choose id
 
     if configs.IsEmpty then
@@ -104,16 +105,17 @@ let parseArgs args =
         |> Option.defaultValue false
 
     let projectDirPath =
-        Directory.GetCurrentDirectory()
+        Directory.GetCurrentDirectory ()
         |> Directory.GetParent
         |> _.Parent
         |> _.Parent
         |> function
             | null -> failwith "Unexpected directory structure!"
             | di -> di.FullName
+
     let savePath =
        results.TryGetResult SavePath
-       |> Option.defaultValue (projectDirPath + @"\results\")
+       |> Option.defaultValue (Path.Combine(projectDirPath, @"results\"))
 
     { Runtime = runtime
       Runs = runs
