@@ -451,8 +451,8 @@ Scripts/
 .config
 
 
-### FIO ###
-/src/FIO.Benchmarks/results
-/src/FIO.Benchmarks.Plots/boxplot_data
-/src/FIO.Benchmarks.Plots/lineplot_data
+### FSharp.FIO ###
+/benchmarks/FSharp.FIO.Benchmarks/results
+/benchmarks/FSharp.FIO.Benchmarks.Plots/boxplot_data
+/benchmarks/FSharp.FIO.Benchmarks.Plots/lineplot_data
 .vscode/*
