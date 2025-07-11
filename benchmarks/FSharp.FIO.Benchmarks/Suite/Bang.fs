@@ -1,13 +1,13 @@
-﻿(*************************************************************************************************************)
-(* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
-(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
-(* All rights reserved                                                                                       *)
-(* --------------------------------------------------------------------------------------------------------- *)
-(* Bang benchmark                                                                                            *)
-(* Measures: Many-to-One message passing                                                                     *)
-(* A Scalability Benchmark Suite for Erlang/OTP                                                              *)
-(* (https://dl.acm.org/doi/10.1145/2364489.2364495I)                                                         *)
-(*************************************************************************************************************)
+﻿(*********************************************************************************************)
+(* FIO - A Type-Safe, Purely Functional Effect System for Asynchronous and Concurrent F#     *)
+(* Copyright (c) 2022-2025 - Daniel "iyyel" Larsen and Technical University of Denmark (DTU) *)
+(* All rights reserved                                                                       *)
+(* ----------------------------------------------------------------------------------------- *)
+(* Bang benchmark                                                                            *)
+(* Measures: Many-to-One message passing                                                     *)
+(* A Scalability Benchmark Suite for Erlang/OTP                                              *)
+(* (https://dl.acm.org/doi/10.1145/2364489.2364495I)                                         *)
+(*********************************************************************************************)
 
 module internal FSharp.FIO.Benchmarks.Suite.Bang
 
@@ -15,7 +15,6 @@ open FSharp.FIO.DSL
 #if DEBUG
 open FSharp.FIO.Lib.IO
 #endif
-
 open FSharp.FIO.Benchmarks.Tools.Timer
 
 open System

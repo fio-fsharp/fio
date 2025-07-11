@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "FIO.Benchmarks": {
+    "FSharp.FIO.Benchmarks": {
       "commandName": "Project",
       "commandLineArgs": "--cooperative-runtime 39 200 1 --runs 30 --bang 50000 1 --save true"
     }

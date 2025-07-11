@@ -1,19 +1,18 @@
-﻿(*************************************************************************************************************)
-(* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
-(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
-(* All rights reserved                                                                                       *)
-(*************************************************************************************************************)
+﻿(*********************************************************************************************)
+(* FIO - A Type-Safe, Purely Functional Effect System for Asynchronous and Concurrent F#     *)
+(* Copyright (c) 2022-2025 - Daniel "iyyel" Larsen and Technical University of Denmark (DTU) *)
+(* All rights reserved                                                                       *)
+(*********************************************************************************************)
 
 module internal FSharp.FIO.Benchmarks.Suite.BenchmarkRunner
 
 open FSharp.FIO.DSL
 open FSharp.FIO.Runtime
-
-open FSharp.FIO.Benchmarks.Suite.Pingpong
-open FSharp.FIO.Benchmarks.Suite.Threadring
 open FSharp.FIO.Benchmarks.Suite.Big
 open FSharp.FIO.Benchmarks.Suite.Bang
 open FSharp.FIO.Benchmarks.Suite.Fork
+open FSharp.FIO.Benchmarks.Suite.Pingpong
+open FSharp.FIO.Benchmarks.Suite.Threadring
 
 open System
 open System.IO

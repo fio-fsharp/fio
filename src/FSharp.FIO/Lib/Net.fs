@@ -1,8 +1,8 @@
-(*************************************************************************************************************)
-(* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
-(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
-(* All rights reserved                                                                                       *)
-(*************************************************************************************************************)
+(*********************************************************************************************)
+(* FIO - A Type-Safe, Purely Functional Effect System for Asynchronous and Concurrent F#     *)
+(* Copyright (c) 2022-2025 - Daniel "iyyel" Larsen and Technical University of Denmark (DTU) *)
+(* All rights reserved                                                                       *)
+(*********************************************************************************************)
 
 namespace FSharp.FIO.Lib.Net
 
@@ -10,14 +10,12 @@ open FSharp.FIO.DSL
 
 open System
 open System.IO
+open System.Net
 open System.Text
 open System.Text.Json
-
-open System.Net
+open System.Threading
 open System.Net.Sockets
 open System.Net.WebSockets
-
-open System.Threading
 open System.Threading.Tasks
 
 module Sockets =

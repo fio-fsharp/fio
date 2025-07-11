@@ -24,7 +24,6 @@
 		<Compile Include="Runtime\DirectRuntime.fs" />
 		<Compile Include="Runtime\CooperativeRuntime.fs" />
 		<Compile Include="Runtime\ConcurrentRuntime.fs" />
-		
 		<Compile Include="Lib\IO.fs" />
 		<Compile Include="Lib\Net.fs" />
 		<Compile Include="Ext\App.fs" />

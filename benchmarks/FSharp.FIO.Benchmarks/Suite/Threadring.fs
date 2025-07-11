@@ -1,13 +1,13 @@
-﻿(*************************************************************************************************************)
-(* FIO - A type-safe, highly concurrent and asynchronous library for F# based on pure functional programming *)
-(* Copyright (c) 2022-2025, Daniel Larsen and Technical University of Denmark (DTU)                          *)
-(* All rights reserved                                                                                       *)
-(* --------------------------------------------------------------------------------------------------------- *)
-(* Threadring benchmark                                                                                      *)
-(* Measures: Message sending; Context switching between actors                                               *)
-(* Savina benchmark #5                                                                                       *)
-(* (http://soft.vub.ac.be/AGERE14/papers/ageresplash2014_submission_19.pdf)                                  *)
-(*************************************************************************************************************)
+﻿(*********************************************************************************************)
+(* FIO - A Type-Safe, Purely Functional Effect System for Asynchronous and Concurrent F#     *)
+(* Copyright (c) 2022-2025 - Daniel "iyyel" Larsen and Technical University of Denmark (DTU) *)
+(* All rights reserved                                                                       *)
+(* ----------------------------------------------------------------------------------------- *)
+(* Threadring benchmark                                                                      *)
+(* Measures: Message sending; Context switching between actors                               *)
+(* Savina benchmark #5                                                                       *)
+(* (http://soft.vub.ac.be/AGERE14/papers/ageresplash2014_submission_19.pdf)                  *)
+(*********************************************************************************************)
 
 module internal FSharp.FIO.Benchmarks.Suite.Threadring
 
@@ -15,7 +15,6 @@ open FSharp.FIO.DSL
 #if DEBUG
 open FSharp.FIO.Lib.IO
 #endif
-
 open FSharp.FIO.Benchmarks.Tools.Timer
 
 open System
