@@ -98,10 +98,12 @@ Inspired by [**ZIO**](https://zio.dev/) and [**Cats Effect**](https://typelevel.
 - **Fibers** (green threads) for scalable concurrency  
 - A focus on **purity**, **type safety**, and **performance**
 
-FIO was developed as part of a master’s thesis in Computer Science at [**DTU**](https://www.dtu.dk/english). [**Read the thesis**](https://iyyel.io/assets/doc/masters_thesis_daniel_larsen.pdf) (some parts may be outdated).
+**FIO** was developed as part of a master’s thesis in Computer Science at [**DTU**](https://www.dtu.dk/english). 
+
+[**Read the thesis**](https://iyyel.io/assets/doc/masters_thesis_daniel_larsen.pdf) (some parts may be outdated).
 
 > **Note:** **FIO** is under active development. Contributions, feedback, and questions are very welcome!  
-> Feel free to report bugs, request features or [reach out](mailto:daniel@iyyel.io).
+> Feel free to report bugs, request features or [**reach out**](mailto:me@iyyel.io).
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -113,17 +115,17 @@ FIO was developed as part of a master’s thesis in Computer Science at [**DTU**
 
 Getting started with **FIO** is simple:
 
-1. Install [.NET](https://dotnet.microsoft.com/en-us/)
-2. Use an editor like [VS Code](https://code.visualstudio.com/), [Visual Studio](https://visualstudio.microsoft.com/downloads/), or [Rider](https://www.jetbrains.com/rider/download/) 
+1. Install [**.NET**](https://dotnet.microsoft.com/en-us/)
+2. Use an editor like [**VS Code**](https://code.visualstudio.com/), [**Visual Studio**](https://visualstudio.microsoft.com/downloads/), or [**Rider**](https://www.jetbrains.com/rider/download/)
 3. Clone this repository
 4. Open it in your editor
-5. Explore the [**FIO.Examples**](https://github.com/fio-fsharp/fio/tree/dev/src/FIO.Examples) project or create your own F# file
+5. Explore the [**FIO.Examples**](https://github.com/fs-fio/FIO/tree/main/examples/FSharp.FIO.Examples) project or create your own F# file
 
 ### Usage
 
 You can use **FIO** in two ways:  
-- **Directly** by creating and running effects manually  
-- Via **`FIOApp`**, which simplifies setup and runtime management
+- Directly by creating and running effects manually  
+- Via `FIOApp`, which simplifies setup and runtime management
 
 #### Direct Usage
 
@@ -132,9 +134,9 @@ Create a new F# file and open the DSL, IO and Concurrent runtime modules:
 ```fsharp
 module DirectUsage
 
-open FIO.DSL
-open FIO.Lib.IO
-open FIO.Runtime.Concurrent
+open FSharp.FIO.DSL
+open FSharp.FIO.Lib.IO
+open FSharp.FIO.Runtime.Concurrent
 
 [<EntryPoint>]
 let main _ =
@@ -172,9 +174,9 @@ Wrap your effect in a `FIOApp` to simplify boilerplate. Open the App module:
 ```fsharp
 module FIOAppUsage
 
-open FIO.DSL
-open FIO.Lib.IO
-open FIO.App
+open FSharp.FIO.DSL
+open FSharp.FIO.Lib.IO
+open FSharp.FIO.App
 
 type WelcomeApp() =
     inherit FIOApp<unit, obj>()
@@ -210,8 +212,8 @@ Prefer DSL chaining? Use bind (>>=) directly:
 ```fsharp
 module DSLOnly
 
-open FIO.DSL
-open FIO.Lib.IO
+open FSharp.FIO.DSL
+open FSharp.FIO.Lib.IO
 
 let askForName =
     FConsole.PrintLine "Hello! What is your name?" >>= fun _ ->
@@ -227,11 +229,11 @@ This repository includes five benchmarks, each designed to evaluate a specific a
 
 ### Benchmark Overview
 
-- **Pingpong** – Message sending and retrieval between two actors  
-- **Threadring** – Message passing with frequent fiber context switching  
-- **Big** – Many-to-many message passing with high channel contention  
-- **Bang** – Many-to-one messaging, stressing a single receiver  
-- **Fork** – Measures fiber spawning overhead
+- `Pingpong` – Message sending and retrieval between two actors  
+- `Threadring` – Message passing with frequent fiber context switching  
+- `Big` – Many-to-many message passing with high channel contention  
+- `Bang` – Many-to-one messaging, stressing a single receiver  
+- `Fork` – Measures fiber spawning overhead
 
 ### Running Benchmarks
 

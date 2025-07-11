@@ -59,7 +59,7 @@ type private Arguments =
                 "specify absolute path to save the benchmark results csv file"
 
 let private parser =
-    ArgumentParser.Create<Arguments> (programName = "FIO.Benchmarks")
+    ArgumentParser.Create<Arguments> (programName = "FSharp.FIO.Benchmarks")
 
 let printUsage () =
     parser.PrintUsage ()

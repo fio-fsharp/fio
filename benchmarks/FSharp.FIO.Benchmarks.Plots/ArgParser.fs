@@ -28,7 +28,7 @@ type private Arguments =
             | LoadPath _ -> "Specify path to load benchmark data files from (default is 'boxplot_data' or 'lineplot_data' in the current directory)."
 
 let private parser =
-    ArgumentParser.Create<Arguments> (programName = "FIO.Benchmarks.Plots")
+    ArgumentParser.Create<Arguments> (programName = "FSharp.FIO.Benchmarks.Plots")
 
 let printUsage () =
     parser.PrintUsage ()
