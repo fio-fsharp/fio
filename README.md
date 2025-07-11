@@ -19,11 +19,13 @@
 
   <p align="center">
     <!-- An awesome README template to jumpstart your projects! -->
+    <!--
     <br />
     <a href="https://github.com/fio-fsharp/fio"><strong>Explore the docs »</strong></a>
     <br />
+    -->
     <br />
-    <a href="https://iyyel.io/projects/fio/">View Post</a>
+    <a href="https://iyyel.io/projects/fio/">View Project Post</a>
     &middot;
     <a href="https://github.com/fio-fsharp/fio/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     &middot;
@@ -45,8 +47,8 @@
         <li><a href="#usage">Usage</a></li>
         <ul>
           <li><a href="#direct-usage">Direct Usage</a></li>
-          <li><a href="#using-fioapp-(recommended)">Using FIOApp (Recommended)</a></li>
-          <li><a href="#alternative:-dsl-only-style">Alternative: DSL-Only Style</a></li>
+          <li><a href="#using-fioapp-recommended">Using FIOApp (Recommended)</a></li>
+          <li><a href="#alternative-dsl-only-style">Alternative: DSL-Only Style</a></li>
         </ul>
       </ul>
     </li>
