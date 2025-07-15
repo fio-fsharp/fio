@@ -4,7 +4,7 @@
 (* All rights reserved                                                                       *)
 (*********************************************************************************************)
 
-module internal FSharp.FIO.Runtime.Montor
+module internal FSharp.FIO.Runtime.Monitor
 
 open FSharp.FIO.DSL
 
