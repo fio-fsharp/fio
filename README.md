@@ -239,36 +239,46 @@ This repository includes five benchmarks, each designed to evaluate a specific a
 
 The benchmarks accept a variety of command-line options:
 
-# TODO: Re-print!
-
 ```
-USAGE: FIO.Benchmarks [--help] [--native-runtime] [--intermediate-runtime <evalworkers> <blockingworkers> <evalsteps>]
-                      [--advanced-runtime <evalworkers> <blockingworkers> <evalsteps>]
-                      [--deadlocking-runtime <evalworkers> <blockingworkers> <evalsteps>] --runs <runs>
-                      [--process-increment <actor inc> <inc times>] [--pingpong <rounds>]
-                      [--threadring <actors> <rounds>] [--big <actors> <rounds>] [--bang <actors> <rounds>]
-                      [--fork <actors>]
+USAGE: FSharp.FIO.Benchmarks [--help]
+                             [--direct-runtime]
+                             [--cooperative-runtime <ewc> <ews> <bwc>]
+                             [--concurrent-runtime <ewc> <ews> <bwc>]
+                             [--runs <runs>]
+                             [--actor-increment <actorInc> <times>]
+                             [--round-increment <roundInc> <times>]
+                             [--pingpong <roundCount>]
+                             [--threadring <actorCount> <roundCount>]
+                             [--big <actorCount> <roundCount>]
+                             [--bang <actorCount> <roundCount>]
+                             [--fork <actorCount>]
+                             [--save <saveToCsv>]
+                             [--savepath <absolutePath>]
 
 OPTIONS:
 
-    --native-runtime       specify native runtime.
-    --intermediate-runtime <evalworkers> <blockingworkers> <evalsteps>
-                          specify evaluation workers, blocking workers and eval steps for intermediate runtime.
-    --advanced-runtime <evalworkers> <blockingworkers> <evalsteps>
-                          specify evaluation workers, blocking workers and eval steps for advanced runtime.
-    --deadlocking-runtime <evalworkers> <blockingworkers> <evalsteps>
-                          specify evaluation workers, blocking workers and eval steps for deadlocking runtime.
-    --runs <runs>         specify the number of runs for each benchmark.
-    --process-increment <actor inc> <inc times>
-                          specify the value of actor increment and how many times.
-    --pingpong <rounds>   specify rounds for pingpong benchmark.
-    --threadring <actors> <rounds>
-                          specify actors and rounds for threadring benchmark.
-    --big <actors> <rounds>
-                          specify actors and rounds for big benchmark.
-    --bang <actors> <rounds>
-                          specify actors and rounds for bang benchmark.
-    --fork <actors>       specify actors for fork benchmark.
+    --direct-runtime      specify Direct runtime
+    --cooperative-runtime <ewc> <ews> <bwc>
+                          specify Cooperative runtime with ewc, ews and bwc
+    --concurrent-runtime <ewc> <ews> <bwc>
+                          specify Concurrent runtime with ewc, ews and bwc
+    --runs <runs>         specify number of runs for each benchmark
+    --actor-increment <actorInc> <times>
+                          specify the value of actor increment and the number of times
+    --round-increment <roundInc> <times>
+                          specify the value of round increment and the number of times
+    --pingpong <roundCount>
+                          specify number of rounds for Pingpong benchmark
+    --threadring <actorCount> <roundCount>
+                          specify number of actors and rounds for Threadring benchmark
+    --big <actorCount> <roundCount>
+                          specify number of actors and rounds for Big benchmark
+    --bang <actorCount> <roundCount>
+                          specify number of actors and rounds for Bang benchmark
+    --fork <actorCount>   specify number of actors for Fork benchmark
+    --save <saveToCsv>    should save benchmark results to csv file
+    --savepath <absolutePath>
+                          specify absolute path to save the benchmark results csv file
     --help                display this list of options.
 ```
 
