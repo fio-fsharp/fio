@@ -21,10 +21,10 @@ jobs:
           dotnet-version: '9.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore src/FSharp.FIO.sln
+        run: dotnet restore ./FSharp.FIO.sln
 
       - name: Build
-        run: dotnet build --no-restore src/FSharp.FIO.sln
+        run: dotnet build --no-restore ./FSharp.FIO.sln
 
       - name: Run tests
-        run: dotnet test --no-build --verbosity normal src/FSharp.FIO.sln
+        run: dotnet test --no-build --verbosity normal ./FSharp.FIO.sln
