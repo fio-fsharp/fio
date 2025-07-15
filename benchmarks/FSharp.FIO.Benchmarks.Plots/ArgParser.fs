@@ -43,7 +43,7 @@ let parseArgs args =
         match results.Contains BoxPlot, results.Contains LinePlot with
         | true, false -> PlotType.BoxPlot
         | false, true -> PlotType.LinePlot
-        | false, false -> invalidArg  (nameof args) "You must specify one of: --boxplot or --lineplots."
+        | false, false -> invalidArg  (nameof args) "You must specify one of: --boxplot or --lineplot."
         | true, true -> invalidArg  (nameof args) "Only one plot type can be specified at a time."
     
     let loadPath =
