@@ -1,0 +1,63 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<WarningsAsErrors>true</WarningsAsErrors>
+		<Title>FSharp.FIO</Title>
+		<Description>FIO is a type-safe, purely functional effect system for F#, designed for building highly concurrent and asynchronous applications. It provides a lightweight DSL for writing composable programs using functional effects.</Description>
+		<PackageProjectUrl>https://github.com/fs-fio/FIO</PackageProjectUrl>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<RepositoryUrl>https://github.com/fs-fio/FIO</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<Version>0.0.22-alpha</Version>
+		<PackageIcon>fio_logo_wide.png</PackageIcon>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Compile Include="DSL\Core.fs" />
+		<Compile Include="DSL\CE.fs" />
+		<Compile Include="DSL\Ops.fs" />
+		<Compile Include="Runtime.Ext\Monitor.fs" />
+		<Compile Include="Runtime.Ext\DeadlockDetector.fs" />
+		<Compile Include="Runtime\Runtime.fs" />
+		<Compile Include="Runtime\DirectRuntime.fs" />
+		<Compile Include="Runtime\CooperativeRuntime.fs" />
+		<Compile Include="Runtime\ConcurrentRuntime.fs" />
+		<Compile Include="Lib\IO.fs" />
+		<Compile Include="Lib\Net.fs" />
+		<Compile Include="Ext\App.fs" />
+	</ItemGroup>
+
+	<PropertyGroup>
+		<!-- 
+		Ensure debugging information is easily found, so that editors can locate the source code locations for your library.
+        This slightly increases the size of your package, but the usability benefits are worth it.
+		-->
+		<DebugType>embedded</DebugType>
+		<!-- Ensure that files that are generated during the build by the .NET SDK are also included in your compiled library. -->
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\..\assets\images\fio_logo_wide.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\..\LICENSE.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\..\README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Update="FSharp.Core" Version="9.0.300" />
+	</ItemGroup>
+
+</Project>

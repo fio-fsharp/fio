@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FSharp.FIO.Benchmarks.Plots": {
+      "commandName": "Project",
+      "commandLineArgs": "--lineplot"
+    }
+  }
+}

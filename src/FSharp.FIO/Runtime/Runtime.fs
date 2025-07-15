@@ -1,0 +1,72 @@
+﻿(*********************************************************************************************)
+(* FIO - A Type-Safe, Purely Functional Effect System for Asynchronous and Concurrent F#     *)
+(* Copyright (c) 2022-2025 - Daniel "iyyel" Larsen and Technical University of Denmark (DTU) *)
+(* All rights reserved                                                                       *)
+(*********************************************************************************************)
+
+namespace FSharp.FIO.Runtime
+
+open FSharp.FIO.DSL
+
+open System.Globalization
+
+[<AutoOpen>]
+module private Utils =
+    
+    let inline pop (contStack: ResizeArray<ContStackFrame>) =
+        let lastIndex = contStack.Count - 1
+        let stackFrame = contStack[lastIndex]
+        contStack.RemoveAt lastIndex
+        stackFrame
+
+/// Functional runtime
+[<AbstractClass>]
+type FRuntime internal () =
+
+    abstract member Name : string
+
+    abstract member ConfigString : string
+
+    override this.ConfigString =
+        this.Name
+
+    abstract member Run<'R, 'E> : FIO<'R, 'E> -> Fiber<'R, 'E>
+
+    member this.ToFileString () =
+        this.ToString()
+            .ToLowerInvariant()
+            .Replace("(", "")
+            .Replace(")", "")
+            .Replace(":", "")
+            .Replace(' ', '-')
+    
+    override this.ToString () =
+        this.ConfigString
+
+type WorkerConfig =
+    { EWC: int
+      EWS: int
+      BWC: int }
+
+/// Functional worker runtime
+[<AbstractClass>]
+type FWorkerRuntime internal (config: WorkerConfig) as this =
+    inherit FRuntime ()
+
+    let validateWorkerConfiguration () =
+        if config.EWC <= 0 ||
+           config.EWS <= 0 ||
+           config.BWC <= 0 then
+            invalidArg "config" $"Invalid worker configuration! %s{this.ToString ()}"
+
+    do validateWorkerConfiguration ()
+
+    member _.GetWorkerConfiguration () =
+        config
+
+    override _.ConfigString =
+        let ci = CultureInfo "en-US"
+        $"""EWC: %s{config.EWC.ToString("N0", ci)} EWS: %s{config.EWS.ToString("N0", ci)} BWC: %s{config.BWC.ToString("N0", ci)}"""
+
+    override this.ToString () =
+        $"{this.Name} ({this.ConfigString})"

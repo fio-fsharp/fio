@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "Benchmarks": {
-      "commandName": "Project",
-      "commandLineArgs": "--concurrent-runtime 19 200 1 --runs 50 --threadring 5000 1"
-    }
-  }
-}

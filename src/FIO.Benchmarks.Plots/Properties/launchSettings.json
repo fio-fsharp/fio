@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "Benchmarks.Plots": {
-      "commandName": "Project",
-      "commandLineArgs": "--lineplots"
-    }
-  }
-}
