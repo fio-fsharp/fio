@@ -118,7 +118,7 @@ let private runBenchmark (runtime: FRuntime) totalRuns (config: BenchmarkConfig)
             
             for currentRun in 1L..totalRuns do
                 printfn $"[FIO.Benchmarks]: Executing: %s{config.ToString()}, Runtime: %s{runtime.ToString()}, Run (%i{currentRun}/%i{totalRuns})"
-                let! benchRes = runtime.Run(eff).AwaitAsync()
+                let! benchRes = runtime.Run(eff).Task()
                 use proc = Process.GetCurrentProcess()
                 let memoryUsage = proc.WorkingSet64 / (1024L * 1024L)
                 let executionTime =

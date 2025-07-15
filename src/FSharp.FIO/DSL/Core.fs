@@ -182,7 +182,7 @@ and Fiber<'R, 'E> internal () =
         AwaitFiber ifiber
 
     /// Waits for the fiber and succeeds with its result.
-    member _.AwaitAsync<'R, 'E> () =
+    member _.Task<'R, 'E> () =
         task {
             match! ifiber.Task with
             | Ok res -> return Ok (res :?> 'R)

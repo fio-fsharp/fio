@@ -17,12 +17,12 @@ open FsCheck.FSharp
 type PropertyTests () =
 
     let result (fiber: Fiber<'R, 'E>) =
-        match fiber.AwaitAsync().Result with
+        match fiber.Task().Result with
         | Ok res -> res
         | Error _ -> failwith "Error happened when result was expected!"
         
     let error (fiber: Fiber<'R, 'E>) =
-        match fiber.AwaitAsync().Result with
+        match fiber.Task().Result with
         | Ok _ -> failwith "Result happened when error was expected!"
         | Error err -> err
     

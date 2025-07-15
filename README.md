@@ -102,7 +102,7 @@ Inspired by [**ZIO**](https://zio.dev/) and [**Cats Effect**](https://typelevel.
 
 [**Read the thesis**](https://iyyel.io/assets/doc/masters_thesis_daniel_larsen.pdf) (some parts may be outdated).
 
-> **Note:** **FIO** is under active development. Contributions, feedback, and questions are very welcome!  
+> **Note:** FIO is under active development. Contributions, feedback, and questions are very welcome!  
 > Feel free to report bugs, request features or [**reach out**](mailto:me@iyyel.io).
 
 
@@ -116,16 +116,16 @@ Inspired by [**ZIO**](https://zio.dev/) and [**Cats Effect**](https://typelevel.
 Getting started with **FIO** is simple:
 
 1. Install [**.NET**](https://dotnet.microsoft.com/en-us/)
-2. Use an editor like [**VS Code**](https://code.visualstudio.com/), [**Visual Studio**](https://visualstudio.microsoft.com/downloads/), or [**Rider**](https://www.jetbrains.com/rider/download/)
+2. Use an editor like [**VS Code**](https://code.visualstudio.com/), [**Visual Studio**](https://visualstudio.microsoft.com/downloads/), or [**Rider**](https://www.jetbrains.com/rider/download/) (or even vim)
 3. Clone this repository
 4. Open it in your editor
-5. Explore the [**FIO.Examples**](https://github.com/fs-fio/FIO/tree/main/examples/FSharp.FIO.Examples) project or create your own F# file
+5. Explore the [**FSharp.FIO.Examples**](https://github.com/fs-fio/FIO/tree/main/examples/FSharp.FIO.Examples) project or create your own F# file
 
 ### Usage
 
 You can use **FIO** in two ways:  
-- Directly by creating and running effects manually  
-- Via `FIOApp`, which simplifies setup and runtime management
+- Directly by creating and running effects manually (examples in [**FSharp.FIO.Examples**](https://github.com/fs-fio/FIO/tree/main/examples/FSharp.FIO.Examples))
+- Via `FIOApp`, which simplifies setup and runtime management (examples in [**FSharp.FIO.Examples.App**](https://github.com/fs-fio/FIO/tree/main/examples/FSharp.FIO.Examples.App))
 
 #### Direct Usage
 
@@ -145,11 +145,13 @@ let main _ =
         let! name = FConsole.ReadLine ()
         do! FConsole.PrintLine $"Hello, %s{name}! Welcome to FIO! 🪻💜"
     }
-
-    let fiber = Runtime().Run askForName
-    let result = fiber.AwaitAsync ()
-    printfn $"%A{result}"
-    exit 0
+    
+    Runtime().Run askForName
+    |> fun fiber -> fiber.Task ()
+    |> Async.AwaitTask
+    |> Async.RunSynchronously
+    |> printfn "%A"
+    0
 ```
 
 Run it with:
@@ -179,9 +181,9 @@ open FSharp.FIO.Lib.IO
 open FSharp.FIO.App
 
 type WelcomeApp() =
-    inherit FIOApp<unit, obj>()
+    inherit FIOApp<unit, exn> ()
 
-    override this.effect = fio {
+    override _.effect = fio {
         do! FConsole.PrintLine "Hello! What is your name?"
         let! name = FConsole.ReadLine ()
         do! FConsole.PrintLine $"Hello, %s{name}! Welcome to FIO! 🪻💜"
@@ -284,15 +286,15 @@ OPTIONS:
 
 ### Example
 
-To run each benchmark 30 times using the concurrent runtime (7 evaluation workers, 1 blocking worker, 15 evaluation steps):
+To run each benchmark 30 times using the concurrent runtime (39 evaluation workers, 200 evaluation steps, 1 blocking worker):
 
 ```bash
---advanced-runtime 7 1 15 --runs 30 --pingpong 120000 --threadring 2000 1 --big 500 1 --bang 3000 1 --fork 3000
+--concurrent-runtime 39 200 1 --runs 30 --pingpong 150000 --threadring 10000 10 --big 250 10 --bang 10000 10 --fork 20000
 ```
 
-
 ### Experimental Flags
-FIO also supports optional compile-time flags:
+
+**FIO** also supports optional compile-time flags:
 
 - `DETECT_DEADLOCK` – Enables a simple thread that attempts to detect deadlocks during execution
 
@@ -301,21 +303,23 @@ FIO also supports optional compile-time flags:
 > **Note:** These features are experimental and may behave unpredictably.
 
 
+
 ## Performance
 
-The following plots illustrate the **execution** of the available runtime systems across benchmarks. The Direct, Cooperative and Concurrent runtimes.
+The following plots illustrate the **execution time** (measured in miliseconds) of the available runtime systems across benchmarks.
 
 The runtimes differ in how they manage fibers and blocked operations:
 
-- **Direct** – Uses .NET tasks
+- **Direct** – .NET tasks with waiting for blocked fibers
 - **Cooperative** – Fibers with linear-time handling of blocked fibers
 - **Concurrent** – Fibers with constant-time handling of blocked fibers
 
+### BoxPlots
 
 <img src="assets/images/boxplot.png" alt="Boxplot" />
 
 
-Lineplot here
+### LinePlots
 
 <img src="assets/images/lineplot.png" alt="Lineplot" />
 

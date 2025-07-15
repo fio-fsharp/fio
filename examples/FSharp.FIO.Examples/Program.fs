@@ -17,7 +17,7 @@ let helloWorld1 () =
     let fiber = Runtime().Run hello
     
     task {
-        let! result = fiber.AwaitAsync()
+        let! result = fiber.Task ()
         match result with
         | Ok result -> printfn $"Success: %s{result}"
         | Error error -> printfn $"Error: %A{error}"
@@ -28,7 +28,7 @@ let helloWorld2 () : unit =
     let fiber: Fiber<string, obj> = Runtime().Run hello
     
     task {
-        let! (result: Result<string, obj>) = fiber.AwaitAsync()
+        let! (result: Result<string, obj>) = fiber.Task ()
         match result with
         | Ok result -> printfn $"Success: %s{result}"
         | Error error -> printfn $"Error: %A{error}"
@@ -39,7 +39,7 @@ let helloWorld3 () : unit =
     let fiber: Fiber<obj, string> = Runtime().Run hello
     
     task {
-        let! (result: Result<obj, string>) = fiber.AwaitAsync()
+        let! (result: Result<obj, string>) = fiber.Task ()
         match result with
         | Ok result -> printfn $"Success: %A{result}"
         | Error error -> printfn $"Error: %s{error}"
@@ -50,7 +50,7 @@ let helloWorld4 () =
     let fiber = Runtime().Run hello
     
     task {
-        let! result = fiber.AwaitAsync()
+        let! result = fiber.Task()
         printfn $"%A{result}"
     } |> ignore
 
@@ -59,7 +59,7 @@ let helloWorld5 () =
     let fiber = Runtime().Run hello
     
     task {
-        let! result = fiber.AwaitAsync()
+        let! result = fiber.Task ()
         printfn $"%A{result}"
     } |> ignore
 
@@ -68,16 +68,16 @@ let helloWorld6 () =
     let fiber = Runtime().Run hello
     
     task {
-        let! result = fiber.AwaitAsync()
+        let! result = fiber.Task()
         printfn $"%A{result}"
     } |> ignore
 
 let concurrency1 () =
-    let concurrent = (FIO.Succeed 42).Fork().Bind(_.Await())
+    let concurrent = (FIO.Succeed 42).Fork().Bind _.Await()
     let fiber = Runtime().Run concurrent
     
     task {
-        let! result = fiber.AwaitAsync()
+        let! result = fiber.Task ()
         printfn $"%A{result}"
     } |> ignore
 
@@ -86,7 +86,7 @@ let concurrency2 () =
     let fiber = Runtime().Run concurrent
     
     task {
-        let! result = fiber.AwaitAsync()
+        let! result = fiber.Task ()
         printfn $"%A{result}"
     } |> ignore
 
@@ -97,7 +97,7 @@ let concurrency3 () =
     let fiber = Runtime().Run concurrent
     
     task {
-        let! result = fiber.AwaitAsync()
+        let! result = fiber.Task ()
         printfn $"%A{result}"
     } |> ignore
 
@@ -110,7 +110,7 @@ let computationExpression1 () =
     let fiber = Runtime().Run hello
     
     task {
-        let! result = fiber.AwaitAsync()
+        let! result = fiber.Task ()
         printfn $"%A{result}"
     } |> ignore
 
@@ -123,7 +123,7 @@ let computationExpression2 () =
     let fiber = Runtime().Run hello
 
     task {
-        let! result = fiber.AwaitAsync()
+        let! result = fiber.Task ()
         printfn $"%A{result}"
     } |> ignore
 
@@ -138,7 +138,7 @@ let computationExpression3 () =
     let fiber = Runtime().Run welcome
 
     task {
-        let! result = fiber.AwaitAsync()
+        let! result = fiber.Task ()
         printfn $"%A{result}"
     } |> ignore
 

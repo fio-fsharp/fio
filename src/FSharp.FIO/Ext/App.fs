@@ -26,7 +26,7 @@ let private mergeResult onSuccess onError = function
     | Error err -> onError err
 
 let private mergeFiber onSuccess onError (fiber: Fiber<'R, 'E>) = task {
-    let! res = fiber.AwaitAsync()
+    let! res = fiber.Task()
     return! mergeResult onSuccess onError res
 }
 
