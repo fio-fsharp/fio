@@ -34,7 +34,7 @@ let createBoxPlot (data: (FileMetadata * BenchmarkData) list) (width: int) (heig
             BoxPoints = StyleParam.BoxPoints.SuspectedOutliers)
         |> Chart.withTraceInfo (metadata.ToString ())
         |> Chart.withSize (width, height)
-        |> Chart.withXAxis (LinearAxis.init(TickAngle = 45)) 
+        |> Chart.withXAxis (LinearAxis.init(TickAngle = 65))
         |> Chart.withYAxisStyle yAxisLabel
         |> Chart.withLayout defaultLayout
         

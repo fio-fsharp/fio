@@ -128,7 +128,7 @@ let private generateLineCharts path linePlotWidth plotHeight =
 let createAndShowCharts args =
     let rowCount, colCount, titles, charts =
         match args.PlotType with
-        | BoxPlot -> generateBoxPlotCharts args.LoadPath 150 5000
-        | LinePlot -> generateLineCharts args.LoadPath 500 2000
+        | BoxPlot -> generateBoxPlotCharts args.LoadPath 100 6000
+        | LinePlot -> generateLineCharts args.LoadPath 350 1800
     Chart.Grid (rowCount, colCount, SubPlotTitles = titles) charts
     |> Chart.show

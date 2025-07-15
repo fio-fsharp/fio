@@ -306,7 +306,7 @@ To run each benchmark 30 times using the concurrent runtime (39 evaluation worke
 
 ## Performance
 
-The following plots illustrate the **execution time** (measured in miliseconds) of the available runtime systems across benchmarks.
+The following plots illustrate the **execution time** (measured in milliseconds) and **scalability** of the available runtime systems across benchmarks.
 
 The runtimes differ in how they manage fibers and blocked operations:
 
@@ -314,12 +314,16 @@ The runtimes differ in how they manage fibers and blocked operations:
 - **Cooperative** – Fibers with linear-time handling of blocked fibers
 - **Concurrent** – Fibers with constant-time handling of blocked fibers
 
-### BoxPlots
+### Execution Time
+
+The boxplots show the measured execution time for each benchmark with the shown configuration and runtime.
 
 <img src="assets/images/boxplot.png" alt="Boxplot" />
 
 
-### LinePlots
+### Scalability
+
+
 
 <img src="assets/images/lineplot.png" alt="Lineplot" />
 
