@@ -293,31 +293,21 @@ FIO also supports optional compile-time flags:
 
 ## Performance
 
-The following plots illustrate the **scalability** of the available runtime systems across benchmarks.  
-**Legend**: `I` = Intermediate Runtime, `A` = Advanced Runtime
+The following plots illustrate the **execution** of the available runtime systems across benchmarks. The Direct, Cooperative and Concurrent runtimes.
 
 The runtimes differ in how they manage fibers and blocked operations:
 
-- **Native** – Uses OS threads directly  
-- **Intermediate** – Fibers with linear-time handling of blocked fibers  
-- **Advanced** – Fibers with constant-time handling of blocked fibers
+- **Direct** – Uses .NET tasks
+- **Cooperative** – Fibers with linear-time handling of blocked fibers
+- **Concurrent** – Fibers with constant-time handling of blocked fibers
 
-### **Threadring**
 
-<img src="assets/images/threadring_scalability_plot.png" alt="Threadring scalability plot" height="500" />
+<img src="assets/images/boxplot.png" alt="Boxplot" />
 
-### **Big**
 
-<img src="assets/images/big_scalability_plot.png" alt="Big scalability plot" height="500" />
+Lineplot here
 
-### **Bang**
-
-<img src="assets/images/bang_scalability_plot.png" alt="Bang scalability plot" height="500" />
-
-### **Fork**
-
-<img src="assets/images/spawn_scalability_plot.png" alt="Fork scalability plot" height="500" />
-
+<img src="assets/images/lineplot.png" alt="Lineplot" />
 
 
 <!-- ROADMAP -->

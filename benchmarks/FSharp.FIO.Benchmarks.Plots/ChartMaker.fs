@@ -51,14 +51,14 @@ let private generatePastelPurples (count: int) : string list =
         
         List.init count createPurpleVariant
 
-let groupPredicates =
+let groupPredicates enablePingpong =
     [
-        fun (d: (FileMetadata * BenchmarkData) list) ->
-            d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "pingpong"
-        fun d -> d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "threadring"
-        fun d -> d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "big"
-        fun d -> d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "bang"
-        fun d -> d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "fork"
+        if enablePingpong then
+            yield fun d -> d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "pingpong"
+        yield fun d -> d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "threadring"
+        yield fun d -> d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "big"
+        yield fun d -> d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "bang"
+        yield fun d -> d |> List.head |> fst |> fun fm -> fm.BenchmarkName.ToLowerInvariant () = "fork"
     ]
 
 let reorderByPredicates predicates items =
@@ -75,7 +75,7 @@ let reorderByPredicates predicates items =
 
 let private generateBoxPlotCharts path boxPlotWidth plotHeight =
     let boxplotData =
-        reorderByPredicates groupPredicates
+        reorderByPredicates (groupPredicates true)
         <| getAllCsvResults path
     let colors = generatePastelPurples boxplotData.Length
     let rowCount, colCount =
@@ -91,23 +91,35 @@ let private generateBoxPlotCharts path boxPlotWidth plotHeight =
     rowCount, colCount, titles, charts
     
 let private generateLineCharts path linePlotWidth plotHeight =
-    let linePlotData =
-        reorderByPredicates groupPredicates
-        <| getAllCsvResults path
+    let rawLineData =
+        getAllCsvResults path
         |> List.collect id
         |> List.groupBy (fst >> _.BenchmarkName)
-        |> List.map (fun (_, group) ->
+    let reorderedGroups =
+        rawLineData
+        |> List.map snd // discard benchmark name keys
+        |> reorderByPredicates (groupPredicates false)
+    let linePlotData =
+        reorderedGroups
+        |> List.map (fun group ->
             group
             |> List.groupBy (fst >> _.RuntimeName)
-            |> List.map (snd >> List.sortBy (fst >> _.ActorCount)))                                    
+            |> List.map (snd >> List.sortBy (fst >> _.ActorCount)))
+                                       
     let rowCount, colCount =
         linePlotData.Length + 1, 1
+
+    let colors  =
+        let colors = generatePastelPurples linePlotData.Length
+        let first = List.head colors
+        let last = List.last colors
+        let middle = colors.[List.length colors / 2]
+        [first; middle; last]
 
     let titles, charts =
         List.map (fun innerList ->
             let metadata: FileMetadata = innerList |> List.head |> List.head |> fst
             let plotWidth = innerList.Length * linePlotWidth
-            let colors = generatePastelPurples innerList.Length
             metadata.BenchmarkName, createLinePlot innerList plotWidth plotHeight colors) linePlotData
             |> List.unzip
             

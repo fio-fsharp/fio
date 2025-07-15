@@ -43,7 +43,7 @@ let createBoxPlot (data: (FileMetadata * BenchmarkData) list) (width: int) (heig
     
 let createLinePlot (data: (FileMetadata * BenchmarkData) list list) (width: int) (height: int) colors =
     
-    let createChart (data: (FileMetadata * BenchmarkData) list) color =
+    let createChart (data: (FileMetadata * BenchmarkData) list) color dash =
         let x = List.map (fun x -> (fst x).ActorCount) data
         let y = List.map (fun x -> (snd x).ExecutionTimes |> List.averageBy float) data
         let yAxisLabel = (snd data.Head).Headers[executionTimeHeaderIndex] + " (lower is better)"
@@ -52,7 +52,7 @@ let createLinePlot (data: (FileMetadata * BenchmarkData) list list) (width: int)
             y,
             StyleParam.Mode.Lines_Markers,
             Marker = Marker.init (Color = Color.fromString color),
-            Line = Line.init (Color = Color.fromString color),
+            Line = Line.init (Color = Color.fromString color, Dash = dash),
             ShowLegend = true)
         |> Chart.withTraceInfo ((fst data.Head).ToString ())
         |> Chart.withSize (width, height)
@@ -60,5 +60,6 @@ let createLinePlot (data: (FileMetadata * BenchmarkData) list list) (width: int)
         |> Chart.withYAxisStyle yAxisLabel
         |> Chart.withLayout defaultLayout
     
+    let dashes = [StyleParam.DrawingStyle.Solid; StyleParam.DrawingStyle.LongDash; StyleParam.DrawingStyle.LongDashDot]
     Chart.combine
-    <| List.map (fun (data, color) -> createChart data color) (List.zip data colors)
+    <| List.map (fun (data, color, style) -> createChart data color style) (List.zip3 data colors dashes)
