@@ -59,6 +59,13 @@ let createLinePlot (data: (FileMetadata * BenchmarkData) list list) (width: int)
         |> Chart.withXAxisStyle "Forked Fibers"
         |> Chart.withYAxisStyle yAxisLabel
         |> Chart.withLayout defaultLayout
+        |> Chart.withLegend (
+            Legend.init (
+                Orientation = StyleParam.Orientation.Vertical,
+                X = -0.05,
+                Y = 1.2,
+                XAnchor = StyleParam.XAnchorPosition.Left,
+                YAnchor = StyleParam.YAnchorPosition.Top))
     
     let dashes = [StyleParam.DrawingStyle.Solid; StyleParam.DrawingStyle.LongDash; StyleParam.DrawingStyle.LongDashDot]
     Chart.combine

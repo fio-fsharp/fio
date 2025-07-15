@@ -316,7 +316,7 @@ The runtimes differ in how they manage fibers and blocked operations:
 
 ### Execution Time
 
-The boxplots show the measured execution time for each benchmark with the shown configuration and runtime.
+The boxplots show the measured execution time for each benchmark with the shown benchmark and runtime configurations.
 
 <img src="assets/images/boxplot.png" alt="Boxplot" />
 
