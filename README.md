@@ -376,7 +376,7 @@ Distributed under the MIT License See [**LICENSE.md**](LICENSE.md) for more info
 <!-- CONTACT -->
 ## Contact
 
-Daniel "iyyel" Larsen - [**iyyel.io**](https://iyyel.io) - [**me@iyyel.io**](mailto:me@iyyel.io)
+Daniel "iyyel" Larsen ([**iyyel.io**](https://iyyel.io))
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -385,7 +385,7 @@ Daniel "iyyel" Larsen - [**iyyel.io**](https://iyyel.io) - [**me@iyyel.io**](mai
 <!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
 
-Alceste Scalas - [**alcsc**](https://people.compute.dtu.dk/alcsc/) - [**github**](https://github.com/alcestes)
+Alceste Scalas ([**people.compute.dtu.dk**](https://people.compute.dtu.dk/alcsc/))
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
