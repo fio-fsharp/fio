@@ -64,10 +64,8 @@
     <li>
       <a href="#performance">Performance</a>
       <ul>
-        <li><a href="#threadring">Threadring</a></li>
-        <li><a href="#big">Big</a></li>
-        <li><a href="#bang">Bang</a></li>
-        <li><a href="#fork">Fork</a></li>
+        <li><a href="#execution-time">Execution Time</a></li>
+        <li><a href="#scalability">Scalability</a></li>
       </ul>
     </li>
     <li><a href="#roadmap">Roadmap</a></li>
@@ -323,29 +321,30 @@ The boxplots show the measured execution time for each benchmark with the shown 
 
 ### Scalability
 
-
+The lineplots show for each benchmark, how each runtime scales when the amount of fibers increases.
 
 <img src="assets/images/lineplot.png" alt="Lineplot" />
+
 
 
 <!-- ROADMAP -->
 ## Roadmap
 
-See the [open issues](https://github.com/fio-fsharp/fio/issues) for a full list of proposed features (and known issues).
+See the [**open issues**](https://github.com/fio-fsharp/fio/issues) for a full list of proposed features (and known issues).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 
 <!-- CONTRIBUTING -->
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome and appreciated!
 
 Got an idea or improvement? Feel free to:
-- ⭐ Star the repository
-- 🐛 Open an issue (tag it with `enhancement`)
-- 🔀 Fork the project and submit a pull request
+- Star the repository
+- Open an issue (tag it with `enhancement`)
+- Fork the project and submit a pull request
 
 ### Quick Start
 
@@ -391,9 +390,6 @@ Alceste Scalas - [**alcsc**](https://people.compute.dtu.dk/alcsc/) - [**github**
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
-
-
-<!-- MARKDOWN LINKS & IMAGES -->
 
 <!-- MARKDOWN LINKS & IMAGES -->
 [contributors-shield]: https://img.shields.io/github/contributors/fio-fsharp/fio.svg?style=for-the-badge
