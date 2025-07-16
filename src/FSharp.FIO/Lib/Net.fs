@@ -38,19 +38,14 @@ module Sockets =
             }
 
         static member Create<'S, 'R, 'E> (socket: Socket, options: JsonSerializerOptions) : FIO<FSocket<'S, 'R, exn>, exn> =
-            fio {
-                return! FSocket.Create<'S, 'R, exn> (socket, id, options)
-            }
+            FSocket.Create<'S, 'R, exn> (socket, id, options)
 
         static member Create<'S, 'R, 'E> (socket: Socket, onError: exn -> 'E) : FIO<FSocket<'S, 'R, 'E>, 'E> =
-            fio {
-                return! FSocket.Create<'S, 'R, 'E> (socket, onError, JsonSerializerOptions())
-            }
+            FSocket.Create<'S, 'R, 'E> (socket, onError, JsonSerializerOptions())
 
         static member Create<'S, 'R, 'E> (socket: Socket) : FIO<FSocket<'S, 'R, exn>, exn> =
-            fio {
-                return! FSocket.Create<'S, 'R, exn> (socket, id, JsonSerializerOptions())
-            }
+            FSocket.Create<'S, 'R, exn> (socket, id, JsonSerializerOptions())
+
 
         static member Create<'S, 'R, 'E> (socket: Socket, host: string, port: int, onError: exn -> 'E, options: JsonSerializerOptions) : FIO<FSocket<'S, 'R, 'E>, 'E> =
             fio {
@@ -65,14 +60,10 @@ module Sockets =
             }
         
         static member Create<'S, 'R, 'E> (socket: Socket, host: string, port: int, onError: exn -> 'E) : FIO<FSocket<'S, 'R, 'E>, 'E> =
-            fio {
-                return! FSocket.Create<'S, 'R, 'E> (socket, host, port, onError, JsonSerializerOptions())
-            }
+            FSocket.Create<'S, 'R, 'E> (socket, host, port, onError, JsonSerializerOptions())
         
         static member Create<'S, 'R, 'E> (socket: Socket, host: string, port: int) : FIO<FSocket<'S, 'R, exn>, exn> =
-            fio {
-                return! FSocket.Create<'S, 'R, exn> (socket, host, port, id, JsonSerializerOptions())
-            }
+            FSocket.Create<'S, 'R, exn> (socket, host, port, id, JsonSerializerOptions())
 
         member _.Send<'S, 'E> (msg: 'S) : FIO<unit, 'E> =
             fio {
@@ -92,6 +83,9 @@ module Sockets =
             fio {
                 do! !<<< (fun () -> socket.Disconnect reuseSocket)
             }
+
+        member this.Disconnect<'E> () : FIO<unit, 'E> =
+            this.Disconnect<'E> true
 
         member _.Close<'E> () : FIO<unit, 'E> =
             fio {
@@ -130,62 +124,71 @@ module WebSockets =
             }
         
         static member Create<'S, 'R, 'E> (ctx, listenerCtx, options) : FIO<FWebSocket<'S, 'R, exn>, exn> =
-            fio {
-                return! FWebSocket.Create<'S, 'R, exn> (ctx, listenerCtx, id, options)
-            }
+            FWebSocket.Create<'S, 'R, exn> (ctx, listenerCtx, id, options)
         
         static member Create<'S, 'R, 'E> (ctx, listenerCtx, onError: exn -> 'E) : FIO<FWebSocket<'S, 'R, 'E>, 'E> =
-            fio {
-                return! FWebSocket.Create<'S, 'R, 'E> (ctx, listenerCtx, onError, JsonSerializerOptions())
-            }
+            FWebSocket.Create<'S, 'R, 'E> (ctx, listenerCtx, onError, JsonSerializerOptions())
         
         static member Create<'S, 'R, 'E> (ctx, listenerCtx) : FIO<FWebSocket<'S, 'R, exn>, exn> =
-            fio {
-            return! FWebSocket.Create<'S, 'R, exn> (ctx, listenerCtx, id, JsonSerializerOptions())
-            }
-        
-        member _.Send<'S, 'E> (msg: 'S) : FIO<unit, 'E> =
+            FWebSocket.Create<'S, 'R, exn> (ctx, listenerCtx, id, JsonSerializerOptions())
+
+        member _.Send<'S, 'E> (msg: 'S, messageType: WebSocketMessageType, endOfMessage: bool, cancellationToken: CancellationToken) : FIO<unit, 'E> =
             fio {
                 let! json = !<<< (fun () -> JsonSerializer.Serialize(msg, options))
                 let! buffer = !<<< (fun () -> Encoding.UTF8.GetBytes json)
-                let! task = !<<< (fun () ->
-                    ctx.WebSocket.SendAsync(
-                        ArraySegment<byte> buffer,
-                        WebSocketMessageType.Text,
-                        true, CancellationToken.None))
-                do! !<<~ task
+                let! sendTask = !<<< (fun () -> ctx.WebSocket.SendAsync(ArraySegment<byte> buffer, messageType, endOfMessage, cancellationToken))
+                do! !<<~ sendTask
             }
 
-        member _.Receive<'R, 'E> () : FIO<'R, 'E> =
+        member this.Send<'S, 'E> (msg: 'S, endOfMessage: bool, cancellationToken: CancellationToken) : FIO<unit, 'E> =
+            this.Send<'S, 'E> (msg, WebSocketMessageType.Text, endOfMessage, cancellationToken)
+
+        member this.Send<'S, 'E> (msg: 'S, cancellationToken: CancellationToken) : FIO<unit, 'E> =
+            this.Send<'S, 'E> (msg, true, cancellationToken)
+
+        member this.Send<'S, 'E> (msg: 'S) : FIO<unit, 'E> =
+            this.Send<'S, 'E> (msg, true, CancellationToken.None)
+
+        member _.Receive<'R, 'E> (bufferSize: int, cancellationToken: CancellationToken) : FIO<'R, 'E> =
             fio {
-                let! buffer = !<<< (fun () -> Array.zeroCreate 1024)
-                let! receiveTask = !<<< (fun () ->
-                    ctx.WebSocket.ReceiveAsync(
-                        ArraySegment<byte> buffer,
-                        CancellationToken.None))
+                let! buffer = !<<< (fun () -> Array.zeroCreate bufferSize)
+                let! receiveTask = !<<< (fun () -> ctx.WebSocket.ReceiveAsync(ArraySegment<byte> buffer, cancellationToken))
                 let! receiveResult = !<<~~ receiveTask
                 
                 if receiveResult.MessageType = WebSocketMessageType.Close then
-                    let! closeTask = !<<< (fun () ->
-                        ctx.WebSocket.CloseAsync(
-                            WebSocketCloseStatus.NormalClosure,
-                            "Closing",
-                            CancellationToken.None))
+                    let! closeTask = !<<< (fun () -> ctx.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Received Close message", CancellationToken.None))
                     do! !<<~ closeTask
-                    return! !- (onError <| Exception("Received Close message"))
+                    return! !- (onError <| Exception "Received Close message")
                 else
                     let! json = !<<< (fun () -> Encoding.UTF8.GetString(buffer, 0, receiveResult.Count))
                     let! msg = !<<< (fun () -> JsonSerializer.Deserialize<'R>(json, options))
                     return msg
             }
 
-        member _.Close<'E> () : FIO<unit, 'E> =
+        member this.Receive<'R, 'E> (cancellationToken: CancellationToken) : FIO<'R, 'E> =
+            this.Receive<'R, 'E> (1024, cancellationToken)
+            
+        member this.Receive<'R, 'E> () : FIO<'R, 'E> =
+            this.Receive<'R, 'E> CancellationToken.None
+
+        member _.Close<'E> (closeStatus: WebSocketCloseStatus, statusDescription: string, cancellationToken: CancellationToken) : FIO<unit, 'E> =
             fio {
-                let! closeTask = !<<< (fun () ->
-                    ctx.WebSocket.CloseAsync(
-                        WebSocketCloseStatus.NormalClosure,
-                        "Closing", CancellationToken.None))
+                let! closeTask = !<<< (fun () -> ctx.WebSocket.CloseAsync(closeStatus, statusDescription, cancellationToken))
                 do! !<<~ closeTask
+            }
+
+        member this.Close<'E> (closeStatus: WebSocketCloseStatus, statusDescription: string) : FIO<unit, 'E> =
+            this.Close<'E> (closeStatus, statusDescription, CancellationToken.None)
+
+        member this.Close<'E> (cancellationToken: CancellationToken) : FIO<unit, 'E> =
+            this.Close<'E> (WebSocketCloseStatus.NormalClosure, "Normal Closure", cancellationToken)
+
+        member this.Close<'E> () : FIO<unit, 'E> =
+            this.Close<'E> CancellationToken.None
+
+        member _.Abort<'E> () : FIO<unit, 'E> =
+            fio {
+                do! !<<< (fun () -> ctx.WebSocket.Abort())
             }
 
         member _.RemoteEndPoint<'E> () : FIO<IPEndPoint, 'E> =
@@ -224,19 +227,13 @@ module WebSockets =
             }
         
         static member Create<'S, 'R, 'E> (options: JsonSerializerOptions) : FIO<FServerWebSocket<'S, 'R, exn>, exn> =
-            fio {
-                return! FServerWebSocket.Create<'S, 'R, exn> (id, options)
-            }
+            FServerWebSocket.Create<'S, 'R, exn> (id, options)
         
         static member Create<'S, 'R, 'E> (onError: exn -> 'E) : FIO<FServerWebSocket<'S, 'R, 'E>, 'E> =
-            fio {
-                return! FServerWebSocket.Create<'S, 'R, 'E> (onError, JsonSerializerOptions())
-            }
+            FServerWebSocket.Create<'S, 'R, 'E> (onError, JsonSerializerOptions())
 
         static member Create<'S, 'R, 'E> () : FIO<FServerWebSocket<'S, 'R, exn>, exn> =
-            fio {
-                return! FServerWebSocket.Create<'S, 'R, exn> (id, JsonSerializerOptions())
-            }
+            FServerWebSocket.Create<'S, 'R, exn> (id, JsonSerializerOptions())
 
         member _.Start<'E> url : FIO<unit, 'E> =
             fio {
@@ -244,27 +241,33 @@ module WebSockets =
                 do! !<<< (fun () -> listener.Start())
             }
 
-        member _.Accept<'S, 'R, 'E> () : FIO<FWebSocket<'S, 'R, 'E>, 'E> =
+        member _.Accept<'S, 'R, 'E> (subProtocol: string | null) : FIO<FWebSocket<'S, 'R, 'E>, 'E> =
             fio {
                 let! listenerCtxTask = !<<< (fun () -> listener.GetContextAsync())
                 let! listenerCtx = !<<~~ listenerCtxTask
                 
                 if listenerCtx.Request.IsWebSocketRequest then
-                    let! ctxTask = !<<< (fun () ->
-                        listenerCtx.AcceptWebSocketAsync(
-                            subProtocol = null))
+                    let! ctxTask = !<<< (fun () -> listenerCtx.AcceptWebSocketAsync subProtocol)
                     let! ctx = !<<~~ ctxTask
                     return! FWebSocket.Create<'S, 'R, 'E> (ctx, listenerCtx, onError, options)
                 else
                     do! !<<< (fun () -> listenerCtx.Response.StatusCode <- 400)
                     do! !<<< (fun () -> listenerCtx.Response.Close())
-                    let! error = !- (onError <| Exception("Not a WebSocket request"))
+                    let! error = !- (onError <| Exception "Not a WebSocket request")
                     return error
             }
+        
+        member this.Accept<'S, 'R, 'E> () : FIO<FWebSocket<'S, 'R, 'E>, 'E> =
+            this.Accept<'S, 'R, 'E> null
 
         member _.Close<'E> () : FIO<unit, 'E> =
             fio {
                 do! !<<< (fun () -> listener.Stop())
+            }
+
+        member _.Abort<'E> () : FIO<unit, 'E> =
+            fio {
+                do! !<<< (fun () -> listener.Abort())
             }
 
     /// Functional Client WebSocket
@@ -288,59 +291,73 @@ module WebSockets =
             }
         
         static member Create<'S, 'R, 'E> (options: JsonSerializerOptions) : FIO<FClientWebSocket<'S, 'R, exn>, exn> =
-            fio {
-                return! FClientWebSocket.Create<'S, 'R, exn> (id, options)
-            }
+            FClientWebSocket.Create<'S, 'R, exn> (id, options)
         
         static member Create<'S, 'R, 'E> (onError: exn -> 'E) : FIO<FClientWebSocket<'S, 'R, 'E>, 'E> =
-            fio {
-                return! FClientWebSocket.Create<'S, 'R, 'E> (onError, JsonSerializerOptions())
-            }
-        
+            FClientWebSocket.Create<'S, 'R, 'E> (onError, JsonSerializerOptions())
+
         static member Create<'S, 'R, 'E> () : FIO<FClientWebSocket<'S, 'R, exn>, exn> =
-            fio {
-                return! FClientWebSocket.Create<'S, 'R, exn> (id, JsonSerializerOptions())
-            }
+            FClientWebSocket.Create<'S, 'R, exn> (id, JsonSerializerOptions())
         
-        member _.Connect<'E> url : FIO<unit, 'E> =
+        member _.Connect<'E> (url, cancellationToken: CancellationToken) : FIO<unit, 'E> =
             fio {
                 let! uri = !<<< (fun () -> Uri url)
-                let! connectTask = !<<< (fun () ->
-                    clientWebSocket.ConnectAsync(
-                        uri, CancellationToken.None))
+                let! connectTask = !<<< (fun () -> clientWebSocket.ConnectAsync(uri, cancellationToken))
                 do! !<<~ connectTask
             }
-        
-        member _.Send<'S, 'E> (msg: 'S) : FIO<unit, 'E> =
+
+        member this.Connect<'E> url : FIO<unit, 'E> =
+            this.Connect<'E> (url, CancellationToken.None)
+            
+        member _.Send<'S, 'E> (msg: 'S, messageType: WebSocketMessageType, endOfMessage: bool, cancellationToken: CancellationToken) : FIO<unit, 'E> =
             fio {
                 let! json = !<<< (fun () -> JsonSerializer.Serialize(msg, options))
                 let! buffer = !<<< (fun () -> Encoding.UTF8.GetBytes json)
-                let! sendTask = !<<< (fun () ->
-                    clientWebSocket.SendAsync(
-                        ArraySegment buffer,
-                        WebSocketMessageType.Text,
-                        true, CancellationToken.None))
+                let! sendTask = !<<< (fun () -> clientWebSocket.SendAsync(ArraySegment buffer, messageType, endOfMessage, cancellationToken))
                 do! !<<~ sendTask
             }
 
-        member _.Receive<'R, 'E> () : FIO<'R, 'E> =
+        member this.Send<'S, 'E> (msg: 'S, endOfMessage: bool, cancellationToken: CancellationToken) : FIO<unit, 'E> =
+            this.Send<'S, 'E> (msg, WebSocketMessageType.Text, endOfMessage, cancellationToken)
+
+        member this.Send<'S, 'E> (msg: 'S, cancellationToken: CancellationToken) : FIO<unit, 'E> =
+            this.Send<'S, 'E> (msg, true, cancellationToken)
+
+        member this.Send<'S, 'E> (msg: 'S) : FIO<unit, 'E> =
+            this.Send<'S, 'E> (msg, true, CancellationToken.None)
+
+        member _.Receive<'R, 'E> (cancellationToken: CancellationToken, bufferSize: int) : FIO<'R, 'E> =
             fio {
-                let! buffer = !<<< (fun () -> Array.zeroCreate 1024)
-                let! receiveTask = !<<< (fun () ->
-                    clientWebSocket.ReceiveAsync(
-                        ArraySegment buffer,
-                        CancellationToken.None))
+                let! buffer = !<<< (fun () -> Array.zeroCreate bufferSize)
+                let! receiveTask = !<<< (fun () -> clientWebSocket.ReceiveAsync(ArraySegment buffer, cancellationToken))
                 let! receiveResult = !<<~~ receiveTask
                 let! json = !<<< (fun () -> Encoding.UTF8.GetString(buffer, 0, receiveResult.Count))
                 let! msg = !<<< (fun () -> JsonSerializer.Deserialize<'R>(json, options))
                 return msg
             }
 
-        member _.Close<'E> () : FIO<unit, 'E> =
+        member this.Receive<'R, 'E> (cancellationToken: CancellationToken) : FIO<'R, 'E> =
+            this.Receive<'R, 'E> (cancellationToken, 1024)
+        
+        member this.Receive<'R, 'E> () : FIO<'R, 'E> =
+            this.Receive<'R, 'E> (CancellationToken.None, 1024)
+
+        member _.Close<'E> (closeStatus: WebSocketCloseStatus, statusDescription: string, cancellationToken: CancellationToken) : FIO<unit, 'E> =
             fio {
-                let! closeTask = !<<< (fun () ->
-                    clientWebSocket.CloseAsync(
-                        WebSocketCloseStatus.NormalClosure,
-                        "Closing", CancellationToken.None))
+                let! closeTask = !<<< (fun () -> clientWebSocket.CloseAsync(closeStatus, statusDescription, cancellationToken))
                 do! !<<~ closeTask
+            }
+
+        member this.Close<'E> (closeStatus: WebSocketCloseStatus, statusDescription: string) : FIO<unit, 'E> =
+            this.Close<'E> (closeStatus, statusDescription, CancellationToken.None)
+
+        member this.Close<'E> (cancellationToken: CancellationToken) : FIO<unit, 'E> =
+            this.Close<'E> (WebSocketCloseStatus.NormalClosure, "Normal Closure", cancellationToken)
+
+        member this.Close<'E> () : FIO<unit, 'E> =
+            this.Close<'E> CancellationToken.None
+
+        member _.Abort<'E> () : FIO<unit, 'E> =
+            fio {
+                do! !<<< (fun () -> clientWebSocket.Abort())
             }
