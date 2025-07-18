@@ -11,7 +11,7 @@
 		<PackageIcon>fio_logo_wide.png</PackageIcon>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageProjectUrl>https://github.com/fs-fio/FIO</PackageProjectUrl>
-		<Version>0.0.30-alpha</Version>
+		<Version>0.0.31-alpha</Version>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -51,6 +51,11 @@
 			<Pack>True</Pack>
 			<PackagePath>\</PackagePath>
 		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\FSharp.FIO.Lib\bin\$(Configuration)\net9.0\FSharp.FIO.Lib.dll" Pack="true" PackagePath="lib\net9.0\" />
+		<None Include="..\FSharp.FIO.App\bin\$(Configuration)\net9.0\FSharp.FIO.App.dll" Pack="true" PackagePath="lib\net9.0\" />
 	</ItemGroup>
 
 	<ItemGroup>
