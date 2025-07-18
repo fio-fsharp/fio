@@ -493,7 +493,7 @@ and FIO<'R, 'E> =
         ConcurrentEffect (this.Upcast (), fiber, fiber.Internal)
 
     /// <summary>
-    /// Binds a continuation to the result of an effect. If the ef½fect fails, the error is immediately returned.
+    /// Binds a continuation to the result of an effect. If the effect fails, the error is immediately returned.
     /// </summary>
     /// <typeparam name="R">The result type of the applied effect.</typeparam>
     /// <typeparam name="R1">The result type.</typeparam>
