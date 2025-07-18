@@ -4,7 +4,7 @@
 (* All rights reserved                                                                       *)
 (*********************************************************************************************)
 
-module internal FSharp.FIO.Runtime.DeadlockDetector
+module internal FSharp.FIO.Runtime.Tools.DeadlockDetector
 
 open FSharp.FIO.DSL
 

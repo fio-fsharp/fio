@@ -19,19 +19,37 @@ module private Utils =
         contStack.RemoveAt lastIndex
         stackFrame
 
-/// Functional runtime
+/// <summary>
+/// Represents a functional runtime for interpreting FIO effects.
+/// </summary>
 [<AbstractClass>]
 type FRuntime internal () =
-
+    /// <summary>
+    /// Gets the name of the runtime.
+    /// </summary>
     abstract member Name : string
 
+    /// <summary>
+    /// Gets the configuration string for the runtime.
+    /// </summary>
     abstract member ConfigString : string
 
     override this.ConfigString =
         this.Name
 
+    /// <summary>
+    /// Runs an FIO effect and returns a fiber representing its execution.
+    /// </summary>
+    /// <typeparam name="R">The result type.</typeparam>
+    /// <typeparam name="E">The error type.</typeparam>
+    /// <param name="eff">The FIO effect to run.</param>
+    /// <returns>A fiber representing the running effect.</returns>
     abstract member Run<'R, 'E> : FIO<'R, 'E> -> Fiber<'R, 'E>
 
+    /// <summary>
+    /// Gets a file-friendly string representation of the runtime.
+    /// </summary>
+    /// <returns>A string suitable for file names.</returns>
     member this.ToFileString () =
         this.ToString()
             .ToLowerInvariant()
@@ -43,12 +61,17 @@ type FRuntime internal () =
     override this.ToString () =
         this.ConfigString
 
+/// <summary>
+/// Represents the configuration for a worker runtime.
+/// </summary>
 type WorkerConfig =
     { EWC: int
       EWS: int
       BWC: int }
 
-/// Functional worker runtime
+/// <summary>
+/// Represents a functional worker runtime for interpreting FIO effects.
+/// </summary>
 [<AbstractClass>]
 type FWorkerRuntime internal (config: WorkerConfig) as this =
     inherit FRuntime ()
@@ -61,6 +84,10 @@ type FWorkerRuntime internal (config: WorkerConfig) as this =
 
     do validateWorkerConfiguration ()
 
+    /// <summary>
+    /// Gets the worker configuration.
+    /// </summary>
+    /// <returns>The worker configuration.</returns>
     member _.GetWorkerConfiguration () =
         config
 

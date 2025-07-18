@@ -4,6 +4,9 @@
 (* All rights reserved                                                                       *)
 (*********************************************************************************************)
 
+/// <summary>
+/// Provides the direct runtime for interpreting FIO effects, executing effects on the current thread.
+/// </summary>
 module FSharp.FIO.Runtime.Direct
 
 open FSharp.FIO.DSL
@@ -12,6 +15,9 @@ open System
 open System.Threading
 open System.Threading.Tasks
 
+/// <summary>
+/// Represents the direct runtime for FIO, interpreting effects on the current thread.
+/// </summary>
 type Runtime () =
     inherit FRuntime ()
 
