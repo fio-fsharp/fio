@@ -152,24 +152,24 @@ type PingPongMatchApp() =
     let pinger (chan1: Channel<Message>) (chan2: Channel<Message>) =
         fio {
             let! ping = chan1 <-- Ping
-            do! FConsole.PrintLine ($"pinger sent: %A{ping}", _.Message)
+            do! FConsole.PrintLineMapError ($"pinger sent: %A{ping}", _.Message)
             
             match! !<-- chan2 with
-            | Pong -> do! FConsole.PrintLine ($"pinger received: %A{Pong}", _.Message)
+            | Pong -> do! FConsole.PrintLineMapError ($"pinger received: %A{Pong}", _.Message)
             | Ping -> return! !- $"pinger received %A{Ping} when %A{Pong} was expected!"
         }
 
     let ponger (chan1: Channel<Message>) (chan2: Channel<Message>) =
         fio {
             match! !<-- chan1 with
-            | Ping -> do! FConsole.PrintLine ($"ponger received: %A{Ping}", _.Message)
+            | Ping -> do! FConsole.PrintLineMapError ($"ponger received: %A{Ping}", _.Message)
             | Pong -> return! !- $"ponger received %A{Pong} when %A{Ping} was expected!"
             
             let! sentMsg =
                 match Random().Next(0, 2) with
                 | 0 -> chan2 <-- Pong
                 | _ -> chan2 <-- Ping
-            do! FConsole.PrintLine ($"ponger sent: %A{sentMsg}", _.Message)
+            do! FConsole.PrintLineMapError ($"ponger sent: %A{sentMsg}", _.Message)
         }
 
     override _.effect =
@@ -450,7 +450,7 @@ type SocketApp(ip: string, port: int) =
 
     override _.effect =
         fio {
-            do! server ip port <~> client ip port
+            do! client ip port <~> server ip port
         }
 
 type WebSocketApp(serverUrl, clientUrl) =
@@ -519,7 +519,7 @@ type WebSocketApp(serverUrl, clientUrl) =
 
     override _.effect =
         fio {
-            do! server serverUrl <~> client clientUrl
+            do! client clientUrl <~> server serverUrl
         }
         
 WelcomeApp().Run ()

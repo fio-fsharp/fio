@@ -2,17 +2,16 @@
 
 	<PropertyGroup>
 		<TargetFramework>net9.0</TargetFramework>
-		<OutputType>Exe</OutputType>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<WarningsAsErrors>true</WarningsAsErrors>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<Compile Include="Program.fs" />
+		<Compile Include="App.fs" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\src\FSharp.FIO\FSharp.FIO.fsproj" />
-		<ProjectReference Include="..\..\src\FSharp.FIO.Lib\FSharp.FIO.Lib.fsproj" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -4,6 +4,9 @@
 (* All rights reserved                                                                       *)
 (*********************************************************************************************)
 
+/// <summary>
+/// Provides the concurrent (advanced, event-driven) runtime for interpreting FIO effects, enabling scalable and highly concurrent execution.
+/// </summary>
 module FSharp.FIO.Runtime.Concurrent
 
 open FSharp.FIO.DSL
@@ -96,6 +99,9 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
         member _.Dispose () =
             cancellationTokenSource.Cancel ()
 
+/// <summary>
+/// Represents the concurrent runtime for FIO, interpreting effects using event-driven concurrency and advanced scheduling.
+/// </summary>
 and Runtime (config: WorkerConfig) as this =
     inherit FWorkerRuntime(config)
 
@@ -148,7 +154,7 @@ and Runtime (config: WorkerConfig) as this =
             let mutable loop = true
             while loop do
                 if currentContStack.Count = 0 then
-                    result <- (Success res, ResizeArray<ContStackFrame> (), Evaluated)
+                    result <- Success res, ResizeArray<ContStackFrame> (), Evaluated
                     completed <- true
                     loop <- false
                 else
@@ -164,7 +170,7 @@ and Runtime (config: WorkerConfig) as this =
             let mutable loop = true
             while loop do
                 if currentContStack.Count = 0 then
-                    result <- (Failure err, ResizeArray<ContStackFrame> (), Evaluated)
+                    result <- Failure err, ResizeArray<ContStackFrame> (), Evaluated
                     completed <- true
                     loop <- false
                 else
@@ -186,7 +192,7 @@ and Runtime (config: WorkerConfig) as this =
         task {
             while not completed do
                 if currentEWSteps = 0 then
-                    result <- (currentEff, currentContStack, RescheduleForRunning)
+                    result <- currentEff, currentContStack, RescheduleForRunning
                     completed <- true
                 else
                     currentEWSteps <- currentEWSteps - 1
@@ -213,7 +219,7 @@ and Runtime (config: WorkerConfig) as this =
                         else
                             do! chan.AddBlockingWorkItem
                                 <| WorkItem.Create (ReceiveChan chan, workItem.IFiber, currentContStack, Skipped)
-                            result <- (Success (), ResizeArray<ContStackFrame> (), Skipped)
+                            result <- Success (), ResizeArray<ContStackFrame> (), Skipped
                             completed <- true
                     | ConcurrentEffect (eff, fiber, ifiber) ->
                         do! activeWorkItemChan.AddAsync
@@ -266,7 +272,7 @@ and Runtime (config: WorkerConfig) as this =
                             // TODO: This double check here fixes a race condition, but is not optimal.
                             if ifiber.Completed then
                                 do! ifiber.RescheduleBlockingWorkItems activeWorkItemChan
-                            result <- (Success (), ResizeArray<ContStackFrame> (), Skipped)
+                            result <- Success (), ResizeArray<ContStackFrame> (), Skipped
                             completed <- true
                     | AwaitTPLTask (task, onError) ->
                         try

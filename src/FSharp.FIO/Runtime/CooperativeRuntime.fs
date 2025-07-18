@@ -4,6 +4,9 @@
 (* All rights reserved                                                                       *)
 (*********************************************************************************************)
 
+/// <summary>
+/// Provides the cooperative (work-stealing) runtime for interpreting FIO effects, enabling concurrent and asynchronous execution across multiple workers.
+/// </summary>
 module FSharp.FIO.Runtime.Cooperative
 
 open FSharp.FIO.DSL
@@ -111,6 +114,9 @@ and private BlockingWorker (config: BlockingWorkerConfig) =
     member internal _.RescheduleForBlocking blockingData =
         config.ActiveBlockingDataChan.AddAsync blockingData
 
+/// <summary>
+/// Represents the cooperative runtime for FIO, interpreting effects concurrently using work-stealing and multiple workers.
+/// </summary>
 and Runtime (config: WorkerConfig) as this =
     inherit FWorkerRuntime(config)
     
@@ -164,7 +170,7 @@ and Runtime (config: WorkerConfig) as this =
             let mutable loop = true
             while loop do
                 if currentContStack.Count = 0 then
-                    result <- (Success res, ResizeArray<ContStackFrame> (), Evaluated)
+                    result <- Success res, ResizeArray<ContStackFrame> (), Evaluated
                     completed <- true
                     loop <- false
                 else
@@ -181,7 +187,7 @@ and Runtime (config: WorkerConfig) as this =
             let mutable loop = true
             while loop do
                 if currentContStack.Count = 0 then
-                    result <- (Failure err, ResizeArray<ContStackFrame> (), Evaluated)
+                    result <- Failure err, ResizeArray<ContStackFrame> (), Evaluated
                     completed <- true
                     loop <- false
                 else
@@ -204,7 +210,7 @@ and Runtime (config: WorkerConfig) as this =
         task {
             while not completed do
                 if currentEWSteps = 0 then
-                    result <- (currentEff, currentContStack, RescheduleForRunning)
+                    result <- currentEff, currentContStack, RescheduleForRunning
                     completed <- true
                 else
                     currentEWSteps <- currentEWSteps - 1
@@ -230,7 +236,7 @@ and Runtime (config: WorkerConfig) as this =
                         else
                             let newPrevAction = RescheduleForBlocking <| BlockingChannel chan
                             currentPrevAction <- newPrevAction
-                            result <- (ReceiveChan chan, currentContStack, newPrevAction)
+                            result <- ReceiveChan chan, currentContStack, newPrevAction
                             completed <- true
                     | ConcurrentEffect (eff, fiber, ifiber) ->
                         do! activeWorkItemChan.AddAsync
@@ -281,7 +287,7 @@ and Runtime (config: WorkerConfig) as this =
                         else
                             let newPrevAction = RescheduleForBlocking <| BlockingIFiber ifiber
                             currentPrevAction <- newPrevAction
-                            result <- (AwaitFiber ifiber, currentContStack, newPrevAction)
+                            result <- AwaitFiber ifiber, currentContStack, newPrevAction
                             completed <- true
                     | AwaitTPLTask (task, onError) ->
                         try
